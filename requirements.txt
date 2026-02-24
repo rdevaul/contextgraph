@@ -1,0 +1,11 @@
+# Core (stdlib only for store, features fallback, tagger, assembler, cli)
+# Optional: install for better NLP in features.py
+spacy>=3.7
+# python -m spacy download en_core_web_sm
+
+# Testing
+pytest>=8.0
+
+# Future (v0.2 - GP tagger evolution)
+# deap>=1.4
+# sentence-transformers>=3.0
