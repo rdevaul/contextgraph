@@ -61,15 +61,14 @@ def _make_pset() -> gp.PrimitiveSet:
 
     All primitives operate on floats; boolean semantics via threshold.
     """
-    pset = gp.PrimitiveSet("PREDICATE", 19)
+    pset = gp.PrimitiveSet("PREDICATE", 34)
 
     # Rename arguments to meaningful names for inspection
     for i, name in enumerate([
         "token_count", "has_code", "has_url", "is_question",
         "ent0", "ent1", "ent2", "ent3", "ent4",
         "ent5", "ent6", "ent7", "ent8", "ent9",
-        "kw0", "kw1", "kw2", "kw3", "kw4",
-    ]):
+    ] + [f"kw{j}" for j in range(20)]):
         pset.renameArguments(**{f"ARG{i}": name})
 
     # Logical ops (on floats: treat > 0.5 as True)
@@ -105,7 +104,17 @@ _ENTITY_VOCAB = [
 ]
 
 _KEYWORD_VOCAB = [
-    "security", "context", "tagger", "deployment", "shopping",
+    # Infrastructure / ops
+    "security", "deployment", "running", "launchctl", "service",
+    # Context / AI
+    "context", "tagger", "model", "prompt", "tokens",
+    # Voice PWA
+    "voice", "pwa", "transcri",  # matches transcription/transcribe/transcribed
+    "websocket", "audio",
+    # Projects
+    "shopping", "openclaw", "yapcad",
+    # Research
+    "corpus", "injection",
 ]
 
 
@@ -237,12 +246,16 @@ class GeneticTagger:
 
 def _evaluate_individual(individual, tag: str,
                          training_examples: List[Tuple[List[float], bool]],
-                         penalty: float = 0.01) -> Tuple[float]:
+                         penalty: float = 0.005) -> Tuple[float]:
     """
     Fitness function for a single tag's predicate.
 
     training_examples: [(feature_vector, should_have_tag)]
-    Fitness = accuracy - size_penalty (prefer smaller trees)
+    Fitness = balanced_accuracy - size_penalty
+
+    Balanced accuracy = (TPR + TNR) / 2, which prevents degenerate
+    always-True or always-False solutions from scoring well on
+    imbalanced datasets.
     """
     try:
         func = TOOLBOX.compile(expr=individual)
@@ -252,18 +265,25 @@ def _evaluate_individual(individual, tag: str,
     if not training_examples:
         return (0.5,)
 
-    correct = 0
+    tp = fp = tn = fn = 0
     for vec, label in training_examples:
         try:
             pred = float(func(*vec)) > 0.5
-            if pred == label:
-                correct += 1
+            if label:
+                if pred: tp += 1
+                else:    fn += 1
+            else:
+                if pred: fp += 1
+                else:    tn += 1
         except Exception:
-            pass
+            fn += 1 if label else (fp := fp)  # penalise crashes
 
-    accuracy = correct / len(training_examples)
+    tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0  # sensitivity
+    tnr = tn / (tn + fp) if (tn + fp) > 0 else 0.0  # specificity
+    balanced_acc = (tpr + tnr) / 2.0
+
     size_penalty = penalty * len(individual)
-    return (max(0.0, accuracy - size_penalty),)
+    return (max(0.0, balanced_acc - size_penalty),)
 
 
 def evolve_predicates_for_tag(

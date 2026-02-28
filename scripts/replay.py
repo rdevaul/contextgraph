@@ -19,11 +19,28 @@ from logger import iter_records
 from store import Message, MessageStore
 from features import extract_features
 from tagger import assign_tags
+from ensemble import EnsembleTagger
+from gp_tagger import GeneticTagger
 
 
 def replay(db_path: str, start_date: str | None, end_date: str | None,
            dry_run: bool, verbose: bool) -> None:
     store = MessageStore(db_path=db_path)
+
+    # Build ensemble: baseline + GP tagger (if available)
+    ensemble = EnsembleTagger(vote_threshold=0.3)
+    ensemble.register("v0-baseline", assign_tags, initial_weight=1.0)
+    gp_path = Path(__file__).parent.parent / "data" / "gp-tagger.pkl"
+    if gp_path.exists():
+        import pickle
+        with gp_path.open("rb") as f:
+            gp_tagger = pickle.load(f)
+        ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, initial_weight=0.8)
+        if verbose:
+            print(f"  Ensemble: baseline + GP tagger ({gp_tagger.tagger_id})")
+    else:
+        if verbose:
+            print("  Ensemble: baseline only (no GP tagger found)")
 
     total = skipped = loaded = 0
     for record in iter_records(start_date=start_date, end_date=end_date):
@@ -39,9 +56,10 @@ def replay(db_path: str, start_date: str | None, end_date: str | None,
             skipped += 1
             continue
 
-        # Tag fresh
+        # Tag with ensemble
         features = extract_features(record.user_text, record.assistant_text)
-        tags = assign_tags(features, record.user_text, record.assistant_text)
+        ens_result = ensemble.assign(features, record.user_text, record.assistant_text)
+        tags = ens_result.tags
 
         msg = Message(
             id=record.id,
