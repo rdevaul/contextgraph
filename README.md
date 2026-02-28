@@ -90,3 +90,13 @@ python3 -m pytest tests/ -v
 | `assembler.py` | Context assembly policy |
 | `cli.py` | CLI for testing |
 | `tests/` | pytest suite |
+
+## Documentation
+
+- [`docs/CONTEXT_TRANSITION.md`](docs/CONTEXT_TRANSITION.md) — Design doc: transitioning from linear context window to graph-primary context assembly. Covers the problem statement, transition phases, key design questions, and how this differs from standard RAG.
+
+## Current Status (Feb 2026)
+
+- **Phase 1 (Passive Collection)** — active. Harvesting ~40-70 interactions/night, nightly GP retraining, 159 messages tagged across 20 topics.
+- **Phase 2 (Shadow Mode)** — next milestone. Wire quality agent to measure context density and reframing rate without changing user experience.
+- **Phase 3 (Hybrid Injection)** — pending Phase 2 validation.
