@@ -1,6 +1,15 @@
 __pycache__/
 *.pyc
 *.db
+*.pkl
 .pytest_cache/
 *.egg-info/
 .env
+
+# Private data — interaction logs, shadow output, quality scores, trained models
+data/interactions/
+data/shadow-log.jsonl
+data/quality-state.json
+data/harvester-state.json
+data/shadow-report.json
+data/gp-tagger.pkl
