@@ -32,7 +32,7 @@ from features import extract_features
 from gp_tagger import GeneticTagger
 from logger import iter_records
 from quality import QualityAgent
-from reframing import detect_reframing
+from reframing import detect_reframing, is_system_artifact
 from store import MessageStore
 from tagger import assign_tags
 
@@ -61,33 +61,34 @@ def build_ensemble(verbose: bool = False) -> EnsembleTagger:
     return ensemble
 
 
-def simulate_linear_window(store: MessageStore, current_msg_id: str,
-                           current_ts: float, token_budget: int) -> dict:
+def simulate_linear_window(store: MessageStore, current_ts: float,
+                           token_budget: int) -> dict:
     """
-    Simulate a linear recency-only window (the baseline to beat).
+    Simulate a linear recency-only window *as of* current_ts (the baseline to beat).
 
-    Returns stats about what a pure-recency approach would assemble.
+    Retrieves all messages prior to current_ts, sorts newest-first, and packs
+    to the token budget — exactly what a sliding window would have provided.
     """
-    recent = store.get_recent(50)
-    # Filter to messages before current one
-    prior = [m for m in recent if m.timestamp < current_ts]
-
+    # Pull all messages in the store that predate this interaction
+    # get_by_tag with a broad query isn't available, so use get_recent with
+    # a large N and filter by timestamp
+    all_prior = [m for m in store.get_recent(2000) if m.timestamp < current_ts]
+    # Already newest-first from get_recent
     tokens = 0
-    count = 0
-    for msg in prior:
+    packed = []
+    for msg in all_prior:
         cost = msg.token_count if msg.token_count > 0 else \
             max(1, int(len((msg.user_text + " " + msg.assistant_text).split()) * 1.3))
         if tokens + cost > token_budget:
             break
+        packed.append(msg)
         tokens += cost
-        count += 1
 
     return {
-        "message_count": count,
+        "message_count": len(packed),
         "total_tokens": tokens,
-        "unique_tags": list(set(
-            tag for msg in prior[:count] for tag in msg.tags
-        )),
+        "unique_tags": sorted(set(tag for m in packed for tag in m.tags)),
+        "tag_count": len(set(tag for m in packed for tag in m.tags)),
     }
 
 
@@ -128,7 +129,11 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
         "graph_topic_retrievals": 0,      # interactions where graph added topic context
         "graph_mean_density": 0.0,
         "graph_mean_topic_count": 0.0,
+        "graph_mean_total": 0.0,
         "linear_mean_count": 0.0,
+        "linear_mean_tokens": 0.0,
+        "graph_mean_tokens": 0.0,
+        "novel_from_graph_total": 0,
         "reframing_total": 0,
         "reframing_rate": 0.0,
         "graph_unique_tags_surfaced": set(),
@@ -139,8 +144,10 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
     print()
 
     for i, record in enumerate(records):
-        # Skip very short exchanges
+        # Skip very short exchanges and system artifacts
         if len(record.user_text.strip()) < 10:
+            continue
+        if is_system_artifact(record.user_text):
             continue
 
         metrics["total_interactions"] += 1
@@ -153,9 +160,8 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
         # 2. Graph-based assembly
         assembly = assembler.assemble(record.user_text, inferred_tags)
 
-        # 3. Linear baseline simulation
-        linear = simulate_linear_window(store, record.id, record.interaction_at,
-                                        token_budget)
+        # 3. Linear baseline simulation (as of this interaction's timestamp)
+        linear = simulate_linear_window(store, record.interaction_at, token_budget)
 
         # 4. Reframing detection
         reframe = detect_reframing(record.user_text)
@@ -171,11 +177,15 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
             recent_user_texts=user_text_window,
         )
 
-        # 6. Compute overlap: how many graph-assembled messages would NOT
-        #    have been in the linear window?
-        graph_ids = {m.id for m in assembly.messages}
-        # Linear window is just most recent N — approximate with recency layer
-        novel_from_graph = assembly.topic_count  # topic layer = stuff recency missed
+        # 6. Compute graph vs. linear comparison
+        # How many graph messages would NOT have been in the linear window?
+        linear_msg_count = linear["message_count"]
+        graph_total = len(assembly.messages)
+        # Novel context = topic-retrieved messages (recency layer overlaps with linear)
+        novel_from_graph = assembly.topic_count
+        # Tag diversity: graph can surface older, on-topic messages from many tags
+        graph_tag_count = len(set(assembly.tags_used))
+        linear_tag_count = linear["tag_count"]
 
         # Log entry
         entry = {
@@ -184,14 +194,20 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
             "user_text_preview": record.user_text[:100],
             "inferred_tags": inferred_tags,
             "graph": {
-                "total_messages": len(assembly.messages),
+                "total_messages": graph_total,
                 "recency_count": assembly.recency_count,
                 "topic_count": assembly.topic_count,
                 "total_tokens": assembly.total_tokens,
                 "tags_used": assembly.tags_used,
+                "tag_count": graph_tag_count,
             },
             "linear": linear,
-            "novel_from_graph": novel_from_graph,
+            "comparison": {
+                "novel_from_graph": novel_from_graph,
+                "graph_tag_diversity": graph_tag_count,
+                "linear_tag_diversity": linear_tag_count,
+                "graph_advantage_msgs": graph_total - linear_msg_count,
+            },
             "reframing": {
                 "is_reframing": reframe.is_reframing,
                 "confidence": reframe.confidence,
@@ -210,7 +226,11 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
             metrics["graph_topic_retrievals"] += 1
         metrics["graph_mean_density"] += quality_score.context_density
         metrics["graph_mean_topic_count"] += assembly.topic_count
+        metrics["graph_mean_total"] += len(assembly.messages)
+        metrics["graph_mean_tokens"] += assembly.total_tokens
         metrics["linear_mean_count"] += linear["message_count"]
+        metrics["linear_mean_tokens"] += linear["total_tokens"]
+        metrics["novel_from_graph_total"] += novel_from_graph
         if reframe.is_reframing:
             metrics["reframing_total"] += 1
         metrics["graph_unique_tags_surfaced"].update(inferred_tags)
@@ -228,7 +248,10 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
     if n > 0:
         metrics["graph_mean_density"] /= n
         metrics["graph_mean_topic_count"] /= n
+        metrics["graph_mean_total"] /= n
+        metrics["graph_mean_tokens"] /= n
         metrics["linear_mean_count"] /= n
+        metrics["linear_mean_tokens"] /= n
         metrics["reframing_rate"] = metrics["reframing_total"] / n
         metrics["quality_mean_composite"] = sum(metrics["quality_scores"]) / n
     metrics["graph_unique_tags_surfaced"] = sorted(metrics["graph_unique_tags_surfaced"])
@@ -244,13 +267,21 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "token_budget": token_budget,
         "total_interactions": n,
-        "graph_topic_retrieval_rate": metrics["graph_topic_retrievals"] / n if n else 0,
-        "graph_mean_density": round(metrics["graph_mean_density"], 4),
-        "graph_mean_topic_count": round(metrics["graph_mean_topic_count"], 2),
-        "linear_mean_message_count": round(metrics["linear_mean_count"], 2),
+        "graph": {
+            "topic_retrieval_rate": round(metrics["graph_topic_retrievals"] / n, 4) if n else 0,
+            "mean_density": round(metrics["graph_mean_density"], 4),
+            "mean_topic_msgs": round(metrics["graph_mean_topic_count"], 2),
+            "mean_total_msgs": round(metrics["graph_mean_total"], 2),
+            "mean_tokens": round(metrics["graph_mean_tokens"], 0),
+            "novel_msgs_total": metrics["novel_from_graph_total"],
+            "unique_tags_surfaced": metrics["graph_unique_tags_surfaced"],
+        },
+        "linear": {
+            "mean_msgs": round(metrics["linear_mean_count"], 2),
+            "mean_tokens": round(metrics["linear_mean_tokens"], 0),
+        },
         "reframing_rate": round(metrics["reframing_rate"], 4),
         "quality_mean_composite": round(metrics.get("quality_mean_composite", 0), 4),
-        "unique_tags_surfaced": metrics["graph_unique_tags_surfaced"],
         "success_criteria": {
             "reframing_rate_target": "< 0.05",
             "reframing_rate_actual": round(metrics["reframing_rate"], 4),
@@ -270,37 +301,51 @@ def run_shadow(db_path: str, start_date: str | None, end_date: str | None,
 
 def print_report(report: dict) -> None:
     """Pretty-print the shadow report."""
-    print("\n" + "=" * 60)
+    g = report["graph"]
+    l = report["linear"]
+    sc = report["success_criteria"]
+
+    print("\n" + "=" * 62)
     print("  SHADOW MODE REPORT — Phase 2 Context Graph Evaluation")
-    print("=" * 60)
-    print(f"  Generated:    {report['generated_at']}")
-    print(f"  Interactions: {report['total_interactions']}")
-    print(f"  Token budget: {report['token_budget']}")
+    print("=" * 62)
+    print(f"  Generated:       {report['generated_at']}")
+    print(f"  Interactions:    {report['total_interactions']}")
+    print(f"  Token budget:    {report['token_budget']}")
     print()
 
-    print("  ── Graph Assembly ──")
-    print(f"  Topic retrieval rate:   {report['graph_topic_retrieval_rate']:.1%}")
-    print(f"  Mean density:           {report['graph_mean_density']:.1%}")
-    print(f"  Mean topic messages:    {report['graph_mean_topic_count']:.1f}")
-    print(f"  Tags surfaced:          {len(report['unique_tags_surfaced'])}")
+    print("  ── Graph Assembly ──────────────────────────────────────")
+    print(f"  Topic retrieval rate:   {g['topic_retrieval_rate']:.1%}")
+    print(f"  Mean density:           {g['mean_density']:.1%}   (topic / total assembled)")
+    print(f"  Mean total messages:    {g['mean_total_msgs']:.1f}")
+    print(f"  Mean topic messages:    {g['mean_topic_msgs']:.1f}   (above linear recency)")
+    print(f"  Mean tokens used:       {g['mean_tokens']:.0f}")
+    print(f"  Novel msgs delivered:   {g['novel_msgs_total']} total across all queries")
+    print(f"  Tags surfaced:          {len(g['unique_tags_surfaced'])}")
     print()
 
-    print("  ── Linear Baseline ──")
-    print(f"  Mean messages/window:   {report['linear_mean_message_count']:.1f}")
+    print("  ── Linear Baseline ─────────────────────────────────────")
+    print(f"  Mean messages/window:   {l['mean_msgs']:.1f}")
+    print(f"  Mean tokens used:       {l['mean_tokens']:.0f}")
     print()
 
-    print("  ── Quality Metrics ──")
+    adv_msgs = g["mean_total_msgs"] - l["mean_msgs"]
+    adv_toks = g["mean_tokens"] - l["mean_tokens"]
+    print("  ── Graph vs. Linear Advantage ──────────────────────────")
+    print(f"  Additional messages:    {adv_msgs:+.1f} per query")
+    print(f"  Additional tokens:      {adv_toks:+.0f} per query")
+    print()
+
+    print("  ── Quality Metrics ─────────────────────────────────────")
     print(f"  Reframing rate:         {report['reframing_rate']:.1%}")
     print(f"  Mean composite score:   {report['quality_mean_composite']:.3f}")
     print()
 
-    sc = report["success_criteria"]
-    print("  ── Success Criteria ──")
+    print("  ── Success Criteria ────────────────────────────────────")
     rf_icon = "✅" if sc["reframing_pass"] else "❌"
     dn_icon = "✅" if sc["density_pass"] else "❌"
     print(f"  {rf_icon} Reframing rate:  {sc['reframing_rate_actual']:.1%}  (target: {sc['reframing_rate_target']})")
     print(f"  {dn_icon} Context density: {sc['density_actual']:.1%}  (target: {sc['density_target']})")
-    print("=" * 60)
+    print("=" * 62)
 
 
 def main() -> None:
