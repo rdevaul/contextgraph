@@ -3,17 +3,24 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from store import MessageStore, Message
 from features import extract_features
 from tagger import assign_tags
 from ensemble import EnsembleTagger
-from assembler import ContextAssembler
+from assembler import ContextAssembler, _estimate_tokens
 from quality import QualityAgent
 from gp_tagger import GeneticTagger
+from tag_registry import get_registry
+from sticky import StickyPinManager
+from reframing import detect_reference
 import pickle
 import os
+import json
+from typing import Optional
+from collections import Counter
 
 app = FastAPI()
 
@@ -29,10 +36,23 @@ class IngestRequest(BaseModel):
     timestamp: float
     user_id: str = Field(None, nullable=True)
 
+class ToolState(BaseModel):
+    last_turn_had_tools: bool
+    pending_chain_ids: list[str] = Field(default_factory=list)
+
 class AssembleRequest(BaseModel):
     user_text: str
-    tags: list[str] = Field(None, nullable=True)
+    tags: list[str] | None = None
     token_budget: int = 4000
+    tool_state: ToolState | None = None
+
+class PinRequest(BaseModel):
+    message_ids: list[str]
+    reason: str
+    ttl_turns: int = 20
+
+class UnpinRequest(BaseModel):
+    pin_id: str
 
 class CompareResponse(BaseModel):
     graph_assembly: dict
@@ -41,6 +61,7 @@ class CompareResponse(BaseModel):
 store = MessageStore()
 quality_agent = QualityAgent()
 ensemble = EnsembleTagger(quality_agent=quality_agent)
+pin_manager = StickyPinManager()
 
 gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
 if gp_tagger_path.exists():
@@ -88,17 +109,63 @@ def ingest(request: IngestRequest):
 @app.post("/assemble", response_model=dict)
 def assemble(request: AssembleRequest):
     try:
+        # Tick the pin manager to expire stale pins
+        expired = pin_manager.tick()
+
+        # Handle tool_state auto-pinning
+        if request.tool_state and request.tool_state.last_turn_had_tools:
+            # Auto-create or extend tool chain pin
+            chain_ids = request.tool_state.pending_chain_ids
+            if chain_ids:
+                # Calculate token cost for the chain
+                total_tokens = 0
+                for msg_id in chain_ids:
+                    msg = store.get_by_id(msg_id)
+                    if msg:
+                        total_tokens += _estimate_tokens(msg)
+
+                pin_manager.update_or_create_tool_chain_pin(
+                    message_ids=chain_ids,
+                    reason="Active tool chain in progress",
+                    total_tokens=total_tokens,
+                    ttl_turns=10
+                )
+
+        # Handle reference detection
+        if detect_reference(request.user_text):
+            # Find the most recent substantial work thread
+            # (defined as: a sequence of ≥3 messages with tool-like activity)
+            # For now, we'll pin the most recent 5 messages as a heuristic
+            recent = store.get_recent(5)
+            if len(recent) >= 3:
+                msg_ids = [msg.id for msg in recent]
+                total_tokens = sum(_estimate_tokens(msg) for msg in recent)
+                pin_manager.add_pin(
+                    message_ids=msg_ids,
+                    pin_type="reference",
+                    reason=f"Reference detected: '{request.user_text[:50]}...'",
+                    ttl_turns=5,
+                    total_tokens=total_tokens
+                )
+
         features = extract_features(request.user_text, "")  # Empty assistant_text for incoming message
         if not request.tags:
             request.tags = ensemble.assign(features, request.user_text, "").tags
+
+        # Get pinned message IDs
+        pinned_ids = pin_manager.get_pinned_message_ids()
+
         assembler = ContextAssembler(store, token_budget=request.token_budget)
-        result = assembler.assemble(request.user_text, request.tags)
+        result = assembler.assemble(request.user_text, request.tags, pinned_message_ids=pinned_ids)
+
         return {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
             "total_tokens": result.total_tokens,
+            "sticky_count": result.sticky_count,
             "recency_count": result.recency_count,
             "topic_count": result.topic_count,
-            "tags_used": result.tags_used
+            "tags_used": result.tags_used,
+            "expired_pins": expired
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -179,6 +246,272 @@ def compare(request: TagRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ── Comparison Log Endpoints ───────────────────────────────────────────────────
+
+@app.get("/comparison-log", response_model=list)
+def get_comparison_log(limit: Optional[int] = Query(None, description="Maximum number of entries to return")):
+    """Return comparison log entries from ~/.tag-context/comparison-log.jsonl (most recent first)."""
+    try:
+        log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
+        if not log_path.exists():
+            return []
+
+        entries = []
+        with open(log_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    entries.append(json.loads(line))
+
+        # Most recent first
+        entries.reverse()
+
+        if limit is not None and limit > 0:
+            entries = entries[:limit]
+
+        return entries
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/comparison-stats", response_model=dict)
+def get_comparison_stats():
+    """Compute aggregate statistics from the comparison log."""
+    try:
+        log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
+        if not log_path.exists():
+            return {
+                "total_turns": 0,
+                "avg_graph_tokens": 0,
+                "avg_linear_tokens": 0,
+                "avg_graph_messages": 0,
+                "avg_linear_messages": 0,
+                "avg_tags_per_query": 0,
+                "efficiency_ratio": 0,
+                "token_savings_pct": 0,
+                "time_series": [],
+                "tag_frequency": {}
+            }
+
+        entries = []
+        with open(log_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    entries.append(json.loads(line))
+
+        if not entries:
+            return {
+                "total_turns": 0,
+                "avg_graph_tokens": 0,
+                "avg_linear_tokens": 0,
+                "avg_graph_messages": 0,
+                "avg_linear_messages": 0,
+                "avg_tags_per_query": 0,
+                "efficiency_ratio": 0,
+                "token_savings_pct": 0,
+                "time_series": [],
+                "tag_frequency": {}
+            }
+
+        total_turns = len(entries)
+        total_graph_tokens = sum(e["graph_assembly"]["tokens"] for e in entries)
+        total_linear_tokens = sum(e["linear_would_have"]["tokens"] for e in entries)
+        total_graph_messages = sum(e["graph_assembly"]["messages"] for e in entries)
+        total_linear_messages = sum(e["linear_would_have"]["messages"] for e in entries)
+
+        avg_graph_tokens = total_graph_tokens / total_turns
+        avg_linear_tokens = total_linear_tokens / total_turns
+        avg_graph_messages = total_graph_messages / total_turns
+        avg_linear_messages = total_linear_messages / total_turns
+
+        # Calculate tag usage
+        all_tags = []
+        for entry in entries:
+            all_tags.extend(entry["graph_assembly"]["tags"])
+
+        avg_tags_per_query = len(all_tags) / total_turns if total_turns > 0 else 0
+
+        # Efficiency ratio: (linear - graph) / linear = token savings
+        if total_linear_tokens > 0:
+            efficiency_ratio = (total_linear_tokens - total_graph_tokens) / total_linear_tokens
+            token_savings_pct = efficiency_ratio * 100
+        else:
+            efficiency_ratio = 0
+            token_savings_pct = 0
+
+        # Time series data (most recent 50 entries, chronological order)
+        time_series = []
+        recent_entries = entries[-50:] if len(entries) > 50 else entries
+        for i, entry in enumerate(recent_entries):
+            time_series.append({
+                "index": i,
+                "timestamp": entry.get("timestamp", ""),
+                "graph_tokens": entry["graph_assembly"]["tokens"],
+                "linear_tokens": entry["linear_would_have"]["tokens"],
+                "graph_messages": entry["graph_assembly"]["messages"],
+                "linear_messages": entry["linear_would_have"]["messages"]
+            })
+
+        # Tag frequency
+        tag_counter = Counter(all_tags)
+        tag_frequency = dict(tag_counter.most_common(20))  # Top 20 tags
+
+        return {
+            "total_turns": total_turns,
+            "avg_graph_tokens": round(avg_graph_tokens, 2),
+            "avg_linear_tokens": round(avg_linear_tokens, 2),
+            "avg_graph_messages": round(avg_graph_messages, 2),
+            "avg_linear_messages": round(avg_linear_messages, 2),
+            "avg_tags_per_query": round(avg_tags_per_query, 2),
+            "efficiency_ratio": round(efficiency_ratio, 4),
+            "token_savings_pct": round(token_savings_pct, 2),
+            "time_series": time_series,
+            "tag_frequency": tag_frequency
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Dashboard Endpoint ─────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
+def get_dashboard():
+    """Serve the context graph dashboard."""
+    try:
+        dashboard_path = Path(__file__).parent / "dashboard.html"
+        with open(dashboard_path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading dashboard: {str(e)}")
+
+# ── Tag Registry Endpoints ─────────────────────────────────────────────────────
+
+@app.get("/registry", response_model=dict)
+def get_tag_registry():
+    """Return current tag registry state (core/candidate/archived tags with metadata)."""
+    try:
+        registry = get_registry()
+        return registry.get_all_tags()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/registry/promote", response_model=dict)
+def force_promote_tag(tag_name: str):
+    """Force-promote a candidate tag to core."""
+    try:
+        registry = get_registry()
+        success = registry.force_promote(tag_name)
+        if success:
+            return {"success": True, "message": f"Tag '{tag_name}' promoted to core"}
+        else:
+            raise HTTPException(status_code=400, detail=f"Cannot promote tag '{tag_name}' (not a candidate or doesn't exist)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/registry/demote", response_model=dict)
+def force_demote_tag(tag_name: str):
+    """Force-archive a core tag."""
+    try:
+        registry = get_registry()
+        success = registry.force_demote(tag_name)
+        if success:
+            return {"success": True, "message": f"Tag '{tag_name}' archived"}
+        else:
+            raise HTTPException(status_code=400, detail=f"Cannot demote tag '{tag_name}' (not a core tag or doesn't exist)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/registry/tick", response_model=dict)
+def registry_tick():
+    """Run promotion and demotion cycle on tag registry."""
+    try:
+        registry = get_registry()
+        promoted = registry.promote_candidates()
+        demoted = registry.demote_stale()
+        return {
+            "promoted": promoted,
+            "demoted": demoted,
+            "message": f"Promoted {len(promoted)} candidates, archived {len(demoted)} stale tags"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Sticky Pin Endpoints ──────────────────────────────────────────────────
+
+@app.post("/pin", response_model=dict)
+def create_pin(request: PinRequest):
+    """Create an explicit pin for specific messages."""
+    try:
+        # Calculate total tokens for the pinned messages
+        total_tokens = 0
+        for msg_id in request.message_ids:
+            msg = store.get_by_id(msg_id)
+            if msg:
+                total_tokens += _estimate_tokens(msg)
+
+        pin_id = pin_manager.add_pin(
+            message_ids=request.message_ids,
+            pin_type="explicit",
+            reason=request.reason,
+            ttl_turns=request.ttl_turns,
+            total_tokens=total_tokens
+        )
+
+        return {
+            "success": True,
+            "pin_id": pin_id,
+            "message": f"Created pin with {len(request.message_ids)} messages"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/unpin", response_model=dict)
+def remove_pin(request: UnpinRequest):
+    """Remove a pin by ID."""
+    try:
+        success = pin_manager.remove_pin(request.pin_id)
+        if success:
+            return {
+                "success": True,
+                "message": f"Pin {request.pin_id} removed"
+            }
+        else:
+            raise HTTPException(status_code=404, detail=f"Pin {request.pin_id} not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/pins", response_model=dict)
+def get_pins():
+    """Get all active pins with their status."""
+    try:
+        active_pins = pin_manager.get_active_pins()
+        pins_data = []
+
+        for pin in active_pins:
+            pins_data.append({
+                "pin_id": pin.pin_id,
+                "pin_type": pin.pin_type,
+                "message_ids": pin.message_ids,
+                "reason": pin.reason,
+                "ttl_turns": pin.ttl_turns,
+                "turns_elapsed": pin.turns_elapsed,
+                "turns_remaining": pin.ttl_turns - pin.turns_elapsed,
+                "total_tokens": pin.total_tokens,
+                "created_at": pin.created_at
+            })
+
+        return {
+            "active_pins": pins_data,
+            "total_pins": len(pins_data),
+            "total_tokens": sum(p.total_tokens for p in active_pins)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8300)
+    uvicorn.run(app, host="0.0.0.0", port=8350)

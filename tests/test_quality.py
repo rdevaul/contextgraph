@@ -51,10 +51,11 @@ def test_reframing_rate_empty():
 
 # ── quality agent ─────────────────────────────────────────────────────────────
 
-def _mock_result(recency=3, topic=2, total_tokens=500):
+def _mock_result(recency=3, topic=2, sticky=0, total_tokens=500):
     return AssemblyResult(
         messages=[],
         total_tokens=total_tokens,
+        sticky_count=sticky,
         recency_count=recency,
         topic_count=topic,
         tags_used=["security"],

@@ -140,3 +140,52 @@ def reframing_rate(user_texts: List[str]) -> float:
         return 0.0
     count = sum(1 for t in user_texts if detect_reframing(t).is_reframing)
     return count / len(user_texts)
+
+
+# ── Reference Detection (for Sticky Threads) ──────────────────────────────
+
+# Patterns for anaphoric references suggesting the user is asking about
+# recent work without explicitly restating context
+_REFERENCE_PATTERNS = [
+    r"\b(any|what'?s?)(\s+the)?\s+(updates?|progress|status|news)\b",
+    r"\bdid (that|it|this) work\b",
+    r"\bwhat happened (with|to)\b",
+    r"\bhow('s| is| did) (that|it|the .+?) (go|going|turn out|work out)\b",
+    r"\bcan you (check|finish|continue|complete)\b",
+    r"\b(is|are) (that|it|this) (done|finished|ready|working|fixed)\b",
+    r"\bany (luck|success|results)\b",
+    r"\bwhere (are we|did we get|is that)\b",
+    r"\b(still|now) working on\b",
+    r"\blet me know (when|if|about)\b",
+]
+
+
+def detect_reference(user_text: str) -> bool:
+    """
+    Detect anaphoric references in user text.
+
+    These are questions like "any updates?" or "did that work?" that refer
+    to recent work without explicitly restating context. When detected,
+    the sticky layer should pin the most recent substantial work thread.
+
+    Parameters
+    ----------
+    user_text : str
+        The user's message
+
+    Returns
+    -------
+    bool
+        True if the message contains reference patterns
+    """
+    # Skip system artifacts
+    if is_system_artifact(user_text):
+        return False
+
+    text_lower = user_text.lower().strip()
+
+    for pattern in _REFERENCE_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE | re.MULTILINE):
+            return True
+
+    return False

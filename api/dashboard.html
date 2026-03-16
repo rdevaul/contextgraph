@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Graph Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #79c0ff;
+            font-size: 1.5em;
+            margin: 20px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .tag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .tag-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .tag-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .tag-card.core {
+            border-left: 4px solid #3fb950;
+        }
+
+        .tag-card.candidate {
+            border-left: 4px solid #d29922;
+        }
+
+        .tag-card.archived {
+            border-left: 4px solid #6e7681;
+        }
+
+        .tag-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            color: #c9d1d9;
+        }
+
+        .tag-meta {
+            font-size: 0.85em;
+            color: #8b949e;
+            margin: 4px 0;
+        }
+
+        .tag-state {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .tag-state.core { background: #1a472a; color: #3fb950; }
+        .tag-state.candidate { background: #3d2c00; color: #d29922; }
+        .tag-state.archived { background: #21262d; color: #6e7681; }
+
+        .progress-bar {
+            background: #21262d;
+            border-radius: 4px;
+            height: 8px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #d29922, #f0c050);
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #58a6ff;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #8b949e;
+        }
+
+        .pin-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-left: 4px solid #a371f7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .pin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .pin-type {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .pin-type.tool_chain { background: #1a472a; color: #3fb950; }
+        .pin-type.explicit { background: #1f6feb20; color: #58a6ff; }
+        .pin-type.reference { background: #3d2c00; color: #d29922; }
+
+        .pin-ttl {
+            font-size: 0.85em;
+            color: #8b949e;
+        }
+
+        .pin-reason {
+            margin: 8px 0;
+            color: #c9d1d9;
+            font-size: 0.9em;
+        }
+
+        .pin-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #8b949e;
+            margin-top: 10px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #c9d1d9;
+            font-weight: 500;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 0.95em;
+        }
+
+        .input-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: #238636;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #2ea043;
+        }
+
+        button:active {
+            background: #1a7f37;
+        }
+
+        .preview-result {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .message-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .message-item {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 8px 0;
+            font-size: 0.9em;
+        }
+
+        .message-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .message-tag {
+            background: #1f6feb;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .comparison-panel {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .comparison-panel h3 {
+            color: #79c0ff;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #8b949e;
+        }
+
+        .error {
+            background: #3d1319;
+            border: 1px solid #f85149;
+            color: #f85149;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 768px) {
+            .tag-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Context Graph Dashboard</h1>
+            <p>Hybrid tag lifecycle system + context graph efficacy monitoring</p>
+        </header>
+
+        <!-- Section 1: Tag Registry -->
+        <div class="section">
+            <h2>Tag Registry</h2>
+            <div id="tag-registry-stats" class="stats-grid"></div>
+
+            <h3 style="color: #3fb950; margin-top: 20px;">Core Tags</h3>
+            <div id="core-tags" class="tag-grid"></div>
+
+            <h3 style="color: #d29922; margin-top: 20px;">Candidate Tags</h3>
+            <div id="candidate-tags" class="tag-grid"></div>
+
+            <h3 style="color: #6e7681; margin-top: 20px;">Archived Tags</h3>
+            <div id="archived-tags" class="tag-grid"></div>
+        </div>
+
+        <!-- Section 2: Active Pins (Sticky Threads) -->
+        <div class="section">
+            <h2>Active Pins (Sticky Threads)</h2>
+            <div id="pins-stats" class="stats-grid"></div>
+            <div id="active-pins-container"></div>
+        </div>
+
+        <!-- Section 3: Context Graph Efficacy -->
+        <div class="section">
+            <h2>Context Graph Efficacy</h2>
+            <div class="stats-grid" id="efficacy-stats"></div>
+
+            <div class="chart-container">
+                <canvas id="density-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="reframing-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="fitness-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Section 4: Overhead Analysis -->
+        <div class="section">
+            <h2>Overhead Analysis</h2>
+            <div id="overhead-stats" class="stats-grid"></div>
+
+            <div class="chart-container">
+                <canvas id="tokens-timeseries-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="tag-frequency-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Section 5: Live Assembly Preview -->
+        <div class="section">
+            <h2>Live Assembly Preview</h2>
+            <div class="input-group">
+                <label for="query-input">Enter a query to see what would be assembled:</label>
+                <textarea id="query-input" placeholder="Type your query here..."></textarea>
+            </div>
+            <button onclick="runAssemblyPreview()">Preview Assembly</button>
+
+            <div id="preview-results" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let registryData = null;
+        let metricsData = null;
+        let healthData = null;
+        let comparisonStats = null;
+        let pinsData = null;
+        let charts = {};
+
+        // Initialize dashboard
+        async function init() {
+            await refreshData();
+            setInterval(refreshData, 30000); // Auto-refresh every 30 seconds
+        }
+
+        async function refreshData() {
+            try {
+                await Promise.all([
+                    fetchRegistry(),
+                    fetchMetrics(),
+                    fetchHealth(),
+                    fetchComparisonStats(),
+                    fetchPins()
+                ]);
+                renderDashboard();
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            }
+        }
+
+        async function fetchRegistry() {
+            const response = await fetch('/registry');
+            registryData = await response.json();
+        }
+
+        async function fetchMetrics() {
+            const response = await fetch('/metrics');
+            metricsData = await response.json();
+        }
+
+        async function fetchHealth() {
+            const response = await fetch('/health');
+            healthData = await response.json();
+        }
+
+        async function fetchComparisonStats() {
+            const response = await fetch('/comparison-stats');
+            comparisonStats = await response.json();
+        }
+
+        async function fetchPins() {
+            const response = await fetch('/pins');
+            pinsData = await response.json();
+        }
+
+        function renderDashboard() {
+            renderTagRegistry();
+            renderPins();
+            renderEfficacy();
+            renderOverhead();
+        }
+
+        function renderTagRegistry() {
+            if (!registryData) return;
+
+            // Stats
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${registryData.core.length}</div>
+                    <div class="stat-label">Core Tags</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${registryData.candidate.length}</div>
+                    <div class="stat-label">Candidates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${registryData.archived.length}</div>
+                    <div class="stat-label">Archived</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${registryData.core.length + registryData.candidate.length + registryData.archived.length}</div>
+                    <div class="stat-label">Total Tags</div>
+                </div>
+            `;
+            document.getElementById('tag-registry-stats').innerHTML = statsHtml;
+
+            // Core tags
+            document.getElementById('core-tags').innerHTML = registryData.core
+                .map(tag => renderTagCard(tag, 'core'))
+                .join('');
+
+            // Candidate tags
+            document.getElementById('candidate-tags').innerHTML = registryData.candidate
+                .map(tag => renderTagCard(tag, 'candidate'))
+                .join('');
+
+            // Archived tags
+            document.getElementById('archived-tags').innerHTML = registryData.archived
+                .map(tag => renderTagCard(tag, 'archived'))
+                .join('');
+        }
+
+        function renderTagCard(tag, state) {
+            const lastSeen = new Date(tag.last_seen * 1000).toLocaleDateString();
+            const salience = (tag.salience * 100).toFixed(1);
+
+            let progressBar = '';
+            if (state === 'candidate') {
+                // Show progress toward promotion (assuming 5 hits, 3 days, 0.3 salience threshold)
+                const progress = Math.min(100, tag.salience / 0.3 * 100);
+                progressBar = `
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="tag-card ${state}">
+                    <span class="tag-state ${state}">${state}</span>
+                    <div class="tag-name">${tag.name}</div>
+                    <div class="tag-meta">Salience: ${salience}%</div>
+                    <div class="tag-meta">Hits: ${tag.hits}</div>
+                    <div class="tag-meta">Last: ${lastSeen}</div>
+                    ${progressBar}
+                </div>
+            `;
+        }
+
+        function renderPins() {
+            if (!pinsData) return;
+
+            // Stats
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${pinsData.total_pins}</div>
+                    <div class="stat-label">Active Pins</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${pinsData.total_tokens}</div>
+                    <div class="stat-label">Total Tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${Math.round((pinsData.total_tokens / 4000) * 100)}%</div>
+                    <div class="stat-label">Budget Used (4k)</div>
+                </div>
+            `;
+            document.getElementById('pins-stats').innerHTML = statsHtml;
+
+            // Render pins
+            const container = document.getElementById('active-pins-container');
+
+            if (pinsData.total_pins === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #8b949e;">No active pins</div>';
+                return;
+            }
+
+            const pinsHtml = pinsData.active_pins.map(pin => {
+                const createdDate = new Date(pin.created_at * 1000).toLocaleString();
+                return `
+                    <div class="pin-card">
+                        <div class="pin-header">
+                            <span class="pin-type ${pin.pin_type}">${pin.pin_type}</span>
+                            <span class="pin-ttl">TTL: ${pin.turns_remaining}/${pin.ttl_turns} turns</span>
+                        </div>
+                        <div class="pin-reason">${pin.reason}</div>
+                        <div class="pin-meta">
+                            <span>Messages: ${pin.message_ids.length}</span>
+                            <span>Tokens: ${pin.total_tokens}</span>
+                            <span>Created: ${createdDate}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = pinsHtml;
+        }
+
+        function renderEfficacy() {
+            if (!metricsData) return;
+
+            const qualityStats = metricsData.quality_stats || {};
+            const taggerIds = Object.keys(qualityStats);
+
+            if (taggerIds.length === 0) {
+                document.getElementById('efficacy-stats').innerHTML = '<div class="stat-card"><div class="stat-label">No quality data yet</div></div>';
+                return;
+            }
+
+            // Calculate aggregate stats
+            let totalDensity = 0;
+            let totalReframing = 0;
+            let totalFitness = 0;
+            let count = 0;
+
+            taggerIds.forEach(id => {
+                const stats = qualityStats[id];
+                totalDensity += stats.mean_density || 0;
+                totalReframing += stats.mean_reframing || 0;
+                totalFitness += stats.fitness || 0;
+                count++;
+            });
+
+            const avgDensity = count > 0 ? (totalDensity / count).toFixed(3) : 0;
+            const avgReframing = count > 0 ? (totalReframing / count).toFixed(3) : 0;
+            const avgFitness = count > 0 ? (totalFitness / count).toFixed(3) : 0;
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${avgDensity}</div>
+                    <div class="stat-label">Avg Context Density</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgReframing}</div>
+                    <div class="stat-label">Avg Reframing Signal</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgFitness}</div>
+                    <div class="stat-label">Composite Fitness</div>
+                </div>
+            `;
+            document.getElementById('efficacy-stats').innerHTML = statsHtml;
+
+            // Render charts (simplified - would need historical data for real time series)
+            renderChart('density-chart', 'Context Density Over Time', [avgDensity], '#3fb950');
+            renderChart('reframing-chart', 'Reframing Signal Over Time', [avgReframing], '#d29922');
+            renderChart('fitness-chart', 'Composite Fitness Trend', [avgFitness], '#58a6ff');
+        }
+
+        function renderChart(canvasId, label, data, color) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+
+            charts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Current'],
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '33',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#c9d1d9' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderOverhead() {
+            if (!comparisonStats) return;
+
+            const totalTurns = comparisonStats.total_turns || 0;
+            const avgGraphTokens = comparisonStats.avg_graph_tokens || 0;
+            const avgLinearTokens = comparisonStats.avg_linear_tokens || 0;
+            const avgTagsPerQuery = comparisonStats.avg_tags_per_query || 0;
+            const tokenSavingsPct = comparisonStats.token_savings_pct || 0;
+
+            // Color code based on savings (green if positive, red if negative)
+            const savingsColor = tokenSavingsPct >= 0 ? '#3fb950' : '#f85149';
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalTurns}</div>
+                    <div class="stat-label">Total Turns Tracked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgGraphTokens.toFixed(0)}</div>
+                    <div class="stat-label">Avg Graph Tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgLinearTokens.toFixed(0)}</div>
+                    <div class="stat-label">Avg Linear Tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: ${savingsColor}">${tokenSavingsPct >= 0 ? '+' : ''}${tokenSavingsPct.toFixed(1)}%</div>
+                    <div class="stat-label">Token Savings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgTagsPerQuery.toFixed(1)}</div>
+                    <div class="stat-label">Avg Tags/Query</div>
+                </div>
+            `;
+            document.getElementById('overhead-stats').innerHTML = statsHtml;
+
+            // Render time series chart
+            renderTokensTimeSeriesChart();
+
+            // Render tag frequency chart
+            renderTagFrequencyChart();
+        }
+
+        function renderTokensTimeSeriesChart() {
+            if (!comparisonStats || !comparisonStats.time_series || comparisonStats.time_series.length === 0) return;
+
+            const ctx = document.getElementById('tokens-timeseries-chart');
+            if (!ctx) return;
+
+            const timeSeries = comparisonStats.time_series;
+            const labels = timeSeries.map((entry, i) => `Turn ${i + 1}`);
+            const graphTokens = timeSeries.map(entry => entry.graph_tokens);
+            const linearTokens = timeSeries.map(entry => entry.linear_tokens);
+
+            // Destroy existing chart if it exists
+            if (charts['tokens-timeseries-chart']) {
+                charts['tokens-timeseries-chart'].destroy();
+            }
+
+            charts['tokens-timeseries-chart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Graph Assembly',
+                            data: graphTokens,
+                            borderColor: '#3fb950',
+                            backgroundColor: '#3fb95033',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Linear Window',
+                            data: linearTokens,
+                            borderColor: '#f85149',
+                            backgroundColor: '#f8514933',
+                            tension: 0.4,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#c9d1d9' }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Token Usage: Graph vs Linear Over Time',
+                            color: '#c9d1d9'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e', maxTicksLimit: 10 }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' },
+                            title: {
+                                display: true,
+                                text: 'Tokens',
+                                color: '#c9d1d9'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTagFrequencyChart() {
+            if (!comparisonStats || !comparisonStats.tag_frequency) return;
+
+            const ctx = document.getElementById('tag-frequency-chart');
+            if (!ctx) return;
+
+            const tagFreq = comparisonStats.tag_frequency;
+            const tags = Object.keys(tagFreq);
+            const frequencies = Object.values(tagFreq);
+
+            if (tags.length === 0) return;
+
+            // Destroy existing chart if it exists
+            if (charts['tag-frequency-chart']) {
+                charts['tag-frequency-chart'].destroy();
+            }
+
+            charts['tag-frequency-chart'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: tags,
+                    datasets: [{
+                        label: 'Tag Usage Count',
+                        data: frequencies,
+                        backgroundColor: '#58a6ff',
+                        borderColor: '#58a6ff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Top Tags by Frequency',
+                            color: '#c9d1d9'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e', maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' },
+                            title: {
+                                display: true,
+                                text: 'Frequency',
+                                color: '#c9d1d9'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function runAssemblyPreview() {
+            const query = document.getElementById('query-input').value;
+            if (!query.trim()) {
+                alert('Please enter a query');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('preview-results');
+            resultsDiv.innerHTML = '<div class="loading">Loading assembly preview...</div>';
+
+            try {
+                const response = await fetch('/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_text: query, assistant_text: '' })
+                });
+
+                const data = await response.json();
+                renderAssemblyComparison(data);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderAssemblyComparison(data) {
+            const { graph_assembly, linear_window } = data;
+
+            const html = `
+                <div class="comparison">
+                    <div class="comparison-panel">
+                        <h3>Graph Assembly</h3>
+                        <div class="tag-meta">
+                            Total Tokens: ${graph_assembly.total_tokens}<br>
+                            Recency Messages: ${graph_assembly.recency_count}<br>
+                            Topic Messages: ${graph_assembly.topic_count}<br>
+                            Tags Used: ${graph_assembly.tags_used.join(', ') || 'none'}
+                        </div>
+                        <div class="message-list">
+                            ${graph_assembly.messages.slice(0, 10).map(msg => `
+                                <div class="message-item">
+                                    <strong>User:</strong> ${msg.user_text.substring(0, 100)}${msg.user_text.length > 100 ? '...' : ''}
+                                    <div class="message-tags">
+                                        ${msg.tags.map(tag => `<span class="message-tag">${tag}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                            ${graph_assembly.messages.length > 10 ? `<div class="tag-meta">...and ${graph_assembly.messages.length - 10} more</div>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="comparison-panel">
+                        <h3>Linear Window (Baseline)</h3>
+                        <div class="tag-meta">
+                            Total Tokens: ${linear_window.total_tokens}<br>
+                            Messages: ${linear_window.recency_count}<br>
+                            Topics Covered: ${linear_window.topic_count}<br>
+                            Tags: ${linear_window.tags_used.join(', ') || 'none'}
+                        </div>
+                        <div class="message-list">
+                            ${linear_window.messages.slice(0, 10).map(msg => `
+                                <div class="message-item">
+                                    <strong>User:</strong> ${msg.user_text.substring(0, 100)}${msg.user_text.length > 100 ? '...' : ''}
+                                    <div class="message-tags">
+                                        ${msg.tags.map(tag => `<span class="message-tag">${tag}</span>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                            ${linear_window.messages.length > 10 ? `<div class="tag-meta">...and ${linear_window.messages.length - 10} more</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('preview-results').innerHTML = html;
+        }
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
