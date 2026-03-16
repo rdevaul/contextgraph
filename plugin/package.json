@@ -1,0 +1,13 @@
+{
+  "name": "openclaw-plugin-contextgraph",
+  "version": "1.0.0",
+  "description": "Graph-based context engine plugin for OpenClaw",
+  "type": "module",
+  "main": "index.ts",
+  "author": "Menehune One",
+  "license": "MIT",
+  "keywords": ["openclaw", "plugin", "context-engine", "contextgraph"],
+  "engines": {
+    "node": ">=22"
+  }
+}
