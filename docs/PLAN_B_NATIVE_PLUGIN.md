@@ -379,6 +379,15 @@ Same as Phase 2, but measured on **real interactions** (not shadow simulation):
 
 ---
 
+## Sticky Threads (P0 Enhancement)
+
+See [`STICKY_THREADS.md`](STICKY_THREADS.md) for the full design. Graph mode
+drops active tool call chains from context during multi-step operations, causing
+the agent to lose track of in-progress work. The sticky thread layer pins active
+work into context regardless of recency/topic scoring.
+
+**Status:** Design complete, implementation in progress.
+
 ## Open Questions
 
 1. **Hot-swapping context engines:** Does OpenClaw support changing the active

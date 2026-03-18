@@ -14,6 +14,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from features import MessageFeatures
 from tagger import TagAssignment, CORE_TAGS
 from quality import QualityAgent
+from tag_registry import get_registry
 
 
 @dataclass
@@ -101,9 +102,13 @@ class EnsembleTagger:
                 tag_votes[tag] = tag_votes.get(tag, 0.0) + normalised_weight
 
         # Threshold filter: only tags with sufficient weighted support
+        # Use registry to get active tags (core + candidate)
+        registry = get_registry()
+        active_tags = registry.get_active_tags()
+
         accepted_tags = sorted(
             tag for tag, vote in tag_votes.items()
-            if vote >= self._vote_threshold and tag in CORE_TAGS
+            if vote >= self._vote_threshold and tag in active_tags
         )
 
         # Aggregate confidence: mean vote score of accepted tags
