@@ -157,7 +157,7 @@ RULES: List[TagRule] = [
         name="shopping",
         predicate=lambda f, u, a: _text_contains_any(
             u, a, ["shopping", "grocery", "milk", "coffee", "shopping list",
-                   "shopping bot", "devaul shop"]
+                   "shopping bot", "shopping list bot"]
         ),
         tags=["shopping-list"],
     ),

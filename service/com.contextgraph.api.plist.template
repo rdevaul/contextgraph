@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd service template for the context graph API.
+
+  Before installing, run the setup script:
+    ./scripts/install-service.sh
+
+  Or substitute manually:
+    INSTALL_PATH  → absolute path to your tag-context checkout
+    PYTHON_PATH   → path to your Python 3 interpreter (e.g. from `which python3`)
+-->
 <plist version="1.0">
 <dict>
     <key>Label</key>
@@ -7,12 +17,18 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/rich/.pyenv/shims/python3</string>
-        <string>api/server.py</string>
+        <string>PYTHON_PATH</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>api.server:app</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>8300</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/rich/Projects/tag-context</string>
+    <string>INSTALL_PATH</string>
 
     <key>StandardOutPath</key>
     <string>/tmp/contextgraph-api.log</string>

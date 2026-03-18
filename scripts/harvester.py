@@ -53,7 +53,7 @@ def _channel_from_key(session_key: str) -> str:
 def _user_id_from_key(session_key: str) -> str:
     """Best-effort user ID extraction from session key."""
     parts = session_key.split(":")
-    # agent:main:telegram:994902066 → "994902066"
+    # agent:main:telegram:<user_id> → "<user_id>"
     for part in reversed(parts):
         if part.isdigit():
             return part

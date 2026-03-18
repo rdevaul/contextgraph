@@ -148,56 +148,32 @@ python3 scripts/shadow.py --report --verbose
 ## Deployment (Python API as a Service)
 
 The Python API (`api/server.py`) must be running for the OpenClaw plugin to function.
-It's managed as a **launchd service** (`com.glados.tag-context`) so it survives reboots
+It's managed as a **launchd service** (`com.contextgraph.api`) so it survives reboots
 and restarts automatically on crash.
 
 ### First-time setup
 
 ```bash
-cd ~/Projects/tag-context
+cd /path/to/tag-context
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create the launchd plist at `~/Library/LaunchAgents/com.glados.tag-context.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.glados.tag-context</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/Users/rich/Projects/tag-context/venv/bin/python3</string>
-        <string>-m</string>
-        <string>uvicorn</string>
-        <string>api.server:app</string>
-        <string>--host</string>
-        <string>127.0.0.1</string>
-        <string>--port</string>
-        <string>8300</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/Users/rich/Projects/tag-context</string>
-    <key>StandardOutPath</key>
-    <string>/tmp/tag-context.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/tag-context.log</string>
-    <key>KeepAlive</key>
-    <true/>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-```
-
-Load it:
+Install the launchd service using the provided script (auto-detects your Python path):
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
+./scripts/install-service.sh
+```
+
+The script reads `service/com.contextgraph.api.plist.template`, substitutes your local
+paths, writes the rendered plist to `~/Library/LaunchAgents/`, and loads it.
+The rendered plist is `.gitignore`'d so local paths never end up in the repo.
+
+To use a specific Python interpreter (e.g. pyenv shim):
+
+```bash
+./scripts/install-service.sh --python ~/.pyenv/shims/python3
 ```
 
 ### Service management
