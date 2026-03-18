@@ -94,6 +94,38 @@ async function apiPost(
   }
 }
 
+async function apiGet(
+  endpoint: string,
+  logger: OpenClawPluginApi["logger"]
+): Promise<unknown | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const response = await fetch(`${PYTHON_API_BASE}${endpoint}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Comparison logging ─────────────────────────────────────────────────────
+
+const COMPARISON_LOG_PATH = path.join(os.homedir(), ".tag-context", "comparison-log.jsonl");
+
+function writeComparisonLog(entry: Record<string, unknown>): void {
+  try {
+    ensureGraphModeDir();
+    const line = JSON.stringify(entry) + "\n";
+    fs.appendFileSync(COMPARISON_LOG_PATH, line, "utf8");
+  } catch {
+    // Non-fatal
+  }
+}
+
 // ── Safe recent context slice ──────────────────────────────────────────────
 //
 // Slicing mid-sequence breaks tool_use/tool_result pairing, which the Claude
@@ -248,6 +280,9 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     ownsCompaction: false,
   };
 
+  // In-memory tracker for tool-use chain IDs (for sticky threads)
+  const toolChainIds = new Map<string, string[]>();
+
   return {
     info,
 
@@ -289,6 +324,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
             "/ingest",
             {
               id: `bootstrap-${sessionId}-${i}`,
+              external_id: `bootstrap-${sessionId}-${i}`,
               session_id: sessionId,
               user_text: userText,
               assistant_text: assistantText,
@@ -315,10 +351,12 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
         return { ingested: false };
       }
 
+      const msgId = `msg-${sessionId}-${Date.now()}`;
       const result = await apiPost(
         "/ingest",
         {
-          id: `msg-${sessionId}-${Date.now()}`,
+          id: msgId,
+          external_id: msgId,
           session_id: sessionId,
           user_text: text,
           assistant_text: "",
@@ -338,10 +376,12 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       const { userParts, assistantParts } = splitUserAssistant(messages);
       if (userParts.length === 0) return { ingestedCount: 0 };
 
+      const batchId = `batch-${sessionId}-${Date.now()}`;
       const result = await apiPost(
         "/ingest",
         {
-          id: `batch-${sessionId}-${Date.now()}`,
+          id: batchId,
+          external_id: batchId,
           session_id: sessionId,
           user_text: userParts.join("\n"),
           assistant_text: assistantParts.join("\n"),
@@ -387,11 +427,22 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // validated at 4K default; 8K gives more depth for dense research messages.
       const GRAPH_TOKEN_BUDGET = 8000;
       const budget = Math.min(tokenBudget ?? GRAPH_TOKEN_BUDGET, GRAPH_TOKEN_BUDGET);
+
+      // Detect tool use in recent messages for sticky threads
+      const recentAssistant = messages.filter(m => m.role === "assistant").slice(-5);
+      const lastTurnHadTools = recentAssistant.some(m => hasToolUse(m));
+      const pendingChainIds = lastTurnHadTools
+        ? (toolChainIds.get(sessionId) ?? [])
+        : [];
+
       const result = await apiPost(
         "/assemble",
         {
           user_text: lastUserText,
           token_budget: budget,
+          tool_state: lastTurnHadTools
+            ? { last_turn_had_tools: true, pending_chain_ids: pendingChainIds }
+            : null,
         },
         logger
       );
@@ -443,9 +494,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       const safe = removeOrphanedToolPairs(assembled, logger);
 
       const totalTokens = data.total_tokens ?? safe.length * 150;
+      const stickyCount = (data as any).sticky_count ?? 0;
 
       logger.info(
-        `contextgraph assemble: ${safe.length} messages, ~${totalTokens} tokens (graph: ${data.messages?.length ?? 0} retrieved)`
+        `contextgraph assemble: ${safe.length} msgs, ~${totalTokens} tok (graph: ${data.messages?.length ?? 0} retrieved, sticky: ${stickyCount}, tools: ${lastTurnHadTools})`
       );
 
       return {
@@ -483,10 +535,22 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
 
       if (!assistantText) return;
 
+      // Use stable turnId for external_id tracking
+      const turnId = `turn-${sessionId}-${Date.now()}`;
+
+      // Detect tool use in this turn
+      const hadTools = assistantMessages.some(m => hasToolUse(m));
+      if (hadTools) {
+        const ids = toolChainIds.get(sessionId) ?? [];
+        ids.push(turnId);
+        toolChainIds.set(sessionId, ids.slice(-10));
+      }
+
       await apiPost(
         "/ingest",
         {
-          id: `turn-${sessionId}-${Date.now()}`,
+          id: turnId,
+          external_id: turnId,
           session_id: sessionId,
           user_text: userText || "",
           assistant_text: assistantText,
@@ -494,6 +558,36 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
         },
         logger
       );
+
+      // Comparison logging — non-fatal
+      if (userText) {
+        try {
+          const comparison = await apiPost("/compare", {
+            user_text: userText,
+            assistant_text: assistantText || "",
+          }, logger) as any;
+
+          if (comparison) {
+            writeComparisonLog({
+              timestamp: new Date().toISOString(),
+              sessionId,
+              userText: userText.slice(0, 200),
+              graphMsgCount: comparison.graph_assembly?.messages?.length ?? 0,
+              graphTokens: comparison.graph_assembly?.total_tokens ?? 0,
+              graphTags: comparison.graph_assembly?.tags_used ?? [],
+              graphRecency: comparison.graph_assembly?.recency_count ?? 0,
+              graphTopic: comparison.graph_assembly?.topic_count ?? 0,
+              linearMsgCount: comparison.linear_window?.messages?.length ?? 0,
+              linearTokens: comparison.linear_window?.total_tokens ?? 0,
+              linearTags: comparison.linear_window?.tags_used ?? [],
+              stickyPins: comparison.graph_assembly?.sticky_count ?? 0,
+              hadTools,
+            });
+          }
+        } catch {
+          // Non-fatal — don't break the turn on logging failure
+        }
+      }
     },
 
     async dispose(): Promise<void> {
