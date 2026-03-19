@@ -16,6 +16,7 @@ from gp_tagger import GeneticTagger
 from tag_registry import get_registry
 from sticky import StickyPinManager
 from reframing import detect_reference
+from utils.text import strip_envelope
 import pickle
 import os
 import json
@@ -91,17 +92,21 @@ def tag(request: TagRequest):
 def ingest(request: IngestRequest):
     try:
         message_id = request.id if request.id else f"api-{time.time()}"
-        features = extract_features(request.user_text, request.assistant_text)
-        tags = ensemble.assign(features, request.user_text, request.assistant_text).tags
+        # Strip OpenClaw channel metadata envelopes before indexing.
+        # Envelope text (message_id, sender_id, timestamps) is noise for
+        # tag inference and retrieval — stripping prevents tag pollution.
+        clean_user = strip_envelope(request.user_text)
+        features = extract_features(clean_user, request.assistant_text)
+        tags = ensemble.assign(features, clean_user, request.assistant_text).tags
         message = Message(
             id=message_id,
             session_id=request.session_id,
-            user_text=request.user_text,
+            user_text=clean_user,
             assistant_text=request.assistant_text,
             timestamp=request.timestamp,
             user_id=request.user_id or "default",
             tags=tags,
-            token_count=len(request.user_text.split()) + len(request.assistant_text.split()),
+            token_count=len(clean_user.split()) + len(request.assistant_text.split()),
             external_id=request.external_id
         )
         store.add_message(message)
@@ -173,15 +178,17 @@ def assemble(request: AssembleRequest):
                     total_tokens=total_tokens
                 )
 
-        features = extract_features(request.user_text, "")  # Empty assistant_text for incoming message
+        # Strip envelope from query text for clean tag inference and similarity matching
+        clean_query = strip_envelope(request.user_text)
+        features = extract_features(clean_query, "")  # Empty assistant_text for incoming message
         if not request.tags:
-            request.tags = ensemble.assign(features, request.user_text, "").tags
+            request.tags = ensemble.assign(features, clean_query, "").tags
 
         # Get pinned message IDs
         pinned_ids = pin_manager.get_pinned_message_ids()
 
         assembler = ContextAssembler(store, token_budget=request.token_budget)
-        result = assembler.assemble(request.user_text, request.tags, pinned_message_ids=pinned_ids)
+        result = assembler.assemble(clean_query, request.tags, pinned_message_ids=pinned_ids)
 
         return {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
@@ -201,6 +208,87 @@ def health():
         messages_in_store = len(store.get_recent(1000))  # Approximate count
         tags = store.get_all_tags()
         return {"status": "ok", "messages_in_store": messages_in_store, "tags": tags, "engine": "contextgraph"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/quality", response_model=dict)
+def quality():
+    """
+    Retrieval quality metrics — the health check that actually tells you if
+    the graph is working, not just if the service is up.
+
+    Returns:
+      - zero_return_rate: fraction of recent turns returning 0 graph messages
+      - avg_topic_messages: average topic-layer message count across recent turns
+      - tag_entropy: how evenly tags are distributed (low = over-generic tags)
+      - top_tags: most frequent tags with corpus frequency
+      - alert: true if quality is likely degraded
+    """
+    try:
+        import math
+
+        COMPARISON_LOG = Path.home() / ".tag-context" / "comparison-log.jsonl"
+        RECENT_WINDOW = 50  # evaluate last N turns
+
+        entries = []
+        if COMPARISON_LOG.exists():
+            with open(COMPARISON_LOG) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            entries.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+
+        recent = entries[-RECENT_WINDOW:] if len(entries) > RECENT_WINDOW else entries
+        total = len(recent)
+
+        zero_return_turns = 0
+        topic_msg_counts = []
+        for e in recent:
+            g = e.get("graph_assembly", {})
+            if g.get("tokens", 0) == 0:
+                zero_return_turns += 1
+            topic_msg_counts.append(g.get("topic", 0))
+
+        zero_return_rate = zero_return_turns / total if total > 0 else 0.0
+        avg_topic = sum(topic_msg_counts) / len(topic_msg_counts) if topic_msg_counts else 0.0
+
+        # Tag entropy — measure how evenly distributed tags are
+        tag_counts = store.tag_counts()
+        total_corpus = len(store.get_recent(10000)) or 1
+        total_tag_assignments = sum(tag_counts.values()) or 1
+        entropy = 0.0
+        for cnt in tag_counts.values():
+            p = cnt / total_tag_assignments
+            if p > 0:
+                entropy -= p * math.log2(p)
+
+        # Top tags with corpus frequency %
+        top_tags = [
+            {"tag": tag, "count": cnt, "corpus_pct": round(cnt / total_corpus * 100, 1)}
+            for tag, cnt in list(tag_counts.items())[:10]
+        ]
+
+        # Alert thresholds
+        alert = zero_return_rate > 0.25 or entropy < 2.0
+
+        return {
+            "turns_evaluated": total,
+            "zero_return_turns": zero_return_turns,
+            "zero_return_rate": round(zero_return_rate, 3),
+            "avg_topic_messages": round(avg_topic, 2),
+            "tag_entropy": round(entropy, 3),
+            "corpus_size": total_corpus,
+            "top_tags": top_tags,
+            "alert": alert,
+            "alert_reasons": [
+                *(["zero_return_rate > 25%"] if zero_return_rate > 0.25 else []),
+                *(["tag_entropy < 2.0 (over-generic tags)"] if entropy < 2.0 else []),
+            ],
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

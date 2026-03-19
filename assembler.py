@@ -3,12 +3,21 @@ assembler.py — Context assembly policy for the tag-context system.
 
 Builds a context window from a combination of recent messages (recency layer)
 and tag-retrieved messages (topic layer), packed to a token budget.
+
+Tag IDF filtering: tags appearing in >30% of the corpus are treated as stop
+words for topic retrieval (they carry no discriminating signal). This threshold
+is configurable via TOPIC_TAG_MAX_CORPUS_FREQ.
 """
 
 from dataclasses import dataclass
 from typing import List, Optional
 
 from store import Message, MessageStore
+
+# Tags appearing in more than this fraction of the corpus are skipped in
+# topic retrieval. At >30% they're effectively stop words (e.g. "code",
+# "openclaw" in a corpus of AI assistant interactions).
+TOPIC_TAG_MAX_CORPUS_FREQ = 0.30
 
 
 def _estimate_tokens(msg: Message) -> int:
@@ -114,7 +123,24 @@ class ContextAssembler:
         # ── Topic layer ────────────────────────────────────────────────────
         topic_candidates: List[Message] = []
 
-        for tag in inferred_tags:
+        # IDF filtering: skip tags that are too common to be discriminating.
+        # Tags in >30% of corpus are stop words — they retrieve nearly everything,
+        # blowing the token budget on low-relevance messages.
+        total_messages = len(list(self.store.get_recent(10000)))  # fast count proxy
+        if total_messages == 0:
+            total_messages = 1  # avoid div-by-zero
+        tag_counts = self.store.tag_counts()
+        useful_tags = [
+            t for t in inferred_tags
+            if tag_counts.get(t, 0) / total_messages <= TOPIC_TAG_MAX_CORPUS_FREQ
+        ]
+        # Fall back to all tags if every tag is high-frequency (small corpus)
+        if not useful_tags and inferred_tags:
+            # Sort by ascending frequency and take the bottom half
+            useful_tags = sorted(inferred_tags, key=lambda t: tag_counts.get(t, 0))
+            useful_tags = useful_tags[: max(1, len(useful_tags) // 2)]
+
+        for tag in useful_tags:
             for msg in self.store.get_by_tag(tag, limit=20):
                 if msg.id not in seen_ids:
                     topic_candidates.append(msg)
@@ -143,5 +169,5 @@ class ContextAssembler:
             sticky_count=len(sticky_msgs),
             recency_count=len(recency_msgs),
             topic_count=len(topic_msgs),
-            tags_used=list(inferred_tags),
+            tags_used=useful_tags,
         )

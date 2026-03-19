@@ -330,6 +330,30 @@ Key test files:
 
 ## Notes for Agents
 
+### ⚠️ Gateway Restart Footgun
+
+Do NOT use `openclaw gateway stop` / `openclaw gateway restart` to reload the
+context graph plugin. These commands orphan the LaunchAgent, kill all active
+sessions (Discord, Telegram, Voice), and disconnect the gateway entirely.
+
+**Correct way to reload the plugin after a change:**
+
+```bash
+# Copy updated plugin
+cp plugin/index.ts ~/.openclaw/extensions/contextgraph/index.ts
+
+# Graceful reload (SIGUSR1 — keeps connections alive)
+openclaw gateway reload
+# or via config API:
+curl -X POST http://localhost:3001/api/gateway/reload
+```
+
+If you're not sure which method is available in your OpenClaw version, use
+`openclaw gateway --help` and check for a `reload` or `signal` subcommand.
+Only use `stop`/`restart` as a last resort when the gateway is already dead.
+
+---
+
 - **Never run the API manually** while the launchd service is active —
   port 8300 conflict will crash-loop both.
 - **`launchctl stop/start` does NOT re-read the plist** — always use
