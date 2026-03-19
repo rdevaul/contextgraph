@@ -181,7 +181,7 @@ class StickyPinManager:
 
         for pin in self.pins:
             pin.turns_elapsed += 1
-            if pin.turns_elapsed >= pin.ttl_turns:
+            if pin.turns_elapsed > pin.ttl_turns:
                 expired.append(pin.pin_id)
 
         # Remove expired pins

@@ -268,7 +268,7 @@ class TestPinTTLExpiry:
         pin_ids1 = [p["pin_id"] for p in pins1["active_pins"]]
         assert pin_id in pin_ids1
 
-        # Second assemble - pin should expire (turns_elapsed=1 -> 2, >= ttl_turns=1)
+        # Second assemble - pin should expire (turns_elapsed=1 -> 2, > ttl_turns=1)
         response2 = requests.post(
             f"{API_BASE_URL}/assemble",
             json={"user_text": "Second query", "token_budget": 4000}

@@ -1,17 +1,17 @@
 {
-  "message_count": 27924,
+  "message_count": 29189,
   "tags": [
     {
       "name": "context-management",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 6724,
+      "last_seen": 1773933000.144445,
+      "hits": 6800,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1675.995670376874,
-      "recency_weight": 0.999999999995628,
-      "distinctiveness": 0.7591776798825257
+      "frequency": 1377.280578135588,
+      "recency_weight": 0.999999999998907,
+      "distinctiveness": 0.7670195635042999
     },
     {
       "name": "rl",
@@ -21,9 +21,9 @@
       "hits": 2806,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 855.0716127623299,
-      "recency_weight": 0.9422824271697721,
-      "distinctiveness": 0.7647157471071608
+      "frequency": 568.5982623611036,
+      "recency_weight": 0.7999818028271105,
+      "distinctiveness": 0.9030039061149712
     },
     {
       "name": "personal",
@@ -34,7 +34,7 @@
       "promoted_at": 1773506420.397859,
       "archived_at": null,
       "frequency": 0.0,
-      "recency_weight": 0.7225656122469564,
+      "recency_weight": 0.6134459525915146,
       "distinctiveness": 1.0
     },
     {
@@ -46,56 +46,56 @@
       "promoted_at": 1773506420.397859,
       "archived_at": null,
       "frequency": 0.0,
-      "recency_weight": 0.7225656122459692,
+      "recency_weight": 0.6134459525901736,
       "distinctiveness": 1.0
     },
     {
       "name": "question",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773850898.534548,
-      "hits": 11225,
+      "last_seen": 1773933000.126356,
+      "hits": 11381,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 2815.389125447814,
-      "recency_weight": 0.9999999999953548,
-      "distinctiveness": 0.5979152487731489
+      "frequency": 2305.1221947707995,
+      "recency_weight": 0.9999999999986338,
+      "distinctiveness": 0.6099859497618314
     },
     {
       "name": "shopping-list",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 803,
+      "last_seen": 1773933000.123269,
+      "hits": 822,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 200.15236812917848,
-      "recency_weight": 0.9999999999920759,
-      "distinctiveness": 0.9712402850900755
+      "frequency": 166.48892520915234,
+      "recency_weight": 0.9999999999967211,
+      "distinctiveness": 0.9718300205620288
     },
     {
       "name": "devops",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 3867,
+      "last_seen": 1773933000.141452,
+      "hits": 3879,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 963.8719894898187,
-      "recency_weight": 0.999999999994535,
-      "distinctiveness": 0.8615020951971635
+      "frequency": 785.6575588339024,
+      "recency_weight": 0.999999999998907,
+      "distinctiveness": 0.8670938121016926
     },
     {
       "name": "code",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853140.310174,
-      "hits": 23862,
+      "last_seen": 1773933000.126356,
+      "hits": 23970,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 5946.231314524213,
-      "recency_weight": 0.9999999999953548,
-      "distinctiveness": 0.14546626557799747
+      "frequency": 4854.914243810778,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.17857510023645518
     },
     {
       "name": "research",
@@ -105,21 +105,21 @@
       "hits": 3863,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1049.3791527088358,
-      "recency_weight": 0.9999999999969943,
-      "distinctiveness": 0.8610231688012664
+      "frequency": 782.785134511156,
+      "recency_weight": 0.8832521905221558,
+      "distinctiveness": 0.8664661758097411
     },
     {
       "name": "infrastructure",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 2790,
+      "last_seen": 1773933000.109268,
+      "hits": 2836,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 695.4235455565931,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9000752122058665
+      "frequency": 574.4070649556787,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.9027968193035372
     },
     {
       "name": "planning",
@@ -129,33 +129,33 @@
       "hits": 3052,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 829.0720098568393,
-      "recency_weight": 0.9999999999980873,
-      "distinctiveness": 0.8902000287811196
+      "frequency": 618.446862674264,
+      "recency_weight": 0.8832521905190183,
+      "distinctiveness": 0.8945003283901967
     },
     {
       "name": "security",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773824478.429599,
-      "hits": 2854,
+      "last_seen": 1773933000.135434,
+      "hits": 2863,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 775.2849335396546,
-      "recency_weight": 0.999999999998907,
-      "distinctiveness": 0.897581281848848
+      "frequency": 579.8756438979152,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.9018983004385965
     },
     {
       "name": "networking",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 2790,
+      "last_seen": 1773933000.109268,
+      "hits": 2836,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 695.4235455565931,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9000752122058665
+      "frequency": 574.4070649543945,
+      "recency_weight": 0.999999999998907,
+      "distinctiveness": 0.9027968193035372
     },
     {
       "name": "api",
@@ -166,68 +166,68 @@
       "promoted_at": 1773506420.397859,
       "archived_at": null,
       "frequency": 0.0,
-      "recency_weight": 0.722565612238664,
+      "recency_weight": 0.6134459525794458,
       "distinctiveness": 1.0
     },
     {
       "name": "llm",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773824478.406637,
-      "hits": 5446,
+      "last_seen": 1773933000.132405,
+      "hits": 5454,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1479.39805636356,
-      "recency_weight": 0.9999999999975407,
-      "distinctiveness": 0.8045155963961377
+      "frequency": 1104.6600713450869,
+      "recency_weight": 0.9999999999978141,
+      "distinctiveness": 0.8131103724771271
     },
     {
       "name": "deployment",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 3867,
+      "last_seen": 1773933000.141452,
+      "hits": 3879,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 963.8719894898187,
-      "recency_weight": 0.999999999994535,
-      "distinctiveness": 0.8615020951971635
+      "frequency": 785.6575588356588,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.8670938121016926
     },
     {
       "name": "openclaw",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853093.399449,
-      "hits": 4621,
+      "last_seen": 1773932965.7334201,
+      "hits": 4766,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1151.6743390924346,
-      "recency_weight": 0.9999999999874307,
-      "distinctiveness": 0.834509185975719
+      "frequency": 965.3895275999647,
+      "recency_weight": 0.9999999999967211,
+      "distinctiveness": 0.836248067342381
     },
     {
       "name": "voice-pwa",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773853052.319565,
-      "hits": 4296,
+      "last_seen": 1773932868.160887,
+      "hits": 4325,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1070.80270670355,
-      "recency_weight": 0.9999999999920759,
-      "distinctiveness": 0.8461373159987107
+      "frequency": 876.2620709741005,
+      "recency_weight": 0.9999999999909829,
+      "distinctiveness": 0.8513898910765213
     },
     {
       "name": "ai",
       "state": "core",
       "first_seen": 1773506420.397859,
-      "last_seen": 1773824478.406637,
-      "hits": 6363,
+      "last_seen": 1773933000.132405,
+      "hits": 6371,
       "promoted_at": 1773506420.397859,
       "archived_at": null,
-      "frequency": 1728.4997856536097,
-      "recency_weight": 0.9999999999986338,
-      "distinctiveness": 0.7715998420618113
+      "frequency": 1290.3904133793574,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.7816879690230614
     },
     {
       "name": "debugging",
@@ -238,7 +238,7 @@
       "promoted_at": 1773506420.397859,
       "archived_at": null,
       "frequency": 0.0,
-      "recency_weight": 0.7225656122343204,
+      "recency_weight": 0.6134459525739143,
       "distinctiveness": 1.0
     },
     {
@@ -249,9 +249,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264122299,
-      "recency_weight": 0.725235848334946,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20417782630856224,
+      "recency_weight": 0.6157129377445378,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "exec",
@@ -261,9 +261,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30822862641118126,
-      "recency_weight": 0.7252358483341533,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2041778263081021,
+      "recency_weight": 0.6157129377438649,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "empty",
@@ -273,9 +273,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264098704,
-      "recency_weight": 0.7252358483331625,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2041778263071818,
+      "recency_weight": 0.615712937742519,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "backend",
@@ -285,9 +285,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264098704,
-      "recency_weight": 0.7252358483331625,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20417782630672163,
+      "recency_weight": 0.615712937741846,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "decode",
@@ -297,9 +297,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30822862640882176,
-      "recency_weight": 0.7252358483323699,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20417782630626144,
+      "recency_weight": 0.615712937741173,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "invalid",
@@ -309,9 +309,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264080353,
-      "recency_weight": 0.7252358483317753,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2041778263052261,
+      "recency_weight": 0.6157129377396588,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "conversation",
@@ -321,9 +321,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264080353,
-      "recency_weight": 0.7252358483317753,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20417782630476597,
+      "recency_weight": 0.6157129377389859,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "richard",
@@ -333,9 +333,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264069866,
-      "recency_weight": 0.7252358483309826,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2041778263043058,
+      "recency_weight": 0.6157129377383129,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sat",
@@ -345,9 +345,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264069866,
-      "recency_weight": 0.7252358483309826,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20417782630327044,
+      "recency_weight": 0.6157129377367988,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sender",
@@ -357,9 +357,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3082286264056758,
-      "recency_weight": 0.7252358483299918,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2041778263028103,
+      "recency_weight": 0.6157129377361258,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "started",
@@ -369,9 +369,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30857768373673145,
-      "recency_weight": 0.7254994480084297,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2043309357463766,
+      "recency_weight": 0.6159367293935475,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "waiting",
@@ -381,9 +381,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30857768373673145,
-      "recency_weight": 0.7254994480084297,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2043309357453397,
+      "recency_weight": 0.6159367293920328,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "application",
@@ -393,9 +393,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30857768373568045,
-      "recency_weight": 0.7254994480076368,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20433093574487884,
+      "recency_weight": 0.6159367293913596,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "traceback",
@@ -405,9 +405,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3089129340584397,
-      "recency_weight": 0.7257521500368699,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20447787879575324,
+      "recency_weight": 0.616151269129224,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "file",
@@ -417,9 +417,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3089129340584397,
-      "recency_weight": 0.7257521500368699,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20447787879483023,
+      "recency_weight": 0.6161512691278771,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "users",
@@ -429,9 +429,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3089129340573864,
-      "recency_weight": 0.7257521500360766,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20447787879436874,
+      "recency_weight": 0.6161512691272036,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "yes",
@@ -441,9 +441,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30906574278023935,
-      "recency_weight": 0.7258671800972541,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2045448203808239,
+      "recency_weight": 0.616248927698462,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "let",
@@ -453,9 +453,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30906574278023935,
-      "recency_weight": 0.7258671800972541,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2045448203803621,
+      "recency_weight": 0.6162489276977884,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "you",
@@ -465,9 +465,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30982996487428566,
-      "recency_weight": 0.7264410342092192,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20487927084769444,
+      "recency_weight": 0.6167361201075855,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "use",
@@ -477,9 +477,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30982996487428566,
-      "recency_weight": 0.7264410342092192,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20487927084723112,
+      "recency_weight": 0.6167361201069114,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "for",
@@ -489,9 +489,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3098299648729612,
-      "recency_weight": 0.7264410342082268,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20487927084676782,
+      "recency_weight": 0.6167361201062372,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "rich",
@@ -501,9 +501,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3098299648719016,
-      "recency_weight": 0.7264410342074328,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20487927084572535,
+      "recency_weight": 0.6167361201047207,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "telegram",
@@ -513,9 +513,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3098299648719016,
-      "recency_weight": 0.7264410342074328,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.204879270845262,
+      "recency_weight": 0.6167361201040465,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "any",
@@ -525,9 +525,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.30999268602441465,
-      "recency_weight": 0.7265629144656051,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20495041118906798,
+      "recency_weight": 0.6168395943763968,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "checking",
@@ -537,9 +537,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3107196692440693,
-      "recency_weight": 0.7271061236934782,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20526793339016716,
+      "recency_weight": 0.6173007697990598,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "check",
@@ -549,9 +549,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.31469646146059754,
-      "recency_weight": 0.7300402060492164,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2069959794516296,
+      "recency_weight": 0.6197917559666377,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "twitter",
@@ -561,9 +561,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3146964614595044,
-      "recency_weight": 0.7300402060484185,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2069959794506837,
+      "recency_weight": 0.6197917559652829,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "step",
@@ -573,9 +573,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3146964614595044,
-      "recency_weight": 0.7300402060484185,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20699597945021078,
+      "recency_weight": 0.6197917559646056,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "load",
@@ -585,9 +585,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3146964614584113,
-      "recency_weight": 0.7300402060476205,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20699597944973783,
+      "recency_weight": 0.6197917559639281,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "read",
@@ -597,9 +597,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.31469646145731817,
-      "recency_weight": 0.7300402060468226,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20699597944914666,
+      "recency_weight": 0.6197917559630813,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "auto",
@@ -609,9 +609,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.31469646145731817,
-      "recency_weight": 0.7300402060468226,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20699597944820075,
+      "recency_weight": 0.6197917559617264,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "quality",
@@ -621,9 +621,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3188847222488103,
-      "recency_weight": 0.7330634978099098,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20879982849627912,
+      "recency_weight": 0.6223584794039532,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "verified-working",
@@ -633,9 +633,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3188847222488103,
-      "recency_weight": 0.7330634978099098,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2087998284957979,
+      "recency_weight": 0.6223584794032729,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "server",
@@ -645,9 +645,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3188847222476879,
-      "recency_weight": 0.7330634978091085,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.20879982849483544,
+      "recency_weight": 0.6223584794019125,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "voice",
@@ -657,9 +657,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3322869404029399,
-      "recency_weight": 0.742302417492274,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21446370317670163,
+      "recency_weight": 0.6302021655525882,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "can",
@@ -669,9 +669,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3322869404029399,
-      "recency_weight": 0.742302417492274,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21446370317568628,
+      "recency_weight": 0.6302021655512107,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "the-voice",
@@ -681,9 +681,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.33228694040141643,
-      "recency_weight": 0.7423024174912598,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2144637031751786,
+      "recency_weight": 0.6302021655505219,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "and",
@@ -693,9 +693,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.332506036775409,
-      "recency_weight": 0.7424481892246674,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21455494936112424,
+      "recency_weight": 0.6303259232802246,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "evening-email-check",
@@ -705,9 +705,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138956231,
-      "recency_weight": 0.7509250958094477,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585636020918,
+      "recency_weight": 0.6375226732300859,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "check-rich",
@@ -717,9 +717,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138943041,
-      "recency_weight": 0.7509250958086269,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585635954155,
+      "recency_weight": 0.6375226732292149,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "list",
@@ -729,9 +729,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138943041,
-      "recency_weight": 0.7509250958086269,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585635847343,
+      "recency_weight": 0.6375226732278213,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "run",
@@ -741,9 +741,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138933149,
-      "recency_weight": 0.7509250958080114,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585635780586,
+      "recency_weight": 0.6375226732269503,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "filter",
@@ -753,9 +753,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138916661,
-      "recency_weight": 0.7509250958069854,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585635687121,
+      "recency_weight": 0.6375226732257309,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "send",
@@ -765,9 +765,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3456842138916661,
-      "recency_weight": 0.7509250958069854,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.21996585635633717,
+      "recency_weight": 0.6375226732250341,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lilly",
@@ -777,9 +777,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.353518610840755,
-      "recency_weight": 0.7557071773356493,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2231120984536373,
+      "recency_weight": 0.641582579354987,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "the",
@@ -789,9 +789,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3535186108393755,
-      "recency_weight": 0.7557071773348233,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22311209845253835,
+      "recency_weight": 0.6415825793535844,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "got",
@@ -801,9 +801,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3535186108393755,
-      "recency_weight": 0.7557071773348233,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22311209845185154,
+      "recency_weight": 0.6415825793527079,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lily",
@@ -813,9 +813,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3538849792013582,
-      "recency_weight": 0.7559263505556932,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2232579710258795,
+      "recency_weight": 0.6417686537009749,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "your-telegram",
@@ -825,9 +825,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3538849792013582,
-      "recency_weight": 0.7559263505556932,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22325797102477915,
+      "recency_weight": 0.641768653699572,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "pairing",
@@ -837,9 +837,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35388497919997586,
-      "recency_weight": 0.755926350554867,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22325797102422895,
+      "recency_weight": 0.6417686536988706,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ask",
@@ -849,9 +849,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3538849791985935,
-      "recency_weight": 0.7559263505540408,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2232579710231286,
+      "recency_weight": 0.6417686536974677,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "will",
@@ -861,9 +861,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3538899916950154,
-      "recency_weight": 0.7559293464824549,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22325996601598047,
+      "recency_weight": 0.6417711971890138,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "see",
@@ -873,9 +873,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3539397411709165,
-      "recency_weight": 0.7559590773832264,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22327976537472927,
+      "recency_weight": 0.6417964382198098,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "here",
@@ -885,9 +885,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35400525151325407,
-      "recency_weight": 0.7559982162083648,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2233058341280764,
+      "recency_weight": 0.6418296664179902,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ash",
@@ -897,9 +897,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35411158961866185,
-      "recency_weight": 0.7560617208551182,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2233481420290809,
+      "recency_weight": 0.6418835807853854,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hey-ash",
@@ -909,9 +909,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3541115896172778,
-      "recency_weight": 0.7560617208542918,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22334814202797967,
+      "recency_weight": 0.6418835807839823,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "one",
@@ -921,9 +921,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35411158961623973,
-      "recency_weight": 0.7560617208536721,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22334814202729142,
+      "recency_weight": 0.6418835807831054,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "because",
@@ -933,9 +933,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.354569224600442,
-      "recency_weight": 0.7563346444491942,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22353011061084774,
+      "recency_weight": 0.6421152882873262,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "please",
@@ -945,9 +945,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3545692245987074,
-      "recency_weight": 0.7563346444481608,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2235301106097447,
+      "recency_weight": 0.6421152882859226,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "that",
@@ -957,9 +957,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.354924832683516,
-      "recency_weight": 0.7565463032720042,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22367139060479455,
+      "recency_weight": 0.6422949830374778,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "good",
@@ -969,9 +969,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.354924832683516,
-      "recency_weight": 0.7565463032720042,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22367139060424235,
+      "recency_weight": 0.6422949830367759,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "excellent",
@@ -981,9 +981,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3550458272868087,
-      "recency_weight": 0.7566182363726933,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22371943683853862,
+      "recency_weight": 0.6423560530193456,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sounds",
@@ -993,9 +993,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35504582728506945,
-      "recency_weight": 0.7566182363716596,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22371943683743373,
+      "recency_weight": 0.6423560530179415,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "this",
@@ -1005,9 +1005,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35512889078716514,
-      "recency_weight": 0.7566675944463526,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2237524138461674,
+      "recency_weight": 0.6423979571857094,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lily-zheng",
@@ -1017,9 +1017,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35609480948287453,
-      "recency_weight": 0.7572401079400037,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.224135474240377,
+      "recency_weight": 0.642884011433769,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "strategist",
@@ -1029,9 +1029,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3560948094814748,
-      "recency_weight": 0.7572401079391761,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22413547423940663,
+      "recency_weight": 0.6428840114325395,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lily-zhengs",
@@ -1041,9 +1041,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3560948094814748,
-      "recency_weight": 0.7572401079391761,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.224135474238159,
+      "recency_weight": 0.6428840114309585,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "subagent-context",
@@ -1053,9 +1053,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3565742842152789,
-      "recency_weight": 0.7575233073151375,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22432533664885537,
+      "recency_weight": 0.6431244428990542,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "results",
@@ -1065,9 +1065,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3565742842152789,
-      "recency_weight": 0.7575233073151375,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22432533664760562,
+      "recency_weight": 0.6431244428974727,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "subagent-task",
@@ -1077,9 +1077,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35657428421352466,
-      "recency_weight": 0.7575233073141026,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2243253366470502,
+      "recency_weight": 0.6431244428967698,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "your",
@@ -1089,9 +1089,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3565742842121213,
-      "recency_weight": 0.7575233073132747,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22432533664649473,
+      "recency_weight": 0.6431244428960669,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "keep",
@@ -1101,9 +1101,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097577497,
-      "recency_weight": 0.7575383130927152,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22433540380551334,
+      "recency_weight": 0.6431371825467834,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "internal",
@@ -1113,9 +1113,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097437137,
-      "recency_weight": 0.7575383130918872,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22433540380509676,
+      "recency_weight": 0.6431371825462562,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "result",
@@ -1125,9 +1125,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097296777,
-      "recency_weight": 0.7575383130910592,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22433540380454123,
+      "recency_weight": 0.6431371825455533,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "what",
@@ -1137,9 +1137,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097296777,
-      "recency_weight": 0.7575383130910592,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22433540380329137,
+      "recency_weight": 0.6431371825439717,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "researched",
@@ -1149,9 +1149,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097156417,
-      "recency_weight": 0.7575383130902312,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2243354038027359,
+      "recency_weight": 0.6431371825432688,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "march",
@@ -1161,9 +1161,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35659972097156417,
-      "recency_weight": 0.7575383130902312,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22433540380148603,
+      "recency_weight": 0.6431371825416871,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "inter",
@@ -1173,9 +1173,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3567655893020603,
-      "recency_weight": 0.7576361177558818,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2244010367911692,
+      "recency_weight": 0.6432202170435114,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "transcription",
@@ -1185,9 +1185,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3572164678395336,
-      "recency_weight": 0.7579015839950459,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22457933204255034,
+      "recency_weight": 0.6434455933791573,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "voxtral",
@@ -1197,9 +1197,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.357216467837773,
-      "recency_weight": 0.7579015839940104,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22457933204157612,
+      "recency_weight": 0.6434455933779266,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "setup",
@@ -1209,9 +1209,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.35855522066261114,
-      "recency_weight": 0.7586864181233964,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2251077445625964,
+      "recency_weight": 0.6441119042447778,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "python",
@@ -1221,9 +1221,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3586335248602166,
-      "recency_weight": 0.758732167052528,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.22513860616829826,
+      "recency_weight": 0.6441507443098643,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "projects",
@@ -1233,9 +1233,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.38447380913207474,
-      "recency_weight": 0.7729433878111602,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2350560809749859,
+      "recency_weight": 0.6562158297583458,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "current",
@@ -1245,9 +1245,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.3844738091304431,
-      "recency_weight": 0.7729433878103155,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.23505608097437608,
+      "recency_weight": 0.6562158297576287,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sunday",
@@ -1257,9 +1257,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.38447380912840357,
-      "recency_weight": 0.7729433878092594,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2350560809737662,
+      "recency_weight": 0.6562158297569114,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "america",
@@ -1269,9 +1269,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.38447380912840357,
-      "recency_weight": 0.7729433878092594,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.23505608097239403,
+      "recency_weight": 0.6562158297552977,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "return",
@@ -1281,9 +1281,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.384473809126772,
-      "recency_weight": 0.7729433878084145,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.23505608097178413,
+      "recency_weight": 0.6562158297545804,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "document",
@@ -1293,9 +1293,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41098054200610096,
-      "recency_weight": 0.785889975350172,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24470508911633113,
+      "recency_weight": 0.6672072630475596,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "saturday",
@@ -1305,9 +1305,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41098054200610096,
-      "recency_weight": 0.785889975350172,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24470508911484398,
+      "recency_weight": 0.6672072630459188,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "pi-day",
@@ -1317,9 +1317,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4109805420047027,
-      "recency_weight": 0.7858899753495278,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24470508911418307,
+      "recency_weight": 0.6672072630451896,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sun",
@@ -1329,9 +1329,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4111805513208326,
-      "recency_weight": 0.7859820862482224,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24477598290514974,
+      "recency_weight": 0.6672854636355637,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "before",
@@ -1341,9 +1341,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41183510454443145,
-      "recency_weight": 0.7862829793447016,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2450077958819796,
+      "recency_weight": 0.6675409167716191,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "morning",
@@ -1353,9 +1353,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4121903414507431,
-      "recency_weight": 0.7864459270309826,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24513347972131028,
+      "recency_weight": 0.6676792565942317,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lilye",
@@ -1365,9 +1365,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4121903414507431,
-      "recency_weight": 0.7864459270309826,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24513347971981791,
+      "recency_weight": 0.6676792565925896,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "lynae",
@@ -1377,9 +1377,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4121903414488677,
-      "recency_weight": 0.786445927030123,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2451334797193205,
+      "recency_weight": 0.6676792565920424,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "dana",
@@ -1389,9 +1389,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41219034144652356,
-      "recency_weight": 0.7864459270290486,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2451334797186572,
+      "recency_weight": 0.6676792565913126,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "terry",
@@ -1401,9 +1401,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41219034144652356,
-      "recency_weight": 0.7864459270290486,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24513347971782815,
+      "recency_weight": 0.6676792565904004,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "morning-voicecast",
@@ -1413,9 +1413,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.418512947704641,
-      "recency_weight": 0.7893053212548279,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24735583875528766,
+      "recency_weight": 0.6701068338017204,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "generate",
@@ -1425,9 +1425,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41851294770270764,
-      "recency_weight": 0.7893053212539652,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2473558387544435,
+      "recency_weight": 0.6701068338008049,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "write",
@@ -1437,9 +1437,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.41851294770270764,
-      "recency_weight": 0.7893053212539652,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.24735583875376813,
+      "recency_weight": 0.6701068338000725,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hey",
@@ -1449,9 +1449,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.42644508417747085,
-      "recency_weight": 0.7927866627065994,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25010540002272574,
+      "recency_weight": 0.673062433660865,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "marriott",
@@ -1461,9 +1461,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.42644508417747085,
-      "recency_weight": 0.7927866627065994,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25010540002186266,
+      "recency_weight": 0.6730624336599454,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "san-jose",
@@ -1473,9 +1473,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.42644508417496174,
-      "recency_weight": 0.7927866627055162,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2501054000211722,
+      "recency_weight": 0.6730624336592098,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "cool",
@@ -1485,9 +1485,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.427358153105955,
-      "recency_weight": 0.7931800677715128,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2504191900457988,
+      "recency_weight": 0.6733964278886869,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "yelp",
@@ -1497,9 +1497,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.427358153105955,
-      "recency_weight": 0.7931800677715128,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25041919004510665,
+      "recency_weight": 0.673396427887951,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "morning-email-check",
@@ -1509,9 +1509,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4330510698552723,
-      "recency_weight": 0.7955997845539493,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2523631949067985,
+      "recency_weight": 0.6754507264060305,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "once",
@@ -1521,9 +1521,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4415671591027272,
-      "recency_weight": 0.7991160718886332,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25523176230523104,
+      "recency_weight": 0.678435994727915,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "route",
@@ -1533,9 +1533,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4434619375970993,
-      "recency_weight": 0.7998821105575596,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25586366275144634,
+      "recency_weight": 0.6790863485676667,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "done",
@@ -1545,9 +1545,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4447660387264413,
-      "recency_weight": 0.8004059749551792,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2562972493601107,
+      "recency_weight": 0.679531100558277,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "built-zheng-consulting",
@@ -1557,9 +1557,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.44476603872425785,
-      "recency_weight": 0.8004059749543043,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25629724935847936,
+      "recency_weight": 0.6795311005566059,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "react",
@@ -1569,9 +1569,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.44476603872425785,
-      "recency_weight": 0.8004059749543043,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2562972493577543,
+      "recency_weight": 0.6795311005558632,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "follow",
@@ -1581,9 +1581,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4447660387220744,
-      "recency_weight": 0.8004059749534296,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2562972493563042,
+      "recency_weight": 0.6795311005543778,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "when",
@@ -1593,9 +1593,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.444766038719345,
-      "recency_weight": 0.800405974952336,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2562972493555791,
+      "recency_weight": 0.6795311005536351,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "all",
@@ -1605,9 +1605,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.446038352161904,
-      "recency_weight": 0.8009144456702781,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2567192301068999,
+      "recency_weight": 0.6799627835704795,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "how",
@@ -1617,9 +1617,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4466549992546259,
-      "recency_weight": 0.8011599574813155,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.25692338242564694,
+      "recency_weight": 0.6801712189340698,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "perfect",
@@ -1629,9 +1629,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4696562640081459,
-      "recency_weight": 0.8099058844671776,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26437099073833203,
+      "recency_weight": 0.6875963626429263,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "san-pedro",
@@ -1641,9 +1641,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.471691083370425,
-      "recency_weight": 0.8106428506628677,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2650145248191842,
+      "recency_weight": 0.6882220344466083,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "also",
@@ -1653,9 +1653,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.47169108336735516,
-      "recency_weight": 0.8106428506617601,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26501452481744,
+      "recency_weight": 0.6882220344449158,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "railway",
@@ -1665,9 +1665,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.47268665296303913,
-      "recency_weight": 0.8110013543364372,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26532849918583634,
+      "recency_weight": 0.6885263979849517,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sorry",
@@ -1677,9 +1677,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.47369927874137435,
-      "recency_weight": 0.8113646156611157,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26564725796434835,
+      "recency_weight": 0.6888348006899173,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "linked",
@@ -1689,9 +1689,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.47662610273864947,
-      "recency_weight": 0.8124067850539188,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2665652203429842,
+      "recency_weight": 0.6897195848319767,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "service",
@@ -1701,9 +1701,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.476626102736142,
-      "recency_weight": 0.8124067850530309,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26656522034219987,
+      "recency_weight": 0.6897195848312229,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "status",
@@ -1713,9 +1713,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.4766261027330076,
-      "recency_weight": 0.812406785051921,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.26656522034043517,
+      "recency_weight": 0.6897195848295267,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "understood",
@@ -1725,9 +1725,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.47691770552530915,
-      "recency_weight": 0.8125099896284722,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.2666564058672913,
+      "recency_weight": 0.6898072037642631,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "mon",
@@ -1737,9 +1737,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7578314054030147,
-      "recency_weight": 0.8775128666281565,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33637175715044204,
+      "recency_weight": 0.7449935441071338,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "deploy",
@@ -1749,9 +1749,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659974243033497,
-      "recency_weight": 0.8787360565625137,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3379709815564424,
+      "recency_weight": 0.7460320116192058,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sure",
@@ -1761,9 +1761,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659977872746025,
-      "recency_weight": 0.8787361103898994,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3379710522156193,
+      "recency_weight": 0.7460320573169281,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "help",
@@ -1773,9 +1773,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.765997808904544,
-      "recency_weight": 0.8787361135975437,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33797105642668307,
+      "recency_weight": 0.7460320600403676,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "first",
@@ -1785,9 +1785,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.765997808904544,
-      "recency_weight": 0.8787361135975437,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3379710564251071,
+      "recency_weight": 0.7460320600393483,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "docker",
@@ -1797,9 +1797,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659978691669049,
-      "recency_weight": 0.8787361225342389,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33797106815556804,
+      "recency_weight": 0.7460320676258395,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "explain",
@@ -1809,9 +1809,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659978863231971,
-      "recency_weight": 0.8787361250784562,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3379710714951059,
+      "recency_weight": 0.7460320697856331,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tell",
@@ -1821,9 +1821,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659982715611737,
-      "recency_weight": 0.8787361822078543,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33797114648768384,
+      "recency_weight": 0.7460321182858924,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "starting",
@@ -1833,9 +1833,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659985383454474,
-      "recency_weight": 0.8787362217709653,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33797119842280815,
+      "recency_weight": 0.746032151874099,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "continue",
@@ -1845,9 +1845,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659986617718935,
-      "recency_weight": 0.8787362400746374,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3379712224507949,
+      "recency_weight": 0.7460321674138101,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "everything",
@@ -1857,9 +1857,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7659987173729056,
-      "recency_weight": 0.878736248320054,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.33797123327223144,
+      "recency_weight": 0.7460321744123982,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "looks",
@@ -1869,9 +1869,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 0.7828869153585094,
-      "recency_weight": 0.8811900975278363,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.3412188818328849,
+      "recency_weight": 0.7481154507807758,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "don",
@@ -1881,9 +1881,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441454999634,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288236189143,
+      "recency_weight": 0.7999493022378005,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "wednesday",
@@ -1893,9 +1893,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441454999634,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362882361402656,
+      "recency_weight": 0.7999493022358333,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hey-rich",
@@ -1905,9 +1905,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441454989335,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288236118542,
+      "recency_weight": 0.7999493022349589,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "just",
@@ -1917,9 +1917,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441489698113,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288309336935,
+      "recency_weight": 0.7999493051818939,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "quick",
@@ -1929,9 +1929,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244148969039,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288309288058,
+      "recency_weight": 0.7999493051799267,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "but",
@@ -1941,9 +1941,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244148969039,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362883092663347,
+      "recency_weight": 0.7999493051790523,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "phase",
@@ -1953,9 +1953,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441502918912,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288337169918,
+      "recency_weight": 0.7999493063021315,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "dig",
@@ -1965,9 +1965,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.94224415158462,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288364416372,
+      "recency_weight": 0.7999493073987619,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "found",
@@ -1977,9 +1977,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441529484091,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288393161734,
+      "recency_weight": 0.7999493085557214,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "mean",
@@ -1989,9 +1989,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244154265597,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362884209512715,
+      "recency_weight": 0.7999493096742102,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "success-criteria",
@@ -2001,9 +2001,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244154265597,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288420924117,
+      "recency_weight": 0.7999493096731173,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "reframing",
@@ -2013,9 +2013,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441542645672,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288420880671,
+      "recency_weight": 0.7999493096713687,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "context",
@@ -2025,9 +2025,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441542645672,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362884208535164,
+      "recency_weight": 0.7999493096702758,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "commit",
@@ -2037,9 +2037,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441558206822,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362884536774305,
+      "recency_weight": 0.799949310991391,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "need",
@@ -2049,9 +2049,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441572125348,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362884830201843,
+      "recency_weight": 0.7999493121723945,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "visit",
@@ -2061,9 +2061,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441572125348,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288482998461,
+      "recency_weight": 0.7999493121715202,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "still",
@@ -2073,9 +2073,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441585742642,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288511722102,
+      "recency_weight": 0.7999493133276053,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "model",
@@ -2085,9 +2085,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441600137478,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362885420858517,
+      "recency_weight": 0.7999493145497025,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "open",
@@ -2097,9 +2097,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441613862906,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362885710104333,
+      "recency_weight": 0.7999493157138752,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "plese",
@@ -2109,9 +2109,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441626818516,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362885983220607,
+      "recency_weight": 0.7999493168131288,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "gone",
@@ -2121,9 +2121,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441626818516,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362885983003375,
+      "recency_weight": 0.7999493168122545,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "now",
@@ -2133,9 +2133,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441626810792,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288598273183,
+      "recency_weight": 0.7999493168111615,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "could",
@@ -2145,9 +2145,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441641087195,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288628387116,
+      "recency_weight": 0.7999493180232039,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "right",
@@ -2157,9 +2157,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441641087195,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436288628338239,
+      "recency_weight": 0.7999493180212366,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "whenever-terry",
@@ -2169,9 +2169,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244187733398,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362891266709487,
+      "recency_weight": 0.7999493380784066,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "task",
@@ -2181,9 +2181,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244193448336,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362892471973153,
+      "recency_weight": 0.7999493429294179,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hook",
@@ -2193,9 +2193,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441934470487,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436289247175591,
+      "recency_weight": 0.7999493429285435,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "job",
@@ -2205,9 +2205,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441934460188,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436289247126714,
+      "recency_weight": 0.7999493429265763,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "received",
@@ -2217,9 +2217,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441934460188,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436289247104991,
+      "recency_weight": 0.7999493429257019,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "february",
@@ -2229,9 +2229,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244193444989,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362892470778365,
+      "recency_weight": 0.799949342924609,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "respond",
@@ -2241,9 +2241,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441934437017,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443628924703439,
+      "recency_weight": 0.7999493429228604,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "delete",
@@ -2253,9 +2253,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422441934437017,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362892470072357,
+      "recency_weight": 0.7999493429217674,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "thursday",
@@ -2265,9 +2265,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422442231167356,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436289872915702,
+      "recency_weight": 0.79994936811367,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "thoughts",
@@ -2277,9 +2277,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244315156416,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362918143404145,
+      "recency_weight": 0.7999494462531423,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "clean",
@@ -2289,9 +2289,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443151553862,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436291814291537,
+      "recency_weight": 0.799949446251175,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "implement",
@@ -2301,9 +2301,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443151543564,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436291814269814,
+      "recency_weight": 0.7999494462503007,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "both",
@@ -2313,9 +2313,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443151543564,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362918142480895,
+      "recency_weight": 0.7999494462494264,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "plan",
@@ -2325,9 +2325,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443182513964,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436291879553876,
+      "recency_weight": 0.7999494488778865,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "honest",
@@ -2337,9 +2337,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443200320206,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436291917091804,
+      "recency_weight": 0.7999494503887321,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "thinking",
@@ -2349,9 +2349,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.94224432183041,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362919549936003,
+      "recency_weight": 0.7999494519142226,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "would",
@@ -2361,9 +2361,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443218293801,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362919549773083,
+      "recency_weight": 0.7999494519135668,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "comparison",
@@ -2373,9 +2373,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443250126709,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362920221024266,
+      "recency_weight": 0.7999494546152524,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "while",
@@ -2385,9 +2385,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443250113834,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292022053549,
+      "recency_weight": 0.799949454613285,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "suno",
@@ -2397,9 +2397,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443265600323,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292054720022,
+      "recency_weight": 0.7999494559280617,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "library",
@@ -2409,9 +2409,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443265600323,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362920546982987,
+      "recency_weight": 0.7999494559271874,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "there",
@@ -2421,9 +2421,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443298362677,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292123800245,
+      "recency_weight": 0.799949458708437,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "intros",
@@ -2433,9 +2433,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443298362677,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292123756798,
+      "recency_weight": 0.7999494587066883,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "great",
@@ -2445,9 +2445,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443332618324,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292196008631,
+      "recency_weight": 0.7999494616147163,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "marker",
@@ -2457,9 +2457,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443332605451,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292195986908,
+      "recency_weight": 0.7999494616138418,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "context-graph",
@@ -2469,9 +2469,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443378987676,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436292293807117,
+      "recency_weight": 0.7999494655509584,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "repo",
@@ -2481,9 +2481,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443378977378,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362922937582394,
+      "recency_weight": 0.7999494655489912,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "plugin",
@@ -2493,9 +2493,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443906004594,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362934054234165,
+      "recency_weight": 0.7999495102918338,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "linear",
@@ -2505,9 +2505,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443905994295,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362934054016934,
+      "recency_weight": 0.7999495102909595,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tag",
@@ -2517,9 +2517,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443927222243,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362934501789564,
+      "recency_weight": 0.7999495120931762,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "messages",
@@ -2529,9 +2529,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443927222243,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293450135509,
+      "recency_weight": 0.7999495120914275,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "coverage",
@@ -2541,9 +2541,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443927214519,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293450113786,
+      "recency_weight": 0.7999495120905532,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "stack",
@@ -2553,9 +2553,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443946295211,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293490334576,
+      "recency_weight": 0.7999495137093787,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "however",
@@ -2565,9 +2565,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443964652429,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293529040163,
+      "recency_weight": 0.7999495152672197,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "does",
@@ -2577,9 +2577,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443964642131,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362935290130084,
+      "recency_weight": 0.7999495152661268,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "was",
@@ -2589,9 +2589,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443981274338,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362935640745027,
+      "recency_weight": 0.7999495166772985,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ensure",
@@ -2601,9 +2601,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422443997813856,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293598967642,
+      "recency_weight": 0.7999495180816942,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "eventually",
@@ -2613,9 +2613,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444031842938,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293670719886,
+      "recency_weight": 0.7999495209696126,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "look",
@@ -2625,9 +2625,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444031842938,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362936706981626,
+      "recency_weight": 0.7999495209687383,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "fallback",
@@ -2637,9 +2637,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244403183264,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362936706764394,
+      "recency_weight": 0.799949520967864,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "when-anthropic",
@@ -2649,9 +2649,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244404995299,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362937088498067,
+      "recency_weight": 0.7999495225042837,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ollama",
@@ -2661,9 +2661,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444049940117,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293708833514,
+      "recency_weight": 0.799949522503628,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "the-claude-code",
@@ -2673,9 +2673,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444068719577,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362937484189,
+      "recency_weight": 0.7999495240968795,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "continuous",
@@ -2685,9 +2685,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444068719577,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293748397177,
+      "recency_weight": 0.7999495240960051,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "reading",
@@ -2697,9 +2697,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444086173095,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362937852128365,
+      "recency_weight": 0.7999495255777792,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "are",
@@ -2709,9 +2709,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444086173095,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293785185682,
+      "recency_weight": 0.7999495255766863,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "beep",
@@ -2721,9 +2721,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444086162797,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362937851422357,
+      "recency_weight": 0.7999495255749376,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "keepalive",
@@ -2733,9 +2733,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444086149923,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362937851205125,
+      "recency_weight": 0.7999495255740633,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "after",
@@ -2745,9 +2745,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444120995168,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293858594338,
+      "recency_weight": 0.7999495285312725,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "safari",
@@ -2757,9 +2757,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444120987443,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362938585726147,
+      "recency_weight": 0.7999495285303982,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "vite",
@@ -2769,9 +2769,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444138289058,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293895024409,
+      "recency_weight": 0.7999495299975272,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "silence",
@@ -2781,9 +2781,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444156311572,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293933040286,
+      "recency_weight": 0.7999495315276082,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "two",
@@ -2793,9 +2793,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444173814009,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436293969964566,
+      "recency_weight": 0.7999495330137539,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sub",
@@ -2805,9 +2805,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444191179988,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362940065738565,
+      "recency_weight": 0.7999495344872218,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "gateway",
@@ -2817,9 +2817,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444247170793,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436294124672902,
+      "recency_weight": 0.7999495392405276,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "another",
@@ -2829,9 +2829,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444265960551,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436294164263727,
+      "recency_weight": 0.7999495408339976,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "pydantic",
@@ -2841,9 +2841,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444284127247,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436294202578305,
+      "recency_weight": 0.7999495423761006,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "input",
@@ -2853,9 +2853,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444284116948,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362942025565816,
+      "recency_weight": 0.7999495423752263,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "assemble",
@@ -2865,9 +2865,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444303056037,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443629424248412,
+      "recency_weight": 0.7999495439822485,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "bad",
@@ -2877,9 +2877,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444303043164,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362942424406737,
+      "recency_weight": 0.7999495439804998,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "graph",
@@ -2889,9 +2889,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444322363299,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362942831937,
+      "recency_weight": 0.7999495456207466,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tags",
@@ -2901,9 +2901,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422444322363299,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436294283171977,
+      "recency_weight": 0.7999495456198722,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tag-lifecycle",
@@ -2913,9 +2913,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244540223641,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436296561003423,
+      "recency_weight": 0.7999496372990497,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "california",
@@ -2925,9 +2925,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445439092457,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436296638724262,
+      "recency_weight": 0.7999496404271913,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "mac",
@@ -2937,9 +2937,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445457395611,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362966773104245,
+      "recency_weight": 0.7999496419802237,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "zero",
@@ -2949,9 +2949,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445513790642,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362967962676875,
+      "recency_weight": 0.7999496467680661,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "new-agent",
@@ -2961,9 +2961,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445779645946,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362973570298286,
+      "recency_weight": 0.7999496693378563,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "access",
@@ -2973,9 +2973,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445779638222,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44362973570135367,
+      "recency_weight": 0.7999496693372006,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "google-workspace",
@@ -2985,9 +2985,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422445928867245,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436297671763787,
+      "recency_weight": 0.7999496820053986,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "south-almaden-blvd",
@@ -2997,9 +2997,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447597320018,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436301191108662,
+      "recency_weight": 0.7999498236533357,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hotel",
@@ -3009,9 +3009,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447616454787,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436301231470794,
+      "recency_weight": 0.799949825277845,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "market-st",
@@ -3021,9 +3021,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447616454787,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436301231449071,
+      "recency_weight": 0.7999498252769707,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "flow",
@@ -3033,9 +3033,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447640677055,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363012825425785,
+      "recency_weight": 0.7999498273334001,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "domain",
@@ -3045,9 +3045,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447681994973,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363013696698295,
+      "recency_weight": 0.7999498308401284,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "domains",
@@ -3057,9 +3057,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447681994973,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363013696481063,
+      "recency_weight": 0.7999498308392541,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "console",
@@ -3069,9 +3069,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447762787362,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363015400521394,
+      "recency_weight": 0.7999498376977351,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "navigate",
@@ -3081,9 +3081,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447762787362,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363015400304157,
+      "recency_weight": 0.7999498376968608,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "permissions",
@@ -3093,9 +3093,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447782661053,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436301581951212,
+      "recency_weight": 0.7999498393841036,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "registrant",
@@ -3105,9 +3105,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447803889009,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363016267286387,
+      "recency_weight": 0.799949841186321,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "authenticated",
@@ -3117,9 +3117,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422447922904593,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443630187772664,
+      "recency_weight": 0.799949851288575,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ready",
@@ -3129,9 +3129,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244792289172,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436301877704917,
+      "recency_weight": 0.7999498512877007,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "project",
@@ -3141,9 +3141,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244792289172,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363018776777624,
+      "recency_weight": 0.7999498512866078,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "emails",
@@ -3153,9 +3153,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448024101054,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302091164843,
+      "recency_weight": 0.7999498598791086,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "registered-domains",
@@ -3165,9 +3165,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448043871761,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302132852122,
+      "recency_weight": 0.7999498615569524,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "resend",
@@ -3177,9 +3177,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448062239285,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302171568721,
+      "recency_weight": 0.7999498631152311,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "starting-container",
@@ -3189,9 +3189,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448082944589,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302215238266,
+      "recency_weight": 0.7999498648728577,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "uvicorn",
@@ -3201,9 +3201,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448082931715,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302215189387,
+      "recency_weight": 0.7999498648708904,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "yeah",
@@ -3213,9 +3213,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448104293554,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363022602275093,
+      "recency_weight": 0.7999498666835999,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "important",
@@ -3225,9 +3225,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448104283254,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302260205786,
+      "recency_weight": 0.7999498666827256,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "verify",
@@ -3237,9 +3237,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448104283254,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302260184062,
+      "recency_weight": 0.7999498666818512,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "active",
@@ -3249,9 +3249,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448104272956,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302260135184,
+      "recency_weight": 0.799949866679884,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "cleanup",
@@ -3261,9 +3261,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448163837392,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302385783566,
+      "recency_weight": 0.7999498717370221,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "pins",
@@ -3273,9 +3273,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448163837392,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302385761842,
+      "recency_weight": 0.7999498717361478,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "observable",
@@ -3285,9 +3285,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448163827093,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302385740119,
+      "recency_weight": 0.7999498717352735,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "dashboard",
@@ -3297,9 +3297,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448163816795,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302385718396,
+      "recency_weight": 0.7999498717343992,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "maybe",
@@ -3309,9 +3309,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244818450665,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363024293119124,
+      "recency_weight": 0.7999498734889656,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "press",
@@ -3321,9 +3321,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448205574979,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363024737526435,
+      "recency_weight": 0.799949875277631,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hmm",
@@ -3333,9 +3333,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244822873907,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363025225923725,
+      "recency_weight": 0.7999498772433487,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "vercel",
@@ -3345,9 +3345,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448228726197,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302522565219,
+      "recency_weight": 0.7999498772422557,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "minimal",
@@ -3357,9 +3357,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448252644658,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363025730179145,
+      "recency_weight": 0.7999498792728925,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "spec",
@@ -3369,9 +3369,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448252644658,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302572969037,
+      "recency_weight": 0.7999498792709253,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "monthly-cost",
@@ -3381,9 +3381,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448252636935,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363025729527444,
+      "recency_weight": 0.7999498792702696,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "elastic",
@@ -3393,9 +3393,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448252624062,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302572931021,
+      "recency_weight": 0.7999498792693952,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "add",
@@ -3405,9 +3405,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448275885988,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363026219499707,
+      "recency_weight": 0.7999498812423261,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sid",
@@ -3417,9 +3417,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244827587569,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363026219282475,
+      "recency_weight": 0.7999498812414518,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "key",
@@ -3429,9 +3429,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448296210244,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302664799464,
+      "recency_weight": 0.7999498829669468,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "operation",
@@ -3441,9 +3441,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448321470097,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363027180544884,
+      "recency_weight": 0.7999498851103725,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "avoid",
@@ -3453,9 +3453,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448366791593,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363028136539384,
+      "recency_weight": 0.7999498889580905,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "pseudo",
@@ -3465,9 +3465,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448390431992,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363028634983853,
+      "recency_weight": 0.7999498909642462,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "state",
@@ -3477,9 +3477,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448414813891,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302914928644,
+      "recency_weight": 0.799949893034228,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "malformed",
@@ -3489,9 +3489,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448414803593,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302914890628,
+      "recency_weight": 0.7999498930326979,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "every",
@@ -3501,9 +3501,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448439283327,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436302966500107,
+      "recency_weight": 0.799949895109893,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "client",
@@ -3513,9 +3513,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448439273029,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363029664566606,
+      "recency_weight": 0.7999498951081443,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "reservations",
@@ -3525,9 +3525,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448462771824,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303016002412,
+      "recency_weight": 0.7999498971022778,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "instances",
@@ -3537,9 +3537,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448462758951,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363030159752576,
+      "recency_weight": 0.7999498971011849,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "name",
@@ -3549,9 +3549,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448462748653,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303015931811,
+      "recency_weight": 0.7999498970994363,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "try",
@@ -3561,9 +3561,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448486839616,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363030667212316,
+      "recency_weight": 0.7999498991436254,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "only",
@@ -3573,9 +3573,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448535134829,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363031685987747,
+      "recency_weight": 0.7999499032440256,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ubuntu",
@@ -3585,9 +3585,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448558157315,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303217118098,
+      "recency_weight": 0.7999499051968468,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "disk",
@@ -3597,9 +3597,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244855814959,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303217090944,
+      "recency_weight": 0.7999499051957539,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "not",
@@ -3609,9 +3609,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448558136717,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363032170692207,
+      "recency_weight": 0.7999499051948796,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "zheng",
@@ -3621,9 +3621,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448580252928,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303263671451,
+      "recency_weight": 0.7999499070705411,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "caddy",
@@ -3633,9 +3633,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448580242629,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303263649728,
+      "recency_weight": 0.7999499070696668,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "container",
@@ -3645,9 +3645,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448604042658,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363033138526214,
+      "recency_weight": 0.7999499090902489,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "synchronizing",
@@ -3657,9 +3657,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448604042658,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303313830898,
+      "recency_weight": 0.7999499090893746,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "executing",
@@ -3669,9 +3669,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448604029785,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303313787451,
+      "recency_weight": 0.7999499090876259,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "unable",
@@ -3681,9 +3681,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448628512096,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363033654078005,
+      "recency_weight": 0.7999499111652583,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "error",
@@ -3693,9 +3693,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448628501797,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303365380646,
+      "recency_weight": 0.7999499111641653,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "consider",
@@ -3705,9 +3705,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448653522209,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303418136047,
+      "recency_weight": 0.7999499132874814,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "installing",
@@ -3717,9 +3717,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448679222326,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363034723251976,
+      "recency_weight": 0.7999499154685036,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "removing",
@@ -3729,9 +3729,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244870419382,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303524971984,
+      "recency_weight": 0.7999499175874482,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "failed",
@@ -3741,9 +3741,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942244870419382,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303524950261,
+      "recency_weight": 0.7999499175865739,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sent",
@@ -3753,9 +3753,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448728130305,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436303575424703,
+      "recency_weight": 0.7999499196180851,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "if-rich",
@@ -3765,9 +3765,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422448728120006,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443630357540298,
+      "recency_weight": 0.7999499196172107,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "focusing",
@@ -3777,9 +3777,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452144920715,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436310782637275,
+      "recency_weight": 0.79995020969583,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "jiti",
@@ -3789,9 +3789,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452239726947,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436310982591457,
+      "recency_weight": 0.7999502177436254,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "standing",
@@ -3801,9 +3801,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942245226290907,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363110314911136,
+      "recency_weight": 0.7999502197117483,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "evidence",
@@ -3813,9 +3813,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452311523558,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363111339935735,
+      "recency_weight": 0.7999502238372872,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "context-graph-codebase",
@@ -3825,9 +3825,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942245236251702,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443631124155762,
+      "recency_weight": 0.7999502281665456,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "committed",
@@ -3837,9 +3837,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.942245236251702,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363112415304656,
+      "recency_weight": 0.7999502281654527,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sticky-threads",
@@ -3849,9 +3849,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452362506721,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363112414924494,
+      "recency_weight": 0.7999502281639226,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "working",
@@ -3861,9 +3861,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452387637853,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363112944978583,
+      "recency_weight": 0.7999502302972945,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "codebase",
@@ -3873,9 +3873,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452387637853,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363112944544114,
+      "recency_weight": 0.7999502302955458,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "option",
@@ -3885,9 +3885,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452461313957,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363114498699713,
+      "recency_weight": 0.7999502365507407,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "schema",
@@ -3897,9 +3897,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452461303659,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311449842817,
+      "recency_weight": 0.7999502365496478,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "ingest",
@@ -3909,9 +3909,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452461303659,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.443631144979937,
+      "recency_weight": 0.7999502365478991,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "changes",
@@ -3921,9 +3921,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452486455387,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311502848231,
+      "recency_weight": 0.7999502386830196,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "backwards",
@@ -3933,9 +3933,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452486442514,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363115028265077,
+      "recency_weight": 0.7999502386821453,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sticky",
@@ -3945,9 +3945,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452513257464,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311559351135,
+      "recency_weight": 0.799950240957159,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "full",
@@ -3957,9 +3957,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452513247166,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363115593022573,
+      "recency_weight": 0.7999502409551918,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "zheng-consulting-survey",
@@ -3969,9 +3969,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452513247166,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363115592805336,
+      "recency_weight": 0.7999502409543175,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "test",
@@ -3981,9 +3981,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452586454686,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311713675106,
+      "recency_weight": 0.7999502471684189,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "gmail",
@@ -3993,9 +3993,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452586446961,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311713653382,
+      "recency_weight": 0.7999502471675445,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "didn",
@@ -4005,9 +4005,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452611356674,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363117661483,
+      "recency_weight": 0.7999502492803696,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "no-zheng",
@@ -4017,9 +4017,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.94224526113438,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363117661265766,
+      "recency_weight": 0.7999502492794953,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "the-economist-today",
@@ -4029,9 +4029,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452636580493,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311819316648,
+      "recency_weight": 0.799950251420299,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "garrett",
@@ -4041,9 +4041,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452690717601,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311933511837,
+      "recency_weight": 0.7999502560164476,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "specifically",
@@ -4053,9 +4053,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452715004249,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.4436311984714209,
+      "recency_weight": 0.79995025807725,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "things",
@@ -4065,9 +4065,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452740392846,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363120382464316,
+      "recency_weight": 0.7999502602318245,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "love",
@@ -4077,9 +4077,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9422452740379973,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.44363120382247084,
+      "recency_weight": 0.7999502602309502,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "running",
@@ -4089,9 +4089,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9998719561537575,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.6043611896471701,
+      "recency_weight": 0.8488743361853918,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "almost",
@@ -4101,9 +4101,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9998719711333697,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.6043612448995052,
+      "recency_weight": 0.848874348900741,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "turn",
@@ -4113,9 +4113,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9998719844275434,
-      "distinctiveness": 0.999916149589133
+      "frequency": 0.6043612939441628,
+      "recency_weight": 0.848874360187501,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tue",
@@ -4125,9 +4125,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999830588,
-      "distinctiveness": 0.9999164089275265
+      "frequency": 0.6191083710152983,
+      "recency_weight": 0.8521937726048652,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "graef",
@@ -4137,21 +4137,21 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999795065,
-      "distinctiveness": 0.9999164089275265
+      "frequency": 0.6191083710110675,
+      "recency_weight": 0.8521937726039337,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "has-url",
       "state": "candidate",
       "first_seen": 1773824409.93638,
-      "last_seen": 1773853052.319565,
-      "hits": 1337,
+      "last_seen": 1773933000.147448,
+      "hits": 1402,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1337.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9521148955982952
+      "frequency": 1115.5038636399247,
+      "recency_weight": 1.0,
+      "distinctiveness": 0.9519665616006578
     },
     {
       "name": "root-cause",
@@ -4161,9 +4161,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999874307,
-      "distinctiveness": 0.9999212226248622
+      "frequency": 0.7971421917823791,
+      "recency_weight": 0.8831854935093247,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "memory-pressure",
@@ -4173,9 +4173,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999852447,
-      "distinctiveness": 0.9999212226248622
+      "frequency": 0.7971421917753653,
+      "recency_weight": 0.8831854935083595,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "stopped",
@@ -4185,9 +4185,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999928956,
-      "distinctiveness": 0.9999212288302481
+      "frequency": 0.7971422172339738,
+      "recency_weight": 0.8831854970121844,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "removed",
@@ -4197,9 +4197,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999918027,
-      "distinctiveness": 0.9999212288302481
+      "frequency": 0.79714221722696,
+      "recency_weight": 0.8831854970112192,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "did",
@@ -4209,9 +4209,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999964478,
-      "distinctiveness": 0.9999212412380878
+      "frequency": 0.7971422564502992,
+      "recency_weight": 0.8831855024094601,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "root",
@@ -4221,9 +4221,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999942618,
-      "distinctiveness": 0.9999212474405418
+      "frequency": 0.7971422859734527,
+      "recency_weight": 0.8831855064726809,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "looking",
@@ -4233,9 +4233,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999212474405418
+      "frequency": 0.7971422859576714,
+      "recency_weight": 0.883185506470509,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "mar",
@@ -4245,9 +4245,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999907097,
-      "distinctiveness": 0.9999212474405418
+      "frequency": 0.7971422859506576,
+      "recency_weight": 0.8831855064695437,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "puppeteer",
@@ -4257,9 +4257,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999928956,
-      "distinctiveness": 0.999921253642019
+      "frequency": 0.7971423120212329,
+      "recency_weight": 0.8831855100575918,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "chrome",
@@ -4269,9 +4269,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999907097,
-      "distinctiveness": 0.999921253642019
+      "frequency": 0.797142312014219,
+      "recency_weight": 0.8831855100566265,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tag-distribution",
@@ -4281,9 +4281,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.999921272240592
+      "frequency": 0.7971423859667783,
+      "recency_weight": 0.883185520234588,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "after-tagger-fix",
@@ -4293,9 +4293,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999909829,
-      "distinctiveness": 0.999921272240592
+      "frequency": 0.7971423859580111,
+      "recency_weight": 0.8831855202333814,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "smart",
@@ -4305,9 +4305,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999942618,
-      "distinctiveness": 0.9999212784381643
+      "frequency": 0.7971424072118125,
+      "recency_weight": 0.8831855231585046,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "services-running",
@@ -4317,9 +4317,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999212846347607
+      "frequency": 0.7971424339329329,
+      "recency_weight": 0.8831855268360851,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "give",
@@ -4329,9 +4329,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999964478,
-      "distinctiveness": 0.9999213217938631
+      "frequency": 0.797142574331505,
+      "recency_weight": 0.8831855461588881,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "low",
@@ -4341,9 +4341,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999213217938631
+      "frequency": 0.797142574324491,
+      "recency_weight": 0.8831855461579228,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "compound-rankings",
@@ -4353,9 +4353,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999942618,
-      "distinctiveness": 0.9999213279836362
+      "frequency": 0.7971426063761722,
+      "recency_weight": 0.8831855505691372,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "your-profile",
@@ -4365,9 +4365,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999918027,
-      "distinctiveness": 0.9999213279836362
+      "frequency": 0.7971426063603909,
+      "recency_weight": 0.8831855505669652,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "hey-terry",
@@ -4377,9 +4377,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.999999999995628,
-      "distinctiveness": 0.9999213341724354
+      "frequency": 0.7971426289258,
+      "recency_weight": 0.8831855536726011,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "sending",
@@ -4389,9 +4389,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.999999999994535,
-      "distinctiveness": 0.9999213341724354
+      "frequency": 0.7971426289170326,
+      "recency_weight": 0.8831855536713944,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "happy",
@@ -4401,9 +4401,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999934421,
-      "distinctiveness": 0.9999213341724354
+      "frequency": 0.7971426289100187,
+      "recency_weight": 0.8831855536704291,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tier",
@@ -4413,9 +4413,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.999999999995628,
-      "distinctiveness": 0.9999213403602611
+      "frequency": 0.797142650237479,
+      "recency_weight": 0.8831855566056882,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "south-bay",
@@ -4425,9 +4425,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999213403602611
+      "frequency": 0.7971426502234512,
+      "recency_weight": 0.8831855566037575,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "graph-mode-session-summary",
@@ -4437,9 +4437,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999213527329925
+      "frequency": 0.7971426932851803,
+      "recency_weight": 0.8831855625302636,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "metric",
@@ -4449,9 +4449,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999920759,
-      "distinctiveness": 0.9999213527329925
+      "frequency": 0.7971426932781663,
+      "recency_weight": 0.8831855625292983,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "count",
@@ -4461,9 +4461,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999909829,
-      "distinctiveness": 0.9999213527329925
+      "frequency": 0.7971426932623852,
+      "recency_weight": 0.8831855625271263,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "main-repo",
@@ -4473,9 +4473,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999928956,
-      "distinctiveness": 0.9999213651018322
+      "frequency": 0.7971427461558297,
+      "recency_weight": 0.8831855698067523,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "last",
@@ -4485,9 +4485,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999918027,
-      "distinctiveness": 0.9999213651018322
+      "frequency": 0.7971427461400484,
+      "recency_weight": 0.8831855698045803,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "already",
@@ -4497,9 +4497,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999953548,
-      "distinctiveness": 0.9999213712847932
+      "frequency": 0.7971427678076883,
+      "recency_weight": 0.8831855727866569,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "built",
@@ -4509,9 +4509,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999920759,
-      "distinctiveness": 0.9999213836477987
+      "frequency": 0.7971428249164876,
+      "recency_weight": 0.8831855806464328,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "three",
@@ -4521,9 +4521,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999896166,
-      "distinctiveness": 0.9999213836477987
+      "frequency": 0.7971428249094736,
+      "recency_weight": 0.8831855806454675,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "total",
@@ -4533,9 +4533,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999942618,
-      "distinctiveness": 0.9999213898278437
+      "frequency": 0.7971428519532607,
+      "recency_weight": 0.8831855843674524,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "the-content",
@@ -4545,9 +4545,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999934421,
-      "distinctiveness": 0.9999213898278437
+      "frequency": 0.7971428519462469,
+      "recency_weight": 0.8831855843664871,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "entry",
@@ -4557,9 +4557,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999942618,
-      "distinctiveness": 0.9999213960069171
+      "frequency": 0.7971428848343561,
+      "recency_weight": 0.8831855888928145,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "today",
@@ -4569,9 +4569,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999953548,
-      "distinctiveness": 0.9999214021850192
+      "frequency": 0.7971429093478879,
+      "recency_weight": 0.8831855922665647,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "tagger",
@@ -4581,9 +4581,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999931688,
-      "distinctiveness": 0.9999214021850192
+      "frequency": 0.7971429093391206,
+      "recency_weight": 0.8831855922653581,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "mei",
@@ -4593,9 +4593,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999920759,
-      "distinctiveness": 0.9999214021850192
+      "frequency": 0.7971429093321067,
+      "recency_weight": 0.8831855922643927,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "content",
@@ -4605,9 +4605,9 @@
       "hits": 1,
       "promoted_at": null,
       "archived_at": null,
-      "frequency": 1.0,
-      "recency_weight": 0.9999999999909829,
-      "distinctiveness": 0.9999214021850192
+      "frequency": 0.7971429093250927,
+      "recency_weight": 0.8831855922634275,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "wed",
@@ -4618,8 +4618,8 @@
       "promoted_at": null,
       "archived_at": null,
       "frequency": 1.0,
-      "recency_weight": 0.9999999999587399,
-      "distinctiveness": 0.9999641345671042
+      "recency_weight": 0.9067657543913843,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "unlocking",
@@ -4630,8 +4630,8 @@
       "promoted_at": null,
       "archived_at": null,
       "frequency": 1.0,
-      "recency_weight": 0.999999999961199,
-      "distinctiveness": 0.999964149996415
+      "recency_weight": 0.9073248166113889,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "requesting",
@@ -4642,8 +4642,8 @@
       "promoted_at": null,
       "archived_at": null,
       "frequency": 1.0,
-      "recency_weight": 0.9999999999540947,
-      "distinctiveness": 0.999964149996415
+      "recency_weight": 0.9073248166103972,
+      "distinctiveness": 0.9999654326108749
     },
     {
       "name": "connecting",
@@ -4654,8 +4654,452 @@
       "promoted_at": null,
       "archived_at": null,
       "frequency": 1.0,
-      "recency_weight": 0.9999999999497228,
-      "distinctiveness": 0.999964149996415
+      "recency_weight": 0.9073248166081659,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "start",
+      "state": "candidate",
+      "first_seen": 1773887625.424101,
+      "last_seen": 1773887625.424101,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495444626136768,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "why",
+      "state": "candidate",
+      "first_seen": 1773887642.671844,
+      "last_seen": 1773887642.671844,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495632326674165,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "deploying",
+      "state": "candidate",
+      "first_seen": 1773887642.686839,
+      "last_seen": 1773887642.686839,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495632489840905,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "message",
+      "state": "candidate",
+      "first_seen": 1773887642.703627,
+      "last_seen": 1773887642.703627,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495632672529747,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "response",
+      "state": "candidate",
+      "first_seen": 1773887642.703627,
+      "last_seen": 1773887642.703627,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495632672519367,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "hello",
+      "state": "candidate",
+      "first_seen": 1773887642.730603,
+      "last_seen": 1773887642.730603,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495632966079922,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "normal",
+      "state": "candidate",
+      "first_seen": 1773887642.7633688,
+      "last_seen": 1773887642.7633688,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495633322638433,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "more",
+      "state": "candidate",
+      "first_seen": 1773887664.276858,
+      "last_seen": 1773887664.276858,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495867450879778,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "doing",
+      "state": "candidate",
+      "first_seen": 1773887664.276858,
+      "last_seen": 1773887664.276858,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495867450869399,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "second",
+      "state": "candidate",
+      "first_seen": 1773887664.2807481,
+      "last_seen": 1773887664.2807481,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9495867493181295,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "those",
+      "state": "candidate",
+      "first_seen": 1773888480.844723,
+      "last_seen": 1773888480.844723,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9504758312236572,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "monday",
+      "state": "candidate",
+      "first_seen": 1773888502.575725,
+      "last_seen": 1773888502.575725,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9504995034933132,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "okay",
+      "state": "candidate",
+      "first_seen": 1773888516.5738811,
+      "last_seen": 1773888516.5738811,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9505147524401709,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "statement",
+      "state": "candidate",
+      "first_seen": 1773888577.567441,
+      "last_seen": 1773888577.567441,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9505811988757934,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "information",
+      "state": "candidate",
+      "first_seen": 1773888577.567441,
+      "last_seen": 1773888577.567441,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9505811988747545,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "thanks",
+      "state": "candidate",
+      "first_seen": 1773889006.042366,
+      "last_seen": 1773889006.042366,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9510481107792479,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "then",
+      "state": "candidate",
+      "first_seen": 1773890067.962199,
+      "last_seen": 1773890067.962199,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9522062804862091,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "continuing",
+      "state": "candidate",
+      "first_seen": 1773890342.929827,
+      "last_seen": 1773890342.929827,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.952506400333174,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "answer",
+      "state": "candidate",
+      "first_seen": 1773890345.376266,
+      "last_seen": 1773890345.376266,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9525090709797391,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "user",
+      "state": "candidate",
+      "first_seen": 1773890346.2950091,
+      "last_seen": 1773890346.2950091,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9525100739237353,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "assistant",
+      "state": "candidate",
+      "first_seen": 1773890346.2950091,
+      "last_seen": 1773890346.2950091,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9525100739226943,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "query",
+      "state": "candidate",
+      "first_seen": 1773890346.384675,
+      "last_seen": 1773890346.384675,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9525101718043489,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "pre",
+      "state": "candidate",
+      "first_seen": 1773890346.4051101,
+      "last_seen": 1773890346.4051101,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9525101941112734,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "nope",
+      "state": "candidate",
+      "first_seen": 1773891200.014998,
+      "last_seen": 1773891200.014998,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9534424930726557,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "chase",
+      "state": "candidate",
+      "first_seen": 1773891271.522476,
+      "last_seen": 1773891271.522476,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9535206337971602,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "bug",
+      "state": "candidate",
+      "first_seen": 1773891609.448562,
+      "last_seen": 1773891609.448562,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9538899935682298,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "new",
+      "state": "candidate",
+      "first_seen": 1773891609.448562,
+      "last_seen": 1773891609.448562,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9538899935658839,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "extended",
+      "state": "candidate",
+      "first_seen": 1773891609.448562,
+      "last_seen": 1773891609.448562,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9538899935648414,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "multi",
+      "state": "candidate",
+      "first_seen": 1773893981.0815911,
+      "last_seen": 1773893981.0815911,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9564862633385764,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "test-coverage",
+      "state": "candidate",
+      "first_seen": 1773893981.0815911,
+      "last_seen": 1773893981.0815911,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9564862633372697,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "categories",
+      "state": "candidate",
+      "first_seen": 1773893981.0815911,
+      "last_seen": 1773893981.0815911,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9564862633354402,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "harvester",
+      "state": "candidate",
+      "first_seen": 1773910904.4976268,
+      "last_seen": 1773910904.4976268,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9752189013286049,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "thu",
+      "state": "candidate",
+      "first_seen": 1773928934.3497632,
+      "last_seen": 1773928934.3497632,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9955800709736585,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "hunter-alpha",
+      "state": "candidate",
+      "first_seen": 1773928934.3497632,
+      "last_seen": 1773928934.3497632,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9955800709714823,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "autoscience",
+      "state": "candidate",
+      "first_seen": 1773929168.017397,
+      "last_seen": 1773929168.017397,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9958467240396488,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "replied",
+      "state": "candidate",
+      "first_seen": 1773932712.128835,
+      "last_seen": 1773932712.128835,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9998999037380678,
+      "distinctiveness": 0.9999654326108749
+    },
+    {
+      "name": "final",
+      "state": "candidate",
+      "first_seen": 1773932982.751772,
+      "last_seen": 1773932982.751772,
+      "hits": 1,
+      "promoted_at": null,
+      "archived_at": null,
+      "frequency": 1.0,
+      "recency_weight": 0.9999999999953548,
+      "distinctiveness": 0.999965675842658
     }
   ]
 }

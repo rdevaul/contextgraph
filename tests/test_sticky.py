@@ -113,7 +113,7 @@ class TestStickyPinManager:
         assert pin.turns_elapsed == 2
 
     def test_tick_expires_stale_pins(self, manager):
-        """Test that tick expires pins when turns_elapsed >= ttl_turns."""
+        """Test that tick expires pins when turns_elapsed > ttl_turns."""
         # Add a pin with TTL of 3
         pin_id = manager.add_pin(
             message_ids=["msg-1"],
@@ -125,12 +125,13 @@ class TestStickyPinManager:
 
         assert len(manager.get_active_pins()) == 1
 
-        # Tick twice - pin should still be active
+        # Tick 3 times - pin should still be active
+        manager.tick()
         manager.tick()
         manager.tick()
         assert len(manager.get_active_pins()) == 1
 
-        # Third tick should expire it
+        # Fourth tick should expire it (turns_elapsed=4 > ttl_turns=3)
         expired = manager.tick()
         assert pin_id in expired
         assert len(manager.get_active_pins()) == 0

@@ -571,17 +571,20 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
             writeComparisonLog({
               timestamp: new Date().toISOString(),
               sessionId,
-              userText: userText.slice(0, 200),
-              graphMsgCount: comparison.graph_assembly?.messages?.length ?? 0,
-              graphTokens: comparison.graph_assembly?.total_tokens ?? 0,
-              graphTags: comparison.graph_assembly?.tags_used ?? [],
-              graphRecency: comparison.graph_assembly?.recency_count ?? 0,
-              graphTopic: comparison.graph_assembly?.topic_count ?? 0,
-              linearMsgCount: comparison.linear_window?.messages?.length ?? 0,
-              linearTokens: comparison.linear_window?.total_tokens ?? 0,
-              linearTags: comparison.linear_window?.tags_used ?? [],
-              stickyPins: comparison.graph_assembly?.sticky_count ?? 0,
-              hadTools,
+              had_tools: hadTools,
+              graph_assembly: {
+                tokens: comparison.graph_assembly?.total_tokens ?? 0,
+                messages: comparison.graph_assembly?.messages?.length ?? 0,
+                tags: comparison.graph_assembly?.tags_used ?? [],
+                recency: comparison.graph_assembly?.recency_count ?? 0,
+                topic: comparison.graph_assembly?.topic_count ?? 0,
+                sticky_count: comparison.graph_assembly?.sticky_count ?? 0,
+              },
+              linear_would_have: {
+                tokens: comparison.linear_window?.total_tokens ?? 0,
+                messages: comparison.linear_window?.messages?.length ?? 0,
+                tags: comparison.linear_window?.tags_used ?? [],
+              },
             });
           }
         } catch {

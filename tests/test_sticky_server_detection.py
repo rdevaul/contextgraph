@@ -373,6 +373,166 @@ class TestStickyServerDetection:
             "Extended pin should have reset TTL (turns_elapsed near 0)"
         )
 
+    def test_pin_ttl_progression(self, api_available):
+        """
+        Test 3.5: Pin TTL progression.
+
+        Create pin via tool_state, then call /assemble (no tool_state) N times.
+        Verify turns_elapsed increments and pin expires after ttl_turns.
+        """
+        session_id = _unique_session_id()
+
+        # Ingest messages
+        _ingest_message(session_id, "Start task", "Starting...")
+        _ingest_message(session_id, "Continue", "Continuing...")
+
+        # Create pin with TTL of 3
+        response1 = requests.post(
+            f"{API_BASE_URL}/assemble",
+            json={
+                "user_text": "Query",
+                "tags": None,
+                "token_budget": 4000,
+                "session_id": session_id,
+                "tool_state": {
+                    "last_turn_had_tools": True,
+                    "pending_chain_ids": []
+                }
+            }
+        )
+        assert response1.status_code == 200
+        assert response1.json()["sticky_count"] > 0
+
+        # Get pin ID and TTL
+        pins1 = requests.get(f"{API_BASE_URL}/pins").json()
+        pin_id = pins1["active_pins"][0]["pin_id"]
+        initial_ttl = pins1["active_pins"][0]["ttl_turns"]
+        initial_elapsed = pins1["active_pins"][0]["turns_elapsed"]
+
+        # Tick N+1 times (without tool_state, so pin ages)
+        # With turns_elapsed > ttl_turns semantics, need one extra tick to expire
+        for i in range(initial_ttl - initial_elapsed + 1):
+            response = requests.post(
+                f"{API_BASE_URL}/assemble",
+                json={
+                    "user_text": f"Query {i}",
+                    "session_id": session_id,
+                    "token_budget": 4000,
+                    "tool_state": None
+                }
+            )
+            assert response.status_code == 200
+
+            pins = requests.get(f"{API_BASE_URL}/pins").json()
+            if len(pins["active_pins"]) == 0:
+                # Pin expired
+                break
+
+        # After TTL ticks, pin should be expired
+        pins_final = requests.get(f"{API_BASE_URL}/pins").json()
+        pin_ids_final = [p["pin_id"] for p in pins_final["active_pins"]]
+        assert pin_id not in pin_ids_final, "Pin should be expired after ttl_turns ticks"
+
+    def test_sticky_count_persists_across_turns(self, api_available):
+        """
+        Test 3.7: sticky_count persists across turns.
+
+        Create pin via tool_state in turn 1.
+        In turn 2, call /assemble with no tool_state.
+        Second call should still see sticky_count > 0 (pin persists).
+        """
+        session_id = _unique_session_id()
+
+        # Ingest messages
+        msg1_id, ext1 = _ingest_message(session_id, "Start", "Starting...")
+        msg2_id, ext2 = _ingest_message(session_id, "Continue", "Continuing...")
+
+        # Turn 1: Create pin
+        response1 = requests.post(
+            f"{API_BASE_URL}/assemble",
+            json={
+                "user_text": "Start task",
+                "session_id": session_id,
+                "token_budget": 4000,
+                "tool_state": {
+                    "last_turn_had_tools": True,
+                    "pending_chain_ids": [ext1, ext2]
+                }
+            }
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["sticky_count"] > 0, "Turn 1: Pin should be created"
+
+        # Turn 2: No tool_state, pin should persist
+        response2 = requests.post(
+            f"{API_BASE_URL}/assemble",
+            json={
+                "user_text": "Follow-up query",
+                "session_id": session_id,
+                "token_budget": 4000,
+                "tool_state": None  # No tool state
+            }
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["sticky_count"] > 0, (
+            "Turn 2: Pin should persist from turn 1 (sticky_count > 0)"
+        )
+
+    def test_budget_cap_respected_in_live_assembly(self, api_available):
+        """
+        Test 3.8: Budget cap respected in live assembly.
+
+        Ingest large messages, pin 10 of them, assemble with small budget.
+        Verify sticky_count < 10 and total_tokens <= budget.
+        """
+        session_id = _unique_session_id()
+
+        # Ingest 10 messages with ~200 tokens each
+        large_text = "word " * 50  # ~250 words, ~325 tokens per message
+        external_ids = []
+        for i in range(10):
+            msg_id, ext_id = _ingest_message(
+                session_id,
+                f"User: {large_text}",
+                f"Assistant: {large_text}"
+            )
+            external_ids.append(ext_id)
+
+        # Pin all 10 via explicit pin
+        pin_response = requests.post(
+            f"{API_BASE_URL}/pin",
+            json={
+                "message_ids": external_ids,
+                "reason": "Test budget cap",
+                "ttl_turns": 20
+            }
+        )
+        assert pin_response.status_code == 200
+
+        # Assemble with small budget (400 tokens)
+        response = requests.post(
+            f"{API_BASE_URL}/assemble",
+            json={
+                "user_text": "Query",
+                "session_id": session_id,
+                "token_budget": 400
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # sticky_count should be < 10 (budget cap hit)
+        assert data["sticky_count"] < 10, (
+            f"Expected sticky_count < 10 due to budget cap, got {data['sticky_count']}"
+        )
+
+        # total_tokens should not exceed budget
+        assert data["total_tokens"] <= 400, (
+            f"Budget exceeded: {data['total_tokens']} > 400"
+        )
+
 
 @pytest.mark.sticky
 class TestStickyEdgeCases:

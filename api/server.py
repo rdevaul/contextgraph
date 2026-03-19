@@ -46,6 +46,7 @@ class AssembleRequest(BaseModel):
     tags: list[str] | None = None
     token_budget: int = 4000
     tool_state: ToolState | None = None
+    session_id: str | None = None
 
 class PinRequest(BaseModel):
     message_ids: list[str]
@@ -140,7 +141,11 @@ def assemble(request: AssembleRequest):
                 # pending_chain_ids is empty but last_turn_had_tools=True, so we
                 # know a tool chain was active. Pin the most recent messages from
                 # the store as a best-effort recovery.
-                recent = store.get_recent(5)
+                # Use session-scoped get_recent if session_id is provided for better isolation
+                if request.session_id:
+                    recent = store.get_recent_by_session(5, request.session_id)
+                else:
+                    recent = store.get_recent(5)
                 if recent:
                     fallback_ids = [msg.id for msg in recent]
                     total_tokens = sum(_estimate_tokens(msg) for msg in recent)
@@ -228,12 +233,15 @@ def compare(request: TagRequest):
         features = extract_features(request.user_text, request.assistant_text)
         inferred_tags = ensemble.assign(features, request.user_text, request.assistant_text).tags
 
-        # Graph Assembly
+        # Graph Assembly — READ-ONLY: Get pinned IDs but do NOT tick the pin manager
+        pinned_ids = pin_manager.get_pinned_message_ids()
+
         assembler = ContextAssembler(store, token_budget=4000)
-        graph_assembly_result = assembler.assemble(request.user_text, inferred_tags)
+        graph_assembly_result = assembler.assemble(request.user_text, inferred_tags, pinned_message_ids=pinned_ids)
         graph_assembly = {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in graph_assembly_result.messages],
             "total_tokens": graph_assembly_result.total_tokens,
+            "sticky_count": graph_assembly_result.sticky_count,
             "recency_count": graph_assembly_result.recency_count,
             "topic_count": graph_assembly_result.topic_count,
             "tags_used": graph_assembly_result.tags_used

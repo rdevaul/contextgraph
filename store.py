@@ -196,6 +196,17 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
+    def get_recent_by_session(self, n: int, session_id: str) -> List[Message]:
+        """Return the N most recent messages for a specific session, newest first."""
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?",
+            (session_id, n)
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        tags_map = self._fetch_tags_bulk(conn, ids)
+        return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
+
     def get_by_tag(self, tag: str, limit: int = 20) -> List[Message]:
         """Return messages carrying `tag`, newest first."""
         conn = self._conn()
