@@ -248,10 +248,17 @@ def quality():
         zero_return_turns = 0
         topic_msg_counts = []
         for e in recent:
-            g = e.get("graph_assembly", {})
-            if g.get("tokens", 0) == 0:
+            # Support both flat (new) and nested (legacy) log schemas
+            if "graphTokens" in e:
+                tokens = e.get("graphTokens", 0)
+                topic = e.get("graphTopic", 0)
+            else:
+                g = e.get("graph_assembly", {})
+                tokens = g.get("tokens", 0)
+                topic = g.get("topic", 0)
+            if tokens == 0:
                 zero_return_turns += 1
-            topic_msg_counts.append(g.get("topic", 0))
+            topic_msg_counts.append(topic)
 
         zero_return_rate = zero_return_turns / total if total > 0 else 0.0
         avg_topic = sum(topic_msg_counts) / len(topic_msg_counts) if topic_msg_counts else 0.0
@@ -427,11 +434,22 @@ def get_comparison_stats():
                 "tag_frequency": {}
             }
 
+        def _graph_field(e, flat_key, nested_obj, nested_key, default=0):
+            """Read from flat (new) or nested (legacy) log schema."""
+            if flat_key in e:
+                return e.get(flat_key, default)
+            return e.get(nested_obj, {}).get(nested_key, default)
+
+        def _linear_field(e, flat_key, nested_obj, nested_key, default=0):
+            if flat_key in e:
+                return e.get(flat_key, default)
+            return e.get(nested_obj, {}).get(nested_key, default)
+
         total_turns = len(entries)
-        total_graph_tokens = sum(e["graph_assembly"]["tokens"] for e in entries)
-        total_linear_tokens = sum(e["linear_would_have"]["tokens"] for e in entries)
-        total_graph_messages = sum(e["graph_assembly"]["messages"] for e in entries)
-        total_linear_messages = sum(e["linear_would_have"]["messages"] for e in entries)
+        total_graph_tokens = sum(_graph_field(e, "graphTokens", "graph_assembly", "tokens") for e in entries)
+        total_linear_tokens = sum(_linear_field(e, "linearTokens", "linear_would_have", "tokens") for e in entries)
+        total_graph_messages = sum(_graph_field(e, "graphMsgCount", "graph_assembly", "messages") for e in entries)
+        total_linear_messages = sum(_linear_field(e, "linearMsgCount", "linear_would_have", "messages") for e in entries)
 
         avg_graph_tokens = total_graph_tokens / total_turns
         avg_linear_tokens = total_linear_tokens / total_turns
@@ -441,7 +459,8 @@ def get_comparison_stats():
         # Calculate tag usage
         all_tags = []
         for entry in entries:
-            all_tags.extend(entry["graph_assembly"]["tags"])
+            tags = entry.get("graphTags") or entry.get("graph_assembly", {}).get("tags", [])
+            all_tags.extend(tags)
 
         avg_tags_per_query = len(all_tags) / total_turns if total_turns > 0 else 0
 
@@ -460,10 +479,10 @@ def get_comparison_stats():
             time_series.append({
                 "index": i,
                 "timestamp": entry.get("timestamp", ""),
-                "graph_tokens": entry["graph_assembly"]["tokens"],
-                "linear_tokens": entry["linear_would_have"]["tokens"],
-                "graph_messages": entry["graph_assembly"]["messages"],
-                "linear_messages": entry["linear_would_have"]["messages"]
+                "graph_tokens": _graph_field(entry, "graphTokens", "graph_assembly", "tokens"),
+                "linear_tokens": _linear_field(entry, "linearTokens", "linear_would_have", "tokens"),
+                "graph_messages": _graph_field(entry, "graphMsgCount", "graph_assembly", "messages"),
+                "linear_messages": _linear_field(entry, "linearMsgCount", "linear_would_have", "messages"),
             })
 
         # Tag frequency
