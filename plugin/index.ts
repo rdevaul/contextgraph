@@ -654,5 +654,107 @@ export default function register(api: OpenClawPluginApi): void {
     },
   });
 
+  // Register /memory command
+  api.registerCommand({
+    name: "memory",
+    description: "Memory system status + mode control. Args: context-graph [on|off], memory-graph [on|off]",
+    acceptsArgs: true,
+    handler: async (ctx) => {
+      const arg = (ctx.args ?? "").trim().toLowerCase();
+
+      // /memory context-graph on|off  — toggle context graph (same as /graph on|off)
+      if (arg === "context-graph on" || arg === "cg on") {
+        writeGraphMode(true);
+        return { text: "🔀 **Context Graph ON** — semantic DAG-based context assembly active." };
+      }
+      if (arg === "context-graph off" || arg === "cg off") {
+        writeGraphMode(false);
+        return { text: "🔀 **Context Graph OFF** — linear context window." };
+      }
+
+      // /memory memory-graph on|off  — toggle memory graph ghost mode
+      if (arg === "memory-graph on" || arg === "mg on") {
+        const flagPath = path.join(os.homedir(), ".tag-context", "memory-graph-mode.json");
+        fs.mkdirSync(path.dirname(flagPath), { recursive: true });
+        fs.writeFileSync(flagPath, JSON.stringify({ enabled: true, updatedAt: new Date().toISOString() }));
+        return { text: "👻 **Memory Graph ON** — memory graph harvesting active (ghost mode: harvests but doesn't inject)." };
+      }
+      if (arg === "memory-graph off" || arg === "mg off") {
+        const flagPath = path.join(os.homedir(), ".tag-context", "memory-graph-mode.json");
+        fs.mkdirSync(path.dirname(flagPath), { recursive: true });
+        fs.writeFileSync(flagPath, JSON.stringify({ enabled: false, updatedAt: new Date().toISOString() }));
+        return { text: "⏸️ **Memory Graph OFF** — memory graph harvesting paused." };
+      }
+
+      // Status (no args)
+      const home = os.homedir();
+      const workspace = path.join(home, ".openclaw", "workspace");
+      const today = new Date().toISOString().slice(0, 10);
+
+      // MEMORY.md
+      let memoryLine = "❌ missing";
+      try {
+        const stat = fs.statSync(path.join(workspace, "MEMORY.md"));
+        const kb = (stat.size / 1024).toFixed(1);
+        const age = Math.round((Date.now() - stat.mtimeMs) / 60000);
+        memoryLine = `✅ ${kb} KB — updated ${age}m ago`;
+      } catch { /* missing */ }
+
+      // Today's daily log
+      let dailyLine = "❌ missing";
+      try {
+        const dailyPath = path.join(workspace, "memory", "daily", `${today}.md`);
+        const stat = fs.statSync(dailyPath);
+        const kb = (stat.size / 1024).toFixed(1);
+        const age = Math.round((Date.now() - stat.mtimeMs) / 60000);
+        dailyLine = `✅ ${kb} KB — updated ${age}m ago`;
+      } catch { /* missing */ }
+
+      // Context graph status
+      const graphEnabled = readGraphMode();
+      const graphLabel = graphEnabled ? "🟢 ACTIVE" : "⚪ OFF";
+      let apiLine = "unknown";
+      let storeCount = 0;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`${PYTHON_API_BASE}/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json() as any;
+          storeCount = data.messages_in_store ?? 0;
+          apiLine = `✅ running`;
+        } else {
+          apiLine = `⚠️ error (${res.status})`;
+        }
+      } catch {
+        apiLine = "❌ unreachable";
+      }
+
+      // Memory graph ghost mode status
+      let ghostLine = "⚪ not found";
+      try {
+        const compLog = path.join(home, ".tag-context", "comparison-log.jsonl");
+        const stat = fs.statSync(compLog);
+        const lines = fs.readFileSync(compLog, "utf8").trim().split("\n").filter(Boolean);
+        ghostLine = `👻 GHOST MODE — ${lines.length} comparison entries, last ${Math.round((Date.now() - stat.mtimeMs) / 60000)}m ago`;
+      } catch { /* missing */ }
+
+      return {
+        text: [
+          "**🧠 Memory System Status**",
+          "",
+          `**MEMORY.md:** ${memoryLine}`,
+          `**Daily log (${today}):** ${dailyLine}`,
+          "",
+          `**Context Graph:** ${graphLabel} | API: ${apiLine} | ${storeCount} messages stored`,
+          `**Memory Graph:** ${ghostLine}`,
+          "",
+          "Toggle: `/memory context-graph on|off` · `/memory memory-graph on|off`",
+        ].join("\n"),
+      };
+    },
+  });
+
   logger.info("contextgraph: plugin ready (default: graph mode OFF)");
 }

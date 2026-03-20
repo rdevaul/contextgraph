@@ -1,4 +1,5 @@
 import sys
+import re
 import time
 from pathlib import Path
 
@@ -88,6 +89,34 @@ def tag(request: TagRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?", re.IGNORECASE),
+    re.compile(r"disregard\s+(all\s+)?(previous|prior|above)\s+instructions?", re.IGNORECASE),
+    re.compile(r"you\s+are\s+now\s+(a|an)\s+", re.IGNORECASE),
+    re.compile(r"new\s+instructions?:", re.IGNORECASE),
+    re.compile(r"system\s*prompt\s*:", re.IGNORECASE),
+    re.compile(r"<\s*/?system\s*>", re.IGNORECASE),
+    re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),
+    re.compile(r"###\s*instruction", re.IGNORECASE),
+    re.compile(r"from\s+now\s+on", re.IGNORECASE),
+    re.compile(r"\[SYSTEM\]\s*:", re.IGNORECASE),
+    re.compile(r"<!--.*?-->", re.DOTALL),
+]
+
+# Strip zero-width characters that bypass pattern matching
+_ZERO_WIDTH = re.compile(r'[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff\u00ad]')
+
+def _sanitize_for_storage(text: str) -> str:
+    """Strip prompt injection patterns before storing in the graph."""
+    if not text:
+        return text
+    # Normalize: strip zero-width chars that can bypass pattern matching
+    normalized = _ZERO_WIDTH.sub('', text)
+    result = normalized
+    for pattern in _INJECTION_PATTERNS:
+        result = pattern.sub("[REDACTED]", result)
+    return result
+
 @app.post("/ingest", response_model=dict)
 def ingest(request: IngestRequest):
     try:
@@ -96,6 +125,8 @@ def ingest(request: IngestRequest):
         # Envelope text (message_id, sender_id, timestamps) is noise for
         # tag inference and retrieval — stripping prevents tag pollution.
         clean_user = strip_envelope(request.user_text)
+        # HIGH-01 fix: sanitize injection patterns before storage
+        clean_user = _sanitize_for_storage(clean_user)
         features = extract_features(clean_user, request.assistant_text)
         tags = ensemble.assign(features, clean_user, request.assistant_text).tags
         message = Message(
@@ -652,4 +683,4 @@ def get_pins():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8350)
+    uvicorn.run(app, host="127.0.0.1", port=8350)

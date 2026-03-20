@@ -90,6 +90,33 @@ Shadow mode evaluation across **812 interactions**, 4000-token budget:
   so even perfect topic retrieval caps density around 62%. Adjustable by
   tuning the recency/topic budget split.
 
+### Running shadow mode locally (no budget needed)
+
+When running shadow evaluation locally — not injecting into a live context window —
+the `--budget` flag is meaningless. Blow it open:
+
+```bash
+python3 scripts/shadow.py --report --budget 999999
+```
+
+With an uncapped budget, the **linear baseline expands to the entire history** (~583
+messages in a mature corpus), while the **graph still selects ~22 targeted messages**.
+This is the clearest demonstration of what the graph actually does: semantic selection
+vs. a firehose.
+
+⚠️ **The density metric becomes misleading without a budget cap.** The 60% threshold
+was calibrated for a 4k production budget where you want most assembled context to be
+semantically relevant. With `--budget 999999`, the recency layer also expands and dilutes
+the ratio — density will fail even when the graph is working correctly. The metrics that
+remain meaningful at any budget:
+
+| Metric | Still valid? |
+|--------|-------------|
+| Reframing rate | ✅ Always |
+| Topic retrieval rate | ✅ Always |
+| Novel msgs delivered | ✅ Always |
+| Context density | ❌ Budget-dependent — ignore with large budgets |
+
 ### GP Tagger Fitness (20 tags)
 
 Top-performing tags (fitness ≥ 0.90):
