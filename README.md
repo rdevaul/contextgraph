@@ -338,6 +338,10 @@ python3 -m pytest tests/ -v
 
 ## Documentation
 
+- [`docs/MEMORY_INTEGRATION.md`](docs/MEMORY_INTEGRATION.md) — **How Context Graph
+  works with the existing MEMORY.md / daily log paradigm.** Start here if you're
+  integrating Context Graph into an existing deployment without replacing the old
+  memory system. Includes ghost mode validation checklist and Phase 3.5 upgrade path.
 - [`docs/AGENT_SETUP.md`](docs/AGENT_SETUP.md) — **Operational guide for agents:**
   full setup, service management, nightly scripts, diagnostics, and transition
   status. Start here if you're taking over maintenance.
