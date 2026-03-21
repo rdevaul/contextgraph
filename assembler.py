@@ -19,6 +19,11 @@ from store import Message, MessageStore
 # "openclaw" in a corpus of AI assistant interactions).
 TOPIC_TAG_MAX_CORPUS_FREQ = 0.30
 
+# A single message will not be included if it exceeds this fraction of the
+# total token budget — prevents one giant turn from consuming the entire window.
+# The "always include first" safety valve is also capped at this size.
+MAX_SINGLE_MSG_BUDGET_FRACTION = 0.35
+
 
 def _estimate_tokens(msg: Message) -> int:
     """Estimate tokens for a message (use stored count or word-count proxy)."""
@@ -110,14 +115,19 @@ class ContextAssembler:
         recency_msgs: List[Message] = []
         recency_tokens = 0
 
+        # Cap: no single message may exceed this fraction of the total budget.
+        single_msg_cap = int(self.token_budget * MAX_SINGLE_MSG_BUDGET_FRACTION)
+
         first_recency = True
         for msg in self.store.get_recent(10):
             if msg.id in seen_ids:
                 continue
             cost = _estimate_tokens(msg)
-            # Always include the first (most recent) message even if it
-            # exceeds the budget — otherwise large turns silently empty
-            # the recency layer and the graph returns nothing useful.
+            # Skip messages that are individually larger than the per-message cap
+            # (e.g. giant PR-review turns). This prevents one large message from
+            # consuming the entire context window.
+            if cost > single_msg_cap:
+                continue
             if not first_recency and recency_tokens + cost > recency_budget:
                 break
             recency_msgs.append(msg)
@@ -164,7 +174,9 @@ class ContextAssembler:
 
         for msg in topic_candidates:
             cost = _estimate_tokens(msg)
-            # Always include at least one topic message regardless of size
+            # Skip messages exceeding the per-message cap in topic layer too
+            if cost > single_msg_cap:
+                continue
             if not first_topic and topic_tokens + cost > topic_budget:
                 break
             topic_msgs.append(msg)
