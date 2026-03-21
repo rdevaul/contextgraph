@@ -24,6 +24,22 @@ import json
 from typing import Optional
 from collections import Counter
 
+def _is_retrieval_turn(entry: dict) -> bool:
+    """Return True if this turn represents a genuine retrieval attempt."""
+    user_text = entry.get("userText", "") or entry.get("user_text", "")
+    if not user_text:
+        return False
+    # System callbacks (subagent completion events)
+    if user_text.startswith("System:"):
+        return False
+    # Subagent context turns (isolated sessions, no prior history)
+    if "[Subagent Context]" in user_text[:200]:
+        return False
+    # Cron watcher turns (lightweight monitoring, not semantic queries)
+    if user_text.startswith("[cron:3d4fde45"):  # local-watcher cron ID
+        return False
+    return True
+
 app = FastAPI()
 
 class TagRequest(BaseModel):
@@ -274,11 +290,14 @@ def quality():
                             pass
 
         recent = entries[-RECENT_WINDOW:] if len(entries) > RECENT_WINDOW else entries
-        total = len(recent)
+
+        # Filter to genuine retrieval turns only for quality metrics
+        retrieval_entries = [e for e in recent if _is_retrieval_turn(e)]
+        total = len(retrieval_entries)
 
         zero_return_turns = 0
         topic_msg_counts = []
-        for e in recent:
+        for e in retrieval_entries:
             # Support both flat (new) and nested (legacy) log schemas
             if "graphTokens" in e:
                 tokens = e.get("graphTokens", 0)
@@ -314,7 +333,8 @@ def quality():
         alert = zero_return_rate > 0.25 or entropy < 2.0
 
         return {
-            "turns_evaluated": total,
+            "turns_evaluated": len(recent),           # total turns in window
+            "retrieval_turns_evaluated": total,        # after filtering non-retrieval
             "zero_return_turns": zero_return_turns,
             "zero_return_rate": round(zero_return_rate, 3),
             "avg_topic_messages": round(avg_topic, 2),

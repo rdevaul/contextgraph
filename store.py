@@ -189,6 +189,7 @@ class MessageStore:
     def get_recent(self, n: int) -> List[Message]:
         """Return the N most recent messages, newest first."""
         conn = self._conn()
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")  # ensure WAL visibility
         rows = conn.execute(
             "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?", (n,)
         ).fetchall()
@@ -210,6 +211,7 @@ class MessageStore:
     def get_by_tag(self, tag: str, limit: int = 20) -> List[Message]:
         """Return messages carrying `tag`, newest first."""
         conn = self._conn()
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")  # ensure WAL visibility
         rows = conn.execute(
             """SELECT m.* FROM messages m
                INNER JOIN tags t ON m.id = t.message_id
