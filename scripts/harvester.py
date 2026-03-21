@@ -31,6 +31,9 @@ INCLUDE_PATTERNS = [
     "agent:main:main",          # primary DM session
     "agent:main:telegram:",     # Telegram DMs (includes main)
     "agent:main:voice",         # Voice PWA sessions
+    "agent:main:discord:",      # Discord DM sessions
+    "agent:main:direct:",       # Discord direct sessions (alternate pattern)
+    "agent:vera:",              # Vera subagent sessions
 ]
 
 EXCLUDE_PATTERNS = [
@@ -45,8 +48,12 @@ def _channel_from_key(session_key: str) -> str:
         return "telegram"
     if "voice" in session_key:
         return "voice-pwa"
+    if "discord" in session_key or "direct:" in session_key:
+        return "discord"
     if "console" in session_key:
         return "console"
+    if "vera" in session_key:
+        return "vera"
     return "main"
 
 

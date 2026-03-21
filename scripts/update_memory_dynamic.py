@@ -32,15 +32,31 @@ SHADOW_FILE = WORKSPACE / "SHADOWMEMORY.md"
 CONTEXT_API = "http://localhost:8300/assemble"
 
 DEFAULT_QUERY = "recent projects decisions infrastructure voice PWA context graph memory"
-DEFAULT_BUDGET = 1500
+DEFAULT_BUDGET = 8000  # Recent messages often 2000+ tokens; needs headroom
+
+# Explicit tags for MEMORY.md injection — bypasses tagger inference which
+# fails on abstract query strings. The /assemble endpoint accepts a `tags`
+# parameter that overrides tagger inference (Rich's hook in api/server.py).
+DEFAULT_TAGS = [
+    "decision", "infrastructure", "deployment", "security", "research",
+    "agents", "framework1", "maxrisk", "eldrchat", "contextgraph", "planning",
+]
 
 SECTION_START = "<!-- DYNAMIC_CONTEXT_START -->"
 SECTION_END = "<!-- DYNAMIC_CONTEXT_END -->"
 
 
-def assemble(query: str, token_budget: int) -> dict:
-    """Call /assemble and return the response dict."""
-    payload = json.dumps({"user_text": query, "token_budget": token_budget}).encode()
+def assemble(query: str, token_budget: int, tags: list[str] | None = None) -> dict:
+    """
+    Call /assemble and return the response dict.
+    
+    If tags is provided, bypasses tagger inference and uses explicit tags directly.
+    This is Rich's hook — see api/server.py AssembleRequest.tags field.
+    """
+    payload_dict = {"user_text": query, "token_budget": token_budget}
+    if tags:
+        payload_dict["tags"] = tags
+    payload = json.dumps(payload_dict).encode()
     req = urllib.request.Request(
         CONTEXT_API,
         data=payload,
@@ -163,14 +179,29 @@ def main():
                         help="Query for context assembly")
     parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET,
                         help="Token budget for assembly")
+    parser.add_argument("--tags", nargs="*", default=None,
+                        help="Explicit tags (bypasses tagger). Empty = DEFAULT_TAGS")
+    parser.add_argument("--no-tags", action="store_true",
+                        help="Disable explicit tags — use tagger inference (original behavior)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print result without writing")
     args = parser.parse_args()
 
     target = MEMORY_FILE if args.live else SHADOW_FILE
 
-    print(f"[update_memory_dynamic] Querying ContextGraph...")
-    result = assemble(args.query, args.budget)
+    # Determine which tags to use (default: explicit tags via Rich's hook)
+    if args.no_tags:
+        tags = None
+        tags_mode = "tagger inference"
+    elif args.tags is not None:
+        tags = args.tags if args.tags else DEFAULT_TAGS
+        tags_mode = f"explicit ({len(tags)} tags)"
+    else:
+        tags = DEFAULT_TAGS
+        tags_mode = f"default ({len(DEFAULT_TAGS)} tags)"
+
+    print(f"[update_memory_dynamic] Querying ContextGraph ({tags_mode})...")
+    result = assemble(args.query, args.budget, tags=tags)
 
     if not result:
         print("[update_memory_dynamic] ERROR: No response from ContextGraph. Skipping write.")

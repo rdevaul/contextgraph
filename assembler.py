@@ -110,15 +110,20 @@ class ContextAssembler:
         recency_msgs: List[Message] = []
         recency_tokens = 0
 
+        first_recency = True
         for msg in self.store.get_recent(10):
             if msg.id in seen_ids:
                 continue
             cost = _estimate_tokens(msg)
-            if recency_tokens + cost > recency_budget:
+            # Always include the first (most recent) message even if it
+            # exceeds the budget — otherwise large turns silently empty
+            # the recency layer and the graph returns nothing useful.
+            if not first_recency and recency_tokens + cost > recency_budget:
                 break
             recency_msgs.append(msg)
             recency_tokens += cost
             seen_ids.add(msg.id)
+            first_recency = False
 
         # ── Topic layer ────────────────────────────────────────────────────
         topic_candidates: List[Message] = []
@@ -126,10 +131,14 @@ class ContextAssembler:
         # IDF filtering: skip tags that are too common to be discriminating.
         # Tags in >30% of corpus are stop words — they retrieve nearly everything,
         # blowing the token budget on low-relevance messages.
-        total_messages = len(list(self.store.get_recent(10000)))  # fast count proxy
+        #
+        # Use tag_counts sum as corpus size proxy — avoids fetching all rows.
+        # tag_counts() returns {tag: count} where count = messages with that tag.
+        # Total unique messages ≈ max tag count (most frequent tag upper-bounds corpus).
+        tag_counts = self.store.tag_counts()
+        total_messages = max(tag_counts.values()) if tag_counts else 1
         if total_messages == 0:
             total_messages = 1  # avoid div-by-zero
-        tag_counts = self.store.tag_counts()
         useful_tags = [
             t for t in inferred_tags
             if tag_counts.get(t, 0) / total_messages <= TOPIC_TAG_MAX_CORPUS_FREQ
@@ -151,13 +160,16 @@ class ContextAssembler:
 
         topic_msgs: List[Message] = []
         topic_tokens = 0
+        first_topic = True
 
         for msg in topic_candidates:
             cost = _estimate_tokens(msg)
-            if topic_tokens + cost > topic_budget:
+            # Always include at least one topic message regardless of size
+            if not first_topic and topic_tokens + cost > topic_budget:
                 break
             topic_msgs.append(msg)
             topic_tokens += cost
+            first_topic = False
 
         # ── Combine + sort oldest-first ────────────────────────────────────
         all_msgs = sticky_msgs + recency_msgs + topic_msgs

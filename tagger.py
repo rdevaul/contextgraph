@@ -27,6 +27,16 @@ CORE_TAGS = {
     "voice-pwa", "shopping-list", "openclaw", "yapCAD",
     # General
     "planning", "research", "question", "personal", "has-url",
+    # Memory / context system
+    "memory-system", "contextgraph",
+    # Trading / finance
+    "trading", "options", "maxrisk", "spreads", "finance",
+    # Hardware / compute
+    "hardware", "framework1", "local-compute", "ollama", "litellm",
+    # Agents
+    "agents", "sub-agents", "vera", "garro",
+    # Monitoring
+    "monitoring", "watchdog", "cron",
 }
 
 
@@ -199,6 +209,80 @@ RULES: List[TagRule] = [
                    "literature review"]
         ),
         tags=["research", "planning"],
+    ),
+
+    # Memory system / harvester
+    TagRule(
+        name="memory-system",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["memory.md", "memory/", "memory system", "memory file",
+                   "harvester", "harvest", "memory harvest", "daily log",
+                   "memory_search", "memory_get", "long-term memory",
+                   "contextgraph", "context graph", "store.db", "interaction log",
+                   "replay.py", "ingest", "assemble", "tag-context", "tagger"]
+        ),
+        tags=["memory-system", "contextgraph"],
+    ),
+
+    # Trading / finance / options
+    TagRule(
+        name="trading",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["trading", "trade", "option", "options", "spread", "spreads",
+                   "debit spread", "call spread", "put spread", "expiry", "strike",
+                   "delta", "theta", "gamma", "vega", "iv rank", "implied vol",
+                   "tradier", "maxrisk", "max risk", "portfolio", "position",
+                   "ticker", "spy", "qqq", "stock", "equity", "market open",
+                   "market close", "earnings", "volatility"]
+        ),
+        tags=["trading", "finance"],
+    ),
+
+    # Options-specific
+    TagRule(
+        name="options",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["call option", "put option", "debit spread", "credit spread",
+                   "iron condor", "covered call", "straddle", "strangle",
+                   "options chain", "dte", "days to expiry", "otm", "itm", "atm",
+                   "maxrisk", "max risk capital", "defined risk"]
+        ),
+        tags=["options", "maxrisk", "trading"],
+    ),
+
+    # Local compute / hardware
+    TagRule(
+        name="local-compute",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["framework1", "mac mini", "mac studio", "apple silicon",
+                   "m4", "m3", "amd", "ryzen", "vram", "gpu memory",
+                   "ollama", "litellm", "local model", "local inference",
+                   "qwen", "deepseek", "llama", "mistral", "gemma",
+                   "hugging face", "gguf", "quantiz"]
+        ),
+        tags=["hardware", "local-compute", "llm"],
+    ),
+
+    # Agents / sub-agents
+    TagRule(
+        name="agents",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["sub-agent", "subagent", "spawn agent", "vera", "garro",
+                   "agent: vera", "agent: garro", "agent: mei", "agent: sysadmin",
+                   "sessions_spawn", "isolated session", "pbar", "research loop"]
+        ),
+        tags=["agents", "sub-agents"],
+    ),
+
+    # Monitoring / watchdog
+    TagRule(
+        name="monitoring",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["watchdog", "monitoring", "health check", "healthcheck",
+                   "heartbeat", "cron job", "scheduled", "alert", "uptime",
+                   "infra.db", "metrics", "dashboard"]
+        ),
+        tags=["monitoring", "cron"],
     ),
 ]
 
