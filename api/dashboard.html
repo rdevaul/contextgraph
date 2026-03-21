@@ -373,17 +373,7 @@
             <h2>Context Graph Efficacy</h2>
             <div class="stats-grid" id="efficacy-stats"></div>
 
-            <div class="chart-container">
-                <canvas id="density-chart"></canvas>
-            </div>
-
-            <div class="chart-container">
-                <canvas id="reframing-chart"></canvas>
-            </div>
-
-            <div class="chart-container">
-                <canvas id="fitness-chart"></canvas>
-            </div>
+            <!-- No time-series history available from /metrics — numeric stats above are the real data -->
         </div>
 
         <!-- Section 4: Tag Frequency -->
@@ -672,11 +662,6 @@
                 </div>
             `;
             document.getElementById('efficacy-stats').innerHTML = statsHtml;
-
-            // Render charts (simplified - would need historical data for real time series)
-            renderChart('density-chart', 'Context Density Over Time', [avgDensity], '#3fb950');
-            renderChart('reframing-chart', 'Reframing Signal Over Time', [avgReframing], '#d29922');
-            renderChart('fitness-chart', 'Composite Fitness Trend', [avgFitness], '#58a6ff');
         }
 
         function renderChart(canvasId, label, data, color) {
@@ -774,19 +759,18 @@
 
             const timeSeries = comparisonStats.time_series;
 
-            // Calculate overhead percentage for each turn
-            const overheadData = timeSeries.map(entry => {
-                if (entry.linear_tokens === 0) return null; // Skip turns with no data
-                const overhead = ((entry.graph_tokens - entry.linear_tokens) / entry.linear_tokens) * 100;
-                return overhead;
-            });
+            // Only include turns where at least one side has data
+            const filtered = timeSeries.filter(e => e.graph_tokens > 0 || e.linear_tokens > 0);
 
-            const labels = timeSeries.map((entry, i) => {
+            const labels = filtered.map(entry => {
                 const date = new Date(entry.timestamp);
                 return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             });
 
-            // Destroy existing chart if it exists
+            const graphData = filtered.map(e => e.graph_tokens);
+            // Linear is 0 for turns where the linear window wasn't computed — show as null so it gaps cleanly
+            const linearData = filtered.map(e => e.linear_tokens > 0 ? e.linear_tokens : null);
+
             if (charts['tokens-timeseries-chart']) {
                 charts['tokens-timeseries-chart'].destroy();
             }
@@ -797,13 +781,23 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Token Overhead %',
-                            data: overheadData,
+                            label: 'Graph mode tokens',
+                            data: graphData,
                             borderColor: '#58a6ff',
-                            backgroundColor: '#58a6ff33',
-                            tension: 0.4,
-                            fill: true,
-                            spanGaps: true // Connect points even if some are null
+                            backgroundColor: '#58a6ff22',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                        },
+                        {
+                            label: 'Linear window tokens',
+                            data: linearData,
+                            borderColor: '#3fb950',
+                            backgroundColor: '#3fb95022',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                            spanGaps: false,
                         }
                     ]
                 },
@@ -816,15 +810,15 @@
                         },
                         title: {
                             display: true,
-                            text: 'Token Overhead % Over Time (Graph vs Linear)',
+                            text: 'Tokens per Turn: Graph Mode vs Linear Window',
                             color: '#c9d1d9'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const value = context.parsed.y;
-                                    if (value === null) return 'No data';
-                                    return `Overhead: ${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+                                    if (value === null) return context.dataset.label + ': n/a';
+                                    return context.dataset.label + ': ' + value.toLocaleString() + ' tokens';
                                 }
                             }
                         }
@@ -838,13 +832,11 @@
                             grid: { color: '#30363d' },
                             ticks: {
                                 color: '#8b949e',
-                                callback: function(value) {
-                                    return (value >= 0 ? '+' : '') + value.toFixed(0) + '%';
-                                }
+                                callback: function(value) { return value.toLocaleString(); }
                             },
                             title: {
                                 display: true,
-                                text: 'Overhead Percentage',
+                                text: 'Tokens',
                                 color: '#c9d1d9'
                             }
                         }
