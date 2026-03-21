@@ -162,6 +162,17 @@ RULES: List[TagRule] = [
         tags=["openclaw"],
     ),
 
+    # yapCAD — open-source agentic CAD/CAM tool
+    TagRule(
+        name="yapCAD",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["yapcad", "yapCAD", "yap-cad", "gel-native", "gel native",
+                   "agentic cad", "agentic cam", "yapcad2", "yapCAD 2",
+                   "cad/cam", "geometry engine", "ycpkg", "yapcad-geometry"]
+        ),
+        tags=["yapCAD"],
+    ),
+
     # Shopping list
     TagRule(
         name="shopping",

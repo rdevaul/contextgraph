@@ -1,6 +1,7 @@
 import sys
 import re
 import time
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,6 +19,7 @@ from tag_registry import get_registry
 from sticky import StickyPinManager
 from reframing import detect_reference
 from utils.text import strip_envelope
+from summarizer import summarize_message
 import pickle
 import os
 import json
@@ -83,6 +85,22 @@ quality_agent = QualityAgent()
 ensemble = EnsembleTagger(quality_agent=quality_agent)
 pin_manager = StickyPinManager()
 
+# Summarization configuration
+SUMMARIZE_THRESHOLD = int(os.getenv("SUMMARIZE_THRESHOLD", "2000"))
+
+def _background_summarize(message_id: str) -> None:
+    """Background task to generate and store a summary for a message."""
+    try:
+        msg = store.get_by_id(message_id)
+        if msg is None:
+            return
+        summary = summarize_message(msg)
+        store.set_summary(message_id, summary)
+    except Exception as e:
+        # Log but don't propagate — this is fire-and-forget
+        import logging
+        logging.error(f"Background summarization failed for {message_id}: {e}")
+
 gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
 if gp_tagger_path.exists():
     with open(gp_tagger_path, 'rb') as f:
@@ -145,6 +163,7 @@ def ingest(request: IngestRequest):
         clean_user = _sanitize_for_storage(clean_user)
         features = extract_features(clean_user, request.assistant_text)
         tags = ensemble.assign(features, clean_user, request.assistant_text).tags
+        token_count = len(clean_user.split()) + len(request.assistant_text.split())
         message = Message(
             id=message_id,
             session_id=request.session_id,
@@ -153,10 +172,20 @@ def ingest(request: IngestRequest):
             timestamp=request.timestamp,
             user_id=request.user_id or "default",
             tags=tags,
-            token_count=len(clean_user.split()) + len(request.assistant_text.split()),
+            token_count=token_count,
             external_id=request.external_id
         )
         store.add_message(message)
+
+        # Kick off background summarization if message exceeds threshold
+        if token_count > SUMMARIZE_THRESHOLD:
+            thread = threading.Thread(
+                target=_background_summarize,
+                args=(message_id,),
+                daemon=True
+            )
+            thread.start()
+
         return {"ingested": True, "tags": tags}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

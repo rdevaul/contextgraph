@@ -3,6 +3,10 @@
 spacy>=3.7
 # python -m spacy download en_core_web_sm
 
+# Summarization
+anthropic>=0.40
+requests>=2.31  # for Ollama backend
+
 # Testing
 pytest>=8.0
 

@@ -124,9 +124,29 @@ class ContextAssembler:
                 continue
             cost = _estimate_tokens(msg)
             # Skip messages that are individually larger than the per-message cap
-            # (e.g. giant PR-review turns). This prevents one large message from
-            # consuming the entire context window.
+            # (e.g. giant PR-review turns). Use summary if available, otherwise skip.
             if cost > single_msg_cap:
+                if msg.summary:
+                    # Use the summary instead — create a lightweight proxy message
+                    summary_msg = Message(
+                        id=msg.id,
+                        session_id=msg.session_id,
+                        user_id=msg.user_id,
+                        timestamp=msg.timestamp,
+                        user_text=f"[Summary of large message]",
+                        assistant_text=msg.summary,
+                        tags=msg.tags,
+                        token_count=len(msg.summary.split()),
+                        external_id=msg.external_id,
+                        summary=None
+                    )
+                    cost = _estimate_tokens(summary_msg)
+                    if not first_recency and recency_tokens + cost > recency_budget:
+                        break
+                    recency_msgs.append(summary_msg)
+                    recency_tokens += cost
+                    seen_ids.add(msg.id)
+                    first_recency = False
                 continue
             if not first_recency and recency_tokens + cost > recency_budget:
                 break
@@ -174,8 +194,29 @@ class ContextAssembler:
 
         for msg in topic_candidates:
             cost = _estimate_tokens(msg)
-            # Skip messages exceeding the per-message cap in topic layer too
+            # Skip messages exceeding the per-message cap in topic layer too.
+            # Use summary if available, otherwise skip.
             if cost > single_msg_cap:
+                if msg.summary:
+                    # Use the summary instead — create a lightweight proxy message
+                    summary_msg = Message(
+                        id=msg.id,
+                        session_id=msg.session_id,
+                        user_id=msg.user_id,
+                        timestamp=msg.timestamp,
+                        user_text=f"[Summary of large message]",
+                        assistant_text=msg.summary,
+                        tags=msg.tags,
+                        token_count=len(msg.summary.split()),
+                        external_id=msg.external_id,
+                        summary=None
+                    )
+                    cost = _estimate_tokens(summary_msg)
+                    if not first_topic and topic_tokens + cost > topic_budget:
+                        break
+                    topic_msgs.append(summary_msg)
+                    topic_tokens += cost
+                    first_topic = False
                 continue
             if not first_topic and topic_tokens + cost > topic_budget:
                 break

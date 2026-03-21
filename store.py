@@ -23,6 +23,7 @@ class Message:
     tags: List[str] = field(default_factory=list)
     token_count: int = 0
     external_id: Optional[str] = None  # OpenClaw AgentMessage.id or other external system ID
+    summary: Optional[str] = None      # Summarized version for large messages
 
     @classmethod
     def new(cls, session_id: str, user_id: str, timestamp: float,
@@ -98,6 +99,8 @@ class MessageStore:
 
         # Migration: add external_id column if it doesn't exist
         self._migrate_external_id(conn)
+        # Migration: add summary column if it doesn't exist
+        self._migrate_summary(conn)
 
     def _migrate_external_id(self, conn: sqlite3.Connection) -> None:
         """Add external_id column if it doesn't exist (backwards-compatible migration)."""
@@ -106,6 +109,14 @@ class MessageStore:
         if "external_id" not in columns:
             conn.execute("ALTER TABLE messages ADD COLUMN external_id TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_external_id ON messages(external_id)")
+            conn.commit()
+
+    def _migrate_summary(self, conn: sqlite3.Connection) -> None:
+        """Add summary column if it doesn't exist (backwards-compatible migration)."""
+        cursor = conn.execute("PRAGMA table_info(messages)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "summary" not in columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN summary TEXT")
             conn.commit()
 
     # ── helpers ───────────────────────────────────────────────────────────────
@@ -121,6 +132,7 @@ class MessageStore:
             tags=tags,
             token_count=row["token_count"],
             external_id=row["external_id"] if "external_id" in row.keys() else None,
+            summary=row["summary"] if "summary" in row.keys() else None,
         )
 
     def _fetch_tags_for(self, conn: sqlite3.Connection, message_id: str) -> List[str]:
@@ -267,3 +279,24 @@ class MessageStore:
         msg_by_ext_id = {r["external_id"]: self._row_to_message(r, tags_map[r["id"]]) for r in rows}
         # Return in the same order as input, skipping missing
         return [msg_by_ext_id[eid] for eid in external_ids if eid in msg_by_ext_id]
+
+    # ── summary ───────────────────────────────────────────────────────────────
+
+    def get_summary(self, message_id: str) -> Optional[str]:
+        """Fetch the summary for a message by ID, or None if not set."""
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT summary FROM messages WHERE id = ?", (message_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return row["summary"]
+
+    def set_summary(self, message_id: str, summary: str) -> None:
+        """Store a summary for a message."""
+        conn = self._conn()
+        conn.execute(
+            "UPDATE messages SET summary = ? WHERE id = ?",
+            (summary, message_id),
+        )
+        conn.commit()
