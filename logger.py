@@ -41,6 +41,7 @@ class InteractionRecord:
     user_text: str
     assistant_text: str
     token_count: int
+    is_automated: bool = False
 
 
 def _log_path(ts: float) -> Path:
@@ -48,6 +49,44 @@ def _log_path(ts: float) -> Path:
     import datetime
     date = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
     return LOG_DIR / f"{date}.jsonl"
+
+
+def _is_automated_turn(user_text: str) -> bool:
+    """
+    Detect automated turns (cron jobs, heartbeats, local watcher) by inspecting user_text.
+
+    Returns True if the message matches any of these patterns:
+    - Starts with "[cron:" (cron job payloads)
+    - Contains "Read HEARTBEAT.md if it exists" (heartbeat prompt)
+    - Starts with "[local-watcher]" (file watcher events)
+    - User text is exactly "HEARTBEAT_OK" (heartbeat acknowledgement)
+    """
+    import re
+
+    # Normalize whitespace for consistent matching
+    text = user_text.strip()
+
+    # Pattern 1: Cron job payloads
+    if text.startswith("[cron:"):
+        return True
+
+    # Pattern 2: Heartbeat prompt
+    if "Read HEARTBEAT.md if it exists" in text:
+        return True
+
+    # Pattern 3: Local watcher events
+    if text.startswith("[local-watcher]"):
+        return True
+
+    # Pattern 4: Heartbeat acknowledgement
+    if text == "HEARTBEAT_OK":
+        return True
+
+    # Pattern 5: UUID-style cron IDs (more specific cron pattern)
+    if re.match(r'^\[cron:[a-f0-9-]+', text):
+        return True
+
+    return False
 
 
 def log_interaction(
@@ -79,6 +118,9 @@ def log_interaction(
         words = len((user_text + " " + assistant_text).split())
         token_count = max(1, int(words * 1.3))
 
+    # Auto-detect automated turns (cron, heartbeat, local-watcher)
+    is_automated = _is_automated_turn(user_text)
+
     record = InteractionRecord(
         id=str(uuid.uuid4()),
         logged_at=now,
@@ -89,6 +131,7 @@ def log_interaction(
         user_text=user_text,
         assistant_text=assistant_text,
         token_count=token_count,
+        is_automated=is_automated,
     )
 
     path = _log_path(now)
@@ -122,7 +165,11 @@ def iter_records(start_date: Optional[str] = None,
                 if not line:
                     continue
                 try:
-                    yield InteractionRecord(**json.loads(line))
+                    data = json.loads(line)
+                    # Backward compatibility: default is_automated to False for old records
+                    if "is_automated" not in data:
+                        data["is_automated"] = False
+                    yield InteractionRecord(**data)
                 except (json.JSONDecodeError, TypeError):
                     continue  # skip malformed lines
 

@@ -24,12 +24,13 @@ class Message:
     token_count: int = 0
     external_id: Optional[str] = None  # OpenClaw AgentMessage.id or other external system ID
     summary: Optional[str] = None      # Summarized version for large messages
+    is_automated: bool = False         # True for cron jobs, heartbeats, etc.
 
     @classmethod
     def new(cls, session_id: str, user_id: str, timestamp: float,
             user_text: str, assistant_text: str,
             tags: Optional[List[str]] = None, token_count: int = 0,
-            external_id: Optional[str] = None) -> "Message":
+            external_id: Optional[str] = None, is_automated: bool = False) -> "Message":
         """Create a new Message with a generated UUID."""
         return cls(
             id=str(uuid.uuid4()),
@@ -41,6 +42,7 @@ class Message:
             tags=tags or [],
             token_count=token_count,
             external_id=external_id,
+            is_automated=is_automated,
         )
 
 
@@ -50,6 +52,10 @@ class MessageStore:
 
     Tags are stored in a normalized `tags` table; the `messages` table
     does not duplicate them. All tag operations go through the tags table.
+
+    Threading model: single shared connection (check_same_thread=False) protected
+    by a reentrant lock. WAL mode allows concurrent readers; the lock serializes
+    writers to prevent "database is locked" under concurrent test/request load.
     """
 
     DEFAULT_DB = Path.home() / ".tag-context" / "store.db"
@@ -58,49 +64,54 @@ class MessageStore:
         path = Path(db_path) if db_path else self.DEFAULT_DB
         path.parent.mkdir(parents=True, exist_ok=True)
         self._db_path = str(path)
-        self._local = threading.local()
+        self._lock = threading.RLock()
+        self._conn_obj: Optional[sqlite3.Connection] = None
         self._init_db()
 
     # ── connection ────────────────────────────────────────────────────────────
 
     def _conn(self) -> sqlite3.Connection:
-        """Return a thread-local SQLite connection."""
-        if not hasattr(self._local, "conn"):
-            conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        """Return the shared SQLite connection (thread-safe via _lock)."""
+        if self._conn_obj is None:
+            conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=30)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
-            self._local.conn = conn
-        return self._local.conn
+            conn.execute("PRAGMA busy_timeout=30000")
+            self._conn_obj = conn
+        return self._conn_obj
 
     def _init_db(self) -> None:
-        conn = self._conn()
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id            TEXT PRIMARY KEY,
-                session_id    TEXT NOT NULL,
-                user_id       TEXT NOT NULL,
-                timestamp     REAL NOT NULL,
-                user_text     TEXT NOT NULL,
-                assistant_text TEXT NOT NULL,
-                token_count   INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
+        with self._lock:
+            conn = self._conn()
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id            TEXT PRIMARY KEY,
+                    session_id    TEXT NOT NULL,
+                    user_id       TEXT NOT NULL,
+                    timestamp     REAL NOT NULL,
+                    user_text     TEXT NOT NULL,
+                    assistant_text TEXT NOT NULL,
+                    token_count   INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
 
-            CREATE TABLE IF NOT EXISTS tags (
-                message_id TEXT NOT NULL
-                    REFERENCES messages(id) ON DELETE CASCADE,
-                tag        TEXT NOT NULL,
-                PRIMARY KEY (message_id, tag)
-            );
-            CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
-        """)
-        conn.commit()
+                CREATE TABLE IF NOT EXISTS tags (
+                    message_id TEXT NOT NULL
+                        REFERENCES messages(id) ON DELETE CASCADE,
+                    tag        TEXT NOT NULL,
+                    PRIMARY KEY (message_id, tag)
+                );
+                CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+            """)
+            conn.commit()
 
-        # Migration: add external_id column if it doesn't exist
-        self._migrate_external_id(conn)
-        # Migration: add summary column if it doesn't exist
-        self._migrate_summary(conn)
+            # Migration: add external_id column if it doesn't exist
+            self._migrate_external_id(conn)
+            # Migration: add summary column if it doesn't exist
+            self._migrate_summary(conn)
+            # Migration: add is_automated column if it doesn't exist
+            self._migrate_is_automated(conn)
 
     def _migrate_external_id(self, conn: sqlite3.Connection) -> None:
         """Add external_id column if it doesn't exist (backwards-compatible migration)."""
@@ -119,6 +130,14 @@ class MessageStore:
             conn.execute("ALTER TABLE messages ADD COLUMN summary TEXT")
             conn.commit()
 
+    def _migrate_is_automated(self, conn: sqlite3.Connection) -> None:
+        """Add is_automated column if it doesn't exist (backwards-compatible migration)."""
+        cursor = conn.execute("PRAGMA table_info(messages)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "is_automated" not in columns:
+            conn.execute("ALTER TABLE messages ADD COLUMN is_automated INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _row_to_message(self, row: sqlite3.Row, tags: List[str]) -> Message:
@@ -133,6 +152,7 @@ class MessageStore:
             token_count=row["token_count"],
             external_id=row["external_id"] if "external_id" in row.keys() else None,
             summary=row["summary"] if "summary" in row.keys() else None,
+            is_automated=bool(row["is_automated"]) if "is_automated" in row.keys() else False,
         )
 
     def _fetch_tags_for(self, conn: sqlite3.Connection, message_id: str) -> List[str]:
@@ -160,30 +180,33 @@ class MessageStore:
 
     def add_message(self, msg: Message) -> None:
         """Persist a message and its initial tags."""
-        conn = self._conn()
-        conn.execute(
-            """INSERT INTO messages (id, session_id, user_id, timestamp,
-               user_text, assistant_text, token_count, external_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (msg.id, msg.session_id, msg.user_id, msg.timestamp,
-             msg.user_text, msg.assistant_text, msg.token_count, msg.external_id),
-        )
-        for tag in msg.tags:
+        with self._lock:
+            conn = self._conn()
             conn.execute(
-                "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
-                (msg.id, tag),
+                """INSERT INTO messages (id, session_id, user_id, timestamp,
+                   user_text, assistant_text, token_count, external_id, is_automated)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (msg.id, msg.session_id, msg.user_id, msg.timestamp,
+                 msg.user_text, msg.assistant_text, msg.token_count, msg.external_id,
+                 1 if msg.is_automated else 0),
             )
-        conn.commit()
+            for tag in msg.tags:
+                conn.execute(
+                    "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
+                    (msg.id, tag),
+                )
+            conn.commit()
 
     def add_tags(self, message_id: str, tags: List[str]) -> None:
         """Add tags to an existing message (idempotent)."""
-        conn = self._conn()
-        for tag in tags:
-            conn.execute(
-                "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
-                (message_id, tag),
-            )
-        conn.commit()
+        with self._lock:
+            conn = self._conn()
+            for tag in tags:
+                conn.execute(
+                    "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
+                    (message_id, tag),
+                )
+            conn.commit()
 
     # ── read ──────────────────────────────────────────────────────────────────
 
@@ -198,13 +221,24 @@ class MessageStore:
         tags = self._fetch_tags_for(conn, message_id)
         return self._row_to_message(row, tags)
 
-    def get_recent(self, n: int) -> List[Message]:
-        """Return the N most recent messages, newest first."""
+    def get_recent(self, n: int, include_automated: bool = False) -> List[Message]:
+        """Return the N most recent messages, newest first.
+
+        Parameters
+        ----------
+        n : int
+            Number of messages to return
+        include_automated : bool
+            If False (default), exclude automated turns (cron/heartbeat/etc)
+        """
         conn = self._conn()
-        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")  # ensure WAL visibility
-        rows = conn.execute(
-            "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?", (n,)
-        ).fetchall()
+
+        if include_automated:
+            query = "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?"
+        else:
+            query = "SELECT * FROM messages WHERE is_automated = 0 ORDER BY timestamp DESC LIMIT ?"
+
+        rows = conn.execute(query, (n,)).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -220,18 +254,34 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
-    def get_by_tag(self, tag: str, limit: int = 20) -> List[Message]:
-        """Return messages carrying `tag`, newest first."""
+    def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False) -> List[Message]:
+        """Return messages carrying `tag`, newest first.
+
+        Parameters
+        ----------
+        tag : str
+            Tag to filter by
+        limit : int
+            Maximum number of messages to return
+        include_automated : bool
+            If False (default), exclude automated turns (cron/heartbeat/etc)
+        """
         conn = self._conn()
-        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")  # ensure WAL visibility
-        rows = conn.execute(
-            """SELECT m.* FROM messages m
-               INNER JOIN tags t ON m.id = t.message_id
-               WHERE t.tag = ?
-               ORDER BY m.timestamp DESC
-               LIMIT ?""",
-            (tag, limit),
-        ).fetchall()
+
+        if include_automated:
+            query = """SELECT m.* FROM messages m
+                       INNER JOIN tags t ON m.id = t.message_id
+                       WHERE t.tag = ?
+                       ORDER BY m.timestamp DESC
+                       LIMIT ?"""
+        else:
+            query = """SELECT m.* FROM messages m
+                       INNER JOIN tags t ON m.id = t.message_id
+                       WHERE t.tag = ? AND m.is_automated = 0
+                       ORDER BY m.timestamp DESC
+                       LIMIT ?"""
+
+        rows = conn.execute(query, (tag, limit)).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -279,6 +329,20 @@ class MessageStore:
         msg_by_ext_id = {r["external_id"]: self._row_to_message(r, tags_map[r["id"]]) for r in rows}
         # Return in the same order as input, skipping missing
         return [msg_by_ext_id[eid] for eid in external_ids if eid in msg_by_ext_id]
+
+    def get_non_automated(self, limit: int = 1000) -> List[Message]:
+        """Return non-automated messages (excluding cron/heartbeat turns), newest first."""
+        conn = self._conn()
+        rows = conn.execute(
+            """SELECT * FROM messages
+               WHERE is_automated = 0
+               ORDER BY timestamp DESC
+               LIMIT ?""",
+            (limit,)
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        tags_map = self._fetch_tags_bulk(conn, ids)
+        return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
     # ── summary ───────────────────────────────────────────────────────────────
 

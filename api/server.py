@@ -20,6 +20,7 @@ from sticky import StickyPinManager
 from reframing import detect_reference
 from utils.text import strip_envelope
 from summarizer import summarize_message
+from logger import _is_automated_turn
 import pickle
 import os
 import json
@@ -161,6 +162,10 @@ def ingest(request: IngestRequest):
         clean_user = strip_envelope(request.user_text)
         # HIGH-01 fix: sanitize injection patterns before storage
         clean_user = _sanitize_for_storage(clean_user)
+
+        # Auto-detect automated turns (cron, heartbeat, local-watcher)
+        is_automated = _is_automated_turn(request.user_text)
+
         features = extract_features(clean_user, request.assistant_text)
         tags = ensemble.assign(features, clean_user, request.assistant_text).tags
         token_count = len(clean_user.split()) + len(request.assistant_text.split())
@@ -173,7 +178,8 @@ def ingest(request: IngestRequest):
             user_id=request.user_id or "default",
             tags=tags,
             token_count=token_count,
-            external_id=request.external_id
+            external_id=request.external_id,
+            is_automated=is_automated
         )
         store.add_message(message)
 
