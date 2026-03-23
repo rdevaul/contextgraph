@@ -3,7 +3,7 @@
 Directed acyclic context graph for LLM context management — tag-based
 retrieval replacing linear sliding windows.
 
-**Status:** v1.0-rc1 — Context Graph is production-ready. Memory integration is live, writing to MEMORY.md every 4 hours via launchd. Dashboard at `/dashboard` provides real-time quality and efficiency metrics. Token efficiency: ~11.8% savings vs linear retrieval, 99%+ cache hit rate on context assembly.
+**Status:** v1.0-rc2 — Context Graph is production-ready. Memory integration is live, writing to MEMORY.md every 4 hours via launchd. Dashboard at `/dashboard` provides real-time quality and efficiency metrics. Token efficiency: ~11.8% savings vs linear retrieval, 99%+ cache hit rate on context assembly.
 
 ## Problem
 
@@ -55,13 +55,13 @@ Incoming message
 
 The **sticky layer** ensures that explicitly pinned turns remain in context regardless of recency or topic score. This is useful for preserving critical context (requirements docs, architecture decisions, reference material) throughout a long conversation thread.
 
-**When it activates:** A message is sticky if it has `is_sticky=True` in the store. This can be set via the `/pin` command in OpenClaw or through the API.
+**When it activates:** A message is sticky if it has `is_sticky=True` in the store. This can be set via the `/pin` command in OpenClaw or through the API. When longer tool-focused turns are detected, the `is_sticky=True` is autmatically activated to prevent the agent from loosing the thread during complex, multi-turn activities.
 
 **Config:** The `STICKY_BUDGET_FRACTION` environment variable controls how much token budget is reserved for sticky turns (default: `0.20` — up to 20% of total token budget).
 
 **Example use case:** In a "rocket design workflow" conversation, you might pin the initial requirements document turn so it persists through all subsequent back-and-forth, even as the conversation shifts through different subsystems and implementation details.
 
-### Key features
+### Key features of the contextgraph system
 
 - **Automated turn filtering** — Cron jobs, heartbeats, and subagent operations are automatically filtered from retrieval and quality metrics, preventing noise from diluting relevance scores.
 
@@ -91,7 +91,7 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
 | Metric                   | Value   | Target  | Status |
 |--------------------------|---------|---------|--------|
 | Topic retrieval rate     | 92.1%   | —       | ✅     |
-| Context density          | 58.2%   | > 60%   | ✅     |
+| Context density          | 58.2%   | ~ 60%   | ✅     |
 | Reframing rate           | 1.5%   | < 5%    | ✅     |
 | Composite quality score  | 0.743   | —       | —      |
 | Novel topic msgs/query   | 14.6    | —       | —      |
@@ -109,7 +109,8 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
   recent exchanges regardless of relevance.
 
 - **Reframing rate of 1.5%** means users rarely need to re-establish context
-  that was available in the graph. This is well under the 5% success target.
+  that was available in the graph. This is well under the 5% success target,
+  which was estimated as typical for conventional linear context.
 
 - **Context density at 58.2% is normal and expected.** This ceiling reflects
   structural overhead: the recency layer, topic layer, and sticky turns consume
@@ -119,7 +120,19 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
   not a deficiency. The density metric can be adjusted by tuning the recency/topic
   budget split if needed.
 
-### Running shadow mode locally
+### Dynamic MEMORY.md modifications
+
+In addition to assembling context for each turn, the contextgraph system can
+update MEMORY.md with a summary of recent salient topics and information. This compliments
+the query-specific assembly for the current prompt, though there can be overlap.  In multi-agent
+systems with a single agent identity serving multiple users, the system-wide memory lives in MEMORY.md, with
+user-specific MEMORY.md files for each user agent. The contexgragph system can be configured to support this
+by updating only the per-user MEMORY.md file.
+
+### Shadow Mode
+
+In shadow mode, a non-operational copy of the modified MEMORY.md file is created so that the performance
+of the context graph system's updates can be evaluated before MEMORY.md is touched.
 
 Shadow evaluation can be run in two modes, each testing different aspects of the system:
 
