@@ -60,7 +60,7 @@ about a specific deployment decision surfaces when that deployment comes up agai
 ## Memory Integration: Live Status (v1.0-rc1)
 
 As of v1.0-rc1, memory integration is **live and operational**. The `update_memory_dynamic.py`
-script runs every 4 hours via launchd service (`com.glados.update-memory`), writing directly
+script runs every 4 hours via launchd service (`com.contextgraph.update-memory`), writing directly
 to `MEMORY.md` with the `--live` flag.
 
 ### How it works
@@ -196,11 +196,11 @@ tail -f /tmp/update_memory_dynamic.log
   /Users/rich/Projects/tag-context/scripts/update_memory_dynamic.py --live
 
 # Unload service (to disable memory integration)
-launchctl unload ~/Library/LaunchAgents/com.glados.update-memory.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.update-memory.plist
 
 # Reload service (after changes to plist or script)
-launchctl unload ~/Library/LaunchAgents/com.glados.update-memory.plist
-launchctl load ~/Library/LaunchAgents/com.glados.update-memory.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.update-memory.plist
+launchctl load ~/Library/LaunchAgents/com.contextgraph.update-memory.plist
 ```
 
 ### Script flags

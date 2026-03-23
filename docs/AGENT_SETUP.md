@@ -72,7 +72,7 @@ data/tag_registry.json   ← NOT tracked in git (live runtime file)
 
 Two services run this system:
 
-### 1. Context Graph API — `com.glados.tag-context`
+### 1. Context Graph API — `com.contextgraph.api`
 
 The Python FastAPI server. This is the one that actually matters.
 
@@ -81,12 +81,12 @@ The Python FastAPI server. This is the one that actually matters.
 launchctl list | grep tag-context
 
 # Start / stop
-launchctl start com.glados.tag-context
-launchctl stop com.glados.tag-context
+launchctl start com.contextgraph.api
+launchctl stop com.contextgraph.api
 
 # Restart after code changes (must unload+load to re-read plist)
-launchctl unload ~/Library/LaunchAgents/com.glados.tag-context.plist
-launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.api.plist
+launchctl load ~/Library/LaunchAgents/com.contextgraph.api.plist
 
 # Logs
 tail -f /tmp/tag-context.log
@@ -96,13 +96,13 @@ curl http://localhost:8300/health
 # → {"status":"ok","messages_in_store":...,"engine":"contextgraph"}
 ```
 
-**Plist:** `~/Library/LaunchAgents/com.glados.tag-context.plist`
+**Plist:** `~/Library/LaunchAgents/com.contextgraph.api.plist`
 **Python:** `~/Projects/tag-context/venv/bin/python3`
 **Port:** 8300
 **Log:** `/tmp/tag-context.log`
 
 > Note: There is also a `com.contextgraph.api` service from the template-based
-> installer. The active service is `com.glados.tag-context`. Don't run both —
+> installer. The active service is `com.contextgraph.api`. Don't run both —
 > they both bind port 8300 and will crash-loop each other.
 
 ### 2. OpenClaw Plugin
@@ -259,12 +259,12 @@ launchctl list | grep tag-context
 tail -50 /tmp/tag-context.log
 
 # Restart
-launchctl stop com.glados.tag-context
-launchctl start com.glados.tag-context
+launchctl stop com.contextgraph.api
+launchctl start com.contextgraph.api
 
 # If env vars need updating, must unload+load (not stop+start)
-launchctl unload ~/Library/LaunchAgents/com.glados.tag-context.plist
-launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.api.plist
+launchctl load ~/Library/LaunchAgents/com.contextgraph.api.plist
 ```
 
 ### Plugin not calling API
@@ -389,5 +389,5 @@ Only use `stop`/`restart` as a last resort when the gateway is already dead.
 - **`--live` flag for `update_memory_dynamic.py`** writes directly to
   `MEMORY.md`. Don't flip this without first confirming shadow output
   looks clean and representative for at least 1 day of shadow runs.
-- The `com.glados.tag-context` label is local convention. The template
+- The `com.contextgraph.api` label is local convention. The template
   installer uses `com.contextgraph.api`. Both are fine — just don't run both.

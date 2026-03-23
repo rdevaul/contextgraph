@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Major Features
 
 #### Memory Integration (Phase 4 Complete)
-- **Live MEMORY.md integration** — `update_memory_dynamic.py` runs every 4 hours via launchd (`com.glados.update-memory`), writing graph-assembled context directly to `~/.openclaw/workspace/MEMORY.md`
+- **Live MEMORY.md integration** — `update_memory_dynamic.py` runs every 4 hours via launchd (`com.contextgraph.update-memory`), writing graph-assembled context directly to `~/.openclaw/workspace/MEMORY.md`
 - **HTML marker-based section replacement** — Dynamic Context section is updated without touching curated long-term memory above it
 - **Dual-layer context assembly** — Agents receive both persistent context (MEMORY.md Dynamic Context section, updated every 4h) and live per-turn retrieval
 - **`--live` flag enforcement** — Production mode requires explicit opt-in; `--shadow` mode writes to `SHADOWMEMORY.md` for validation
@@ -58,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture diagram** — Updated to show automated turn filtering, lazy summarization, and IDF tag filtering
 
 ### Services & Operations
-- **API server** (`com.glados.tag-context`) — Port 8300, logs to `/tmp/tag-context.log`
-- **Memory updater** (`com.glados.update-memory`) — Runs every 4 hours, logs to `/tmp/update_memory_dynamic.log`
+- **API server** (`com.contextgraph.api`) — Port 8300, logs to `/tmp/tag-context.log`
+- **Memory updater** (`com.contextgraph.update-memory`) — Runs every 4 hours, logs to `/tmp/update_memory_dynamic.log`
 - **Dashboard** — http://localhost:8300/dashboard
 - **Health checks** — `curl http://localhost:8300/health` (service alive), `curl http://localhost:8300/quality` (retrieval working)
 

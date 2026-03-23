@@ -197,7 +197,7 @@ Low-data tags (0.495): `api`, `debugging`, `personal`, `yapCAD`
 
 Context Graph runs as two launchd services on this machine:
 
-### 1. API Server (`com.glados.tag-context`)
+### 1. API Server (`com.contextgraph.api`)
 - **Port:** 8300
 - **Logs:** `/tmp/tag-context.log`
 - **Dashboard:** http://localhost:8300/dashboard
@@ -206,7 +206,7 @@ Context Graph runs as two launchd services on this machine:
 
 The API server provides context assembly (`/assemble`), ingestion (`/ingest`), and quality monitoring endpoints for the OpenClaw plugin.
 
-### 2. Memory Updater (`com.glados.update-memory`)
+### 2. Memory Updater (`com.contextgraph.update-memory`)
 - **Schedule:** Every 4 hours
 - **Script:** `scripts/update_memory_dynamic.py --live`
 - **Target:** `~/.openclaw/workspace/MEMORY.md`
@@ -222,8 +222,8 @@ launchctl list | grep tag-context
 launchctl list | grep update-memory
 
 # Restart API server (after code changes)
-launchctl unload ~/Library/LaunchAgents/com.glados.tag-context.plist
-launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.api.plist
+launchctl load ~/Library/LaunchAgents/com.contextgraph.api.plist
 
 # View logs
 tail -f /tmp/tag-context.log
@@ -304,12 +304,12 @@ To use a specific Python interpreter (e.g. pyenv shim):
 launchctl list | grep tag-context
 
 # Start / stop
-launchctl start com.glados.tag-context
-launchctl stop com.glados.tag-context
+launchctl start com.contextgraph.api
+launchctl stop com.contextgraph.api
 
 # Restart (e.g. after code changes — must unload+load to re-read plist)
-launchctl unload ~/Library/LaunchAgents/com.glados.tag-context.plist
-launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
+launchctl unload ~/Library/LaunchAgents/com.contextgraph.api.plist
+launchctl load ~/Library/LaunchAgents/com.contextgraph.api.plist
 
 # Logs
 tail -f /tmp/tag-context.log
@@ -447,7 +447,7 @@ python3 -m pytest tests/ -v
   provides real-time quality and efficiency metrics. See [`docs/PLAN_B_NATIVE_PLUGIN.md`](docs/PLAN_B_NATIVE_PLUGIN.md)
   for the full implementation plan.
 - [x] **Phase 4 — Memory Integration Live (v1.0-rc1).** `scripts/update_memory_dynamic.py`
-  runs every 4 hours via launchd (`com.glados.update-memory`), querying `/assemble`
+  runs every 4 hours via launchd (`com.contextgraph.update-memory`), querying `/assemble`
   and writing a `## Dynamic Context` section directly to `MEMORY.md`. Replace-section
   logic uses HTML comment markers so curated long-term memory is never touched.
   Automated turn filtering ensures only retrieval-relevant turns affect quality metrics.
@@ -513,7 +513,7 @@ AGENT_NAME=glados-rich ./scripts/install-service.sh
 AGENT_NAME=glados-jarvis PORT=8301 ./scripts/install-service.sh
 ```
 
-This creates distinct service files (e.g., `com.glados.tag-context-glados-rich.plist`) and allows multiple agents to run concurrently on the same machine.
+This creates distinct service files (e.g., `com.contextgraph.api-glados-rich.plist`) and allows multiple agents to run concurrently on the same machine.
 
 ## Documentation
 
