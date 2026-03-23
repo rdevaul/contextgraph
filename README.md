@@ -210,7 +210,7 @@ Low-data tags (0.495): `api`, `debugging`, `personal`, `yapCAD`
 
 Context Graph runs as two launchd services on this machine:
 
-### 1. API Server (`com.glados.tag-context`)
+### 1. API Server (`tag-context`)
 - **Port:** 8300
 - **Logs:** `/tmp/tag-context.log`
 - **Dashboard:** http://localhost:8300/dashboard
@@ -219,7 +219,7 @@ Context Graph runs as two launchd services on this machine:
 
 The API server provides context assembly (`/assemble`), ingestion (`/ingest`), and quality monitoring endpoints for the OpenClaw plugin.
 
-### 2. Memory Updater (`com.glados.update-memory`)
+### 2. Memory Updater (`update-memory`)
 - **Schedule:** Every 4 hours
 - **Script:** `scripts/update_memory_dynamic.py --live`
 - **Target:** `~/.openclaw/workspace/MEMORY.md`
