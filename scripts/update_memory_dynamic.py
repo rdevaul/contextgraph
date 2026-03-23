@@ -26,9 +26,11 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 
-# Add parent directory to path for config import
+# Add parent/scripts directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 import config
+from channel_access import filter_turns_for_agent
 
 WORKSPACE = config.WORKSPACE
 MEMORY_FILE = config.MEMORY_FILE
@@ -187,11 +189,19 @@ def main():
                         help="Explicit tags (bypasses tagger). Empty = DEFAULT_TAGS")
     parser.add_argument("--no-tags", action="store_true",
                         help="Disable explicit tags — use tagger inference (original behavior)")
+    parser.add_argument("--agent-id", default=None,
+                        help="Agent ID for channel-based filtering (e.g. glados-dana). "
+                             "When set, only turns with matching channel labels are included.")
+    parser.add_argument("--output-file", default=None,
+                        help="Override output file path")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print result without writing")
     args = parser.parse_args()
 
-    target = MEMORY_FILE if args.live else SHADOW_FILE
+    if args.output_file:
+        target = Path(args.output_file)
+    else:
+        target = MEMORY_FILE if args.live else SHADOW_FILE
 
     # Determine which tags to use (default: explicit tags via Rich's hook)
     if args.no_tags:
@@ -212,8 +222,16 @@ def main():
         sys.exit(1)
 
     messages = result.get("messages", [])
+
+    # Apply per-agent channel filtering if --agent-id is provided
+    if args.agent_id:
+        original_count = len(messages)
+        messages = filter_turns_for_agent(messages, args.agent_id)
+        result["messages"] = messages
+        print(f"[update_memory_dynamic] Agent '{args.agent_id}' filter: {original_count} → {len(messages)} messages")
+
     if not messages:
-        print(f"[update_memory_dynamic] ContextGraph returned 0 messages. Skipping write.")
+        print(f"[update_memory_dynamic] ContextGraph returned 0 messages after filtering. Skipping write.")
         sys.exit(0)
 
     section = format_dynamic_section(result, args.query)

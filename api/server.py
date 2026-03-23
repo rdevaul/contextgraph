@@ -57,6 +57,7 @@ class IngestRequest(BaseModel):
     timestamp: float
     user_id: str = Field(None, nullable=True)
     external_id: str = Field(None, nullable=True)  # OpenClaw AgentMessage.id or other external system ID
+    channel_label: str = Field(None, nullable=True)  # Channel label for per-agent memory isolation
 
 class ToolState(BaseModel):
     last_turn_had_tools: bool
@@ -179,7 +180,8 @@ def ingest(request: IngestRequest):
             tags=tags,
             token_count=token_count,
             external_id=request.external_id,
-            is_automated=is_automated
+            is_automated=is_automated,
+            channel_label=request.channel_label,
         )
         store.add_message(message)
 

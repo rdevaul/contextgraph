@@ -159,8 +159,8 @@ def test_migration_idempotency(tmp_path):
     # Should not crash or duplicate migrations
     conn = store2._conn()
     cursor = conn.execute("SELECT COUNT(*) as cnt FROM schema_version")
-    # Should have exactly 3 migration records (one per version)
-    assert cursor.fetchone()[0] == 3
+    # Should have exactly 4 migration records (one per version: 2, 3, 4, 5)
+    assert cursor.fetchone()[0] == 4
 
 
 def test_get_non_automated(store):
