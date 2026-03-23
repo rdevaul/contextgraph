@@ -1,22 +1,23 @@
-# MEMORY_INTEGRATION.md — How Context Graph Works With the Old Memory Paradigm
+# MEMORY_INTEGRATION.md — How Context Graph Works With Memory Paradigm
 
-*For Garrett and other agents integrating Context Graph into an existing OpenClaw deployment.*
+*For agents maintaining Context Graph alongside the existing MEMORY.md system.*
 
 ---
 
 ## Overview
 
-Context Graph and the old memory paradigm (MEMORY.md + daily logs) are **complementary,
+Context Graph and the existing memory paradigm (MEMORY.md + daily logs) are **complementary,
 not competing**. They operate at different timescales and serve different purposes:
 
 | Layer | What it is | Timescale | Managed by |
 |-------|-----------|-----------|------------|
-| **MEMORY.md** | Curated long-term facts, decisions, lessons | Weeks–months | Agent writes manually or via script |
+| **MEMORY.md** | Curated long-term facts, decisions, lessons (+ Dynamic Context section) | Weeks–months | Agent + memory updater (every 4h) |
 | **Daily logs** (`memory/YYYY-MM-DD.md`) | Raw session notes, today's context | Days | Agent writes per-session |
 | **Context Graph** | Tag-indexed message retrieval from recent sessions | Hours–weeks | Auto-indexed every turn |
 
-The old paradigm handles *what the agent should always know*. Context Graph handles
-*what's topically relevant right now*. They don't replace each other.
+The memory paradigm handles *what the agent should always know*. Context Graph handles
+*what's topically relevant right now*. The memory updater bridges them by injecting
+graph-assembled summaries into MEMORY.md's Dynamic Context section.
 
 ---
 
@@ -56,35 +57,28 @@ about a specific deployment decision surfaces when that deployment comes up agai
 
 ---
 
-## Garrett's Approach: Disable Memory Graph, Run Context Graph With Old Paradigm
+## Memory Integration: Live Status (v1.0-rc1)
 
-This is the recommended safe path for initial validation. Here's exactly what it means:
+As of v1.0-rc1, memory integration is **live and operational**. The `update_memory_dynamic.py`
+script runs every 4 hours via launchd service (`com.glados.update-memory`), writing directly
+to `MEMORY.md` with the `--live` flag.
 
-### What to disable
+### How it works
 
-**Memory graph** = `scripts/update_memory_dynamic.py` — the nightly script that injects
-assembled context directly into MEMORY.md (or SHADOWMEMORY.md). This is Phase 3.5 and
-is still in shadow mode. **Leave this off** for now.
+1. **Every 4 hours**, the launchd service triggers `scripts/update_memory_dynamic.py --live`
+2. The script queries `/assemble` for topically-relevant context from the graph
+3. Assembled content is summarized and formatted
+4. The `## Dynamic Context` section in MEMORY.md is updated using HTML comment markers
+   (`<!-- DYNAMIC_CONTEXT_START -->` ... `<!-- DYNAMIC_CONTEXT_END -->`)
+5. Curated long-term memory sections above the markers are never touched
 
-The script is only run manually or via cron — it's not part of the plugin or API. You
-don't need to change any config to disable it; just don't schedule or run it.
-
-### What to keep enabled
-
-**Context Graph retrieval** = the plugin + API, which assembles and injects retrieved
-context as a `[Retrieved Context]` block prepended to each incoming message.
-
-The old memory files (MEMORY.md, daily logs) continue to load at session start exactly
-as before. Context Graph adds retrieved session history on top of that — it doesn't
-replace any of it.
-
-### Result
+### What the agent sees
 
 Each turn the agent sees:
 ```
-[System prompt: SOUL.md + IDENTITY.md + USER.md + MEMORY.md + daily log]
+[System prompt: SOUL.md + IDENTITY.md + USER.md + MEMORY.md (with Dynamic Context) + daily log]
 ...
-[Retrieved Context — from Context Graph /assemble]
+[Retrieved Context — from Context Graph /assemble, live turn-by-turn]
 Previous turn 1 (recent)
 Previous turn 2 (recent)
 Previous turn 3 (on-topic, 2 weeks ago)
@@ -92,7 +86,12 @@ Previous turn 3 (on-topic, 2 weeks ago)
 [Current user message]
 ```
 
-The MEMORY.md layer is unchanged. Context Graph adds a dynamic retrieval layer on top.
+The agent gets **two layers of graph-assembled context**:
+1. **Persistent layer** (MEMORY.md's Dynamic Context section) — updated every 4 hours, always loaded
+2. **Live retrieval layer** (prepended to each message) — assembled per-turn based on inferred tags
+
+This provides both stable persistent context (what's been relevant recently) and dynamic
+turn-specific retrieval (what's relevant *right now*).
 
 ---
 
@@ -181,50 +180,67 @@ and is ready for production use.
 
 ---
 
-## Adding Dynamic Memory Injection Later (Phase 3.5)
+## Service Management
 
-Once Context Graph retrieval is stable, you can optionally layer in dynamic memory
-injection — where a nightly script assembles the most relevant recent context and writes
-it into a dedicated section of MEMORY.md.
-
-This is Phase 3.5 and should be treated as a separate milestone:
+Memory integration runs via launchd service. To manage it:
 
 ```bash
-# First, run in shadow mode for a few days
-python3 scripts/update_memory_dynamic.py --shadow --dry-run  # preview only
-python3 scripts/update_memory_dynamic.py --shadow            # writes to SHADOWMEMORY.md
+# Check status
+launchctl list | grep update-memory
 
-# Review SHADOWMEMORY.md output manually — does it look right?
-cat ~/.openclaw/workspace/SHADOWMEMORY.md
+# View logs (live)
+tail -f /tmp/update_memory_dynamic.log
 
-# If clean and representative for ~1-2 days, promote to live
-python3 scripts/update_memory_dynamic.py --live              # writes to MEMORY.md
+# Manually trigger an update (for testing)
+/Users/rich/Projects/tag-context/venv/bin/python3 \
+  /Users/rich/Projects/tag-context/scripts/update_memory_dynamic.py --live
+
+# Unload service (to disable memory integration)
+launchctl unload ~/Library/LaunchAgents/com.glados.update-memory.plist
+
+# Reload service (after changes to plist or script)
+launchctl unload ~/Library/LaunchAgents/com.glados.update-memory.plist
+launchctl load ~/Library/LaunchAgents/com.glados.update-memory.plist
 ```
 
-The script is safe by design:
-- Skips write if `/assemble` returns empty
-- Uses HTML comment markers (`<!-- DYNAMIC_CONTEXT_START/END -->`) to replace-in-place,
-  never touching curated content above the section
-- `--shadow` flag is the default; `--live` requires explicit opt-in
+### Script flags
 
-This is **not** required for Context Graph retrieval to work. It's an optional enhancement
-that surfaces the most relevant graph content into the persistent memory layer.
+- `--live` — Write to `~/.openclaw/workspace/MEMORY.md` (production mode, currently active)
+- `--shadow` — Write to `~/.openclaw/workspace/SHADOWMEMORY.md` (validation mode)
+- `--dry-run` — Print output without writing any files (preview only)
+
+The launchd service uses `--live` by default. For testing or validation, run manually
+with `--shadow` or `--dry-run`.
+
+### Safety features
+
+The script is designed to be safe:
+- Skips write if `/assemble` returns empty or API is unreachable
+- Uses HTML comment markers to replace only the Dynamic Context section
+- Never modifies curated long-term memory sections above the markers
+- Logs all operations to `/tmp/update_memory_dynamic.log` with timestamps
 
 ---
 
-## Summary
+## Summary (v1.0-rc1 Status)
 
-| What | State in Garrett's plan |
-|------|------------------------|
-| MEMORY.md + daily logs (old paradigm) | ✅ Keep, unchanged |
-| Context Graph plugin + API (retrieval) | ✅ Enable, run in ghost mode |
-| `update_memory_dynamic.py` (memory graph) | ❌ Disable — validate later as Phase 3.5 |
-| Comparison log monitoring | ✅ Use to validate retrieval quality |
-| Promote to production | After checklist above is green |
+| Component | Status |
+|------|--------|
+| MEMORY.md + daily logs (old paradigm) | ✅ Active, enhanced with Dynamic Context section |
+| Context Graph plugin + API (retrieval) | ✅ Production, live turn-by-turn retrieval |
+| `update_memory_dynamic.py` (memory integration) | ✅ Live via launchd, runs every 4 hours with `--live` |
+| Dashboard (`/dashboard`) | ✅ Real-time quality and efficiency metrics |
+| Automated turn filtering | ✅ Cron/heartbeat/subagent turns excluded from metrics |
+| Lazy message summarization | ✅ Large turns summarized on-the-fly (Claude Haiku) |
 
-The goal: Context Graph adds a dynamic retrieval layer on top of the existing memory
-stack without touching or replacing anything that already works. The old paradigm
-handles long-term knowledge; the graph handles topical recency.
+Memory integration is **live and operational**. Context Graph adds:
+1. **Dynamic retrieval layer** — turn-by-turn context assembly based on inferred tags
+2. **Persistent dynamic context** — MEMORY.md section updated every 4 hours from graph
+3. **Quality monitoring** — `/quality` endpoint + dashboard for health checks
+
+The old memory paradigm remains unchanged and complementary. Graph handles topical
+recency and discriminative retrieval; MEMORY.md continues to handle curated long-term
+knowledge.
 
 ---
 
