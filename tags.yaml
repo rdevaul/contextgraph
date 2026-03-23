@@ -1,0 +1,317 @@
+# tags.yaml — User-editable tag configuration for contextgraph
+# Changes are hot-reloaded; no service restart needed.
+#
+# Each tag entry:
+#   name: str — tag identifier (lowercase, hyphens OK)
+#   description: str — human-readable purpose
+#   keywords: list[str] — substring matches (case-insensitive, word-boundary)
+#   patterns: list[str] — regex patterns (applied to combined user+assistant text)
+#   requires_all: bool — if true, ALL keywords must match (default: false = any)
+#   confidence: float — override confidence score (default: 1.0)
+#   enabled: bool — false = tag exists but is disabled (default: true)
+
+version: 1
+
+tags:
+
+  # ── General AI assistant tags ────────────────────────────────────────────
+
+  - name: code
+    description: Message contains or discusses code
+    keywords: []
+    patterns:
+      - "```[\\s\\S]*?```"   # code block
+      - "^    \\S"            # 4-space indent
+    confidence: 1.0
+
+  - name: networking
+    description: Network infrastructure, protocols, VPN
+    keywords:
+      - tailscale
+      - caddy
+      - nginx
+      - gateway
+      - vpn
+      - dns
+      - websocket
+      - firewall
+      - ssl
+      - tls
+    confidence: 1.0
+
+  - name: security
+    description: Security vulnerabilities, credentials, access control
+    keywords:
+      - security vulnerability
+      - authentication failure
+      - credential leak
+      - allowlist
+      - permission denied
+      - privilege escalation
+      - injection attack
+    confidence: 1.0
+
+  - name: ai
+    description: AI/ML topics, model discussion
+    keywords:
+      - large language model
+      - claude ai
+      - chatgpt
+      - anthropic api
+      - openai api
+      - fine-tuning
+      - transformer
+      - neural network
+    confidence: 1.0
+
+  - name: llm
+    description: LLM-specific infrastructure, APIs, inference
+    keywords:
+      - llm
+      - language model
+      - inference server
+      - embedding model
+      - quantiz
+      - gguf
+    confidence: 1.0
+
+  - name: context-management
+    description: This system — context graph, assembly, tagging
+    keywords:
+      - context window
+      - compaction
+      - tag-context
+      - context management
+      - quality agent
+      - context graph
+      - context budget
+      - context assembly
+    confidence: 1.0
+
+  - name: devops
+    description: Deployment, CI/CD, service management
+    keywords:
+      - deploy to
+      - launchd
+      - launchctl
+      - docker compose
+      - docker run
+      - systemctl
+      - daemon reload
+      - ci/cd
+    confidence: 1.0
+
+  - name: research
+    description: Research, literature, design documents
+    keywords:
+      - research paper
+      - research proposal
+      - system design
+      - architecture doc
+      - technical specification
+      - literature review
+    confidence: 1.0
+
+  - name: planning
+    description: Project planning, roadmaps, decisions
+    keywords:
+      - project plan
+      - prototype build
+      - design document
+      - decision
+      - roadmap
+      - milestone
+    confidence: 1.0
+
+  - name: question
+    description: User is asking a question
+    patterns:
+      - "\\?"
+    confidence: 0.7
+
+  - name: has-url
+    description: Message contains a URL
+    patterns:
+      - "https?://\\S+"
+    confidence: 0.5
+
+  - name: monitoring
+    description: Health checks, cron, watchdog, dashboards
+    keywords:
+      - watchdog
+      - health check
+      - healthcheck
+      - cron job
+      - scheduled
+      - uptime
+      - metrics
+      - dashboard
+    confidence: 1.0
+
+  - name: agents
+    description: Sub-agents, agent spawning, agentic workflows
+    keywords:
+      - sub-agent
+      - subagent
+      - spawn agent
+      - sessions_spawn
+      - isolated session
+    confidence: 1.0
+
+  - name: trading
+    description: Financial trading, options, portfolio management
+    keywords:
+      - trading
+      - option
+      - spread
+      - debit spread
+      - put spread
+      - call spread
+      - tradier
+      - maxrisk
+      - portfolio
+      - earnings
+      - volatility
+    confidence: 1.0
+
+  - name: hardware
+    description: Physical compute hardware, devices
+    keywords:
+      - mac mini
+      - mac studio
+      - apple silicon
+      - framework
+      - gpu memory
+      - vram
+    confidence: 1.0
+
+  - name: local-compute
+    description: Local LLM inference, Ollama, on-device models
+    keywords:
+      - ollama
+      - litellm
+      - local model
+      - local inference
+      - qwen
+      - deepseek
+      - llama
+      - mistral
+    confidence: 1.0
+
+  # ── Domain-specific tags (enable/customize as needed) ──────────────────
+
+  - name: yapCAD
+    description: yapCAD agentic CAD/CAM system
+    keywords:
+      - yapcad
+      - yap-cad
+      - gel-native
+      - agentic cad
+      - agentic cam
+      - geometry engine
+      - ycpkg
+      - step file
+      - stl file
+      - boolean operation
+    confidence: 1.0
+
+  - name: openclaw
+    description: OpenClaw platform, sessions, skills
+    keywords:
+      - openclaw
+      - heartbeat
+      - session
+      - workflow_auto
+      - compaction safeguard
+      - skill
+    confidence: 1.0
+
+  - name: memory-system
+    description: Memory files, harvester, context graph integration
+    keywords:
+      - memory.md
+      - memory system
+      - harvester
+      - daily log
+      - long-term memory
+      - contextgraph
+      - store.db
+      - interaction log
+    confidence: 1.0
+
+  - name: voice-pwa
+    description: Voice PWA, STT, TTS, push-to-talk
+    keywords:
+      - voice pwa
+      - push to talk
+      - voxtral
+      - whisper
+      - piper tts
+      - openai tts
+      - voice backend
+      - voice frontend
+    confidence: 1.0
+
+  - name: shopping-list
+    description: Shopping list bot, items, grocery
+    keywords:
+      - shopping list
+      - grocery
+      - shopbot
+      - add to list
+    confidence: 1.0
+
+  # ── Example domain tags (disabled — copy and enable for your domain) ───
+
+  - name: rocket
+    description: Sounding rocket, propulsion, structures
+    enabled: false
+    keywords:
+      - sounding rocket
+      - oxidizer tank
+      - fuel tank
+      - nosecone
+      - intertank
+      - thrust structure
+      - propellant
+    confidence: 1.0
+
+  - name: print-farm
+    description: 3D printing, slicing, print farm operations
+    enabled: false
+    keywords:
+      - print farm
+      - bambu
+      - prusa
+      - slicer
+      - 3d print
+      - fdm
+      - filament
+      - petg
+    confidence: 1.0
+
+  - name: fea
+    description: Finite element analysis, structural simulation
+    enabled: false
+    keywords:
+      - finite element
+      - fea
+      - stress analysis
+      - von mises
+      - mesh
+      - simulation
+      - safety factor
+      - deflection
+    confidence: 1.0
+
+  - name: wipow
+    description: Wireless power project
+    enabled: false
+    keywords:
+      - wipow
+      - wireless power
+      - power transfer
+      - beamforming
+      - phased array
+      - rectenna
+    confidence: 1.0

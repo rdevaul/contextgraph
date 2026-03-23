@@ -7,6 +7,9 @@ spacy>=3.7
 anthropic>=0.40
 requests>=2.31  # for Ollama backend
 
+# Fixed tagger (YAML config)
+pyyaml>=6.0
+
 # Testing
 pytest>=8.0
 

@@ -72,3 +72,109 @@ def test_tag_counts(store):
     counts = store.tag_counts()
     assert counts["security"] == 2
     assert counts["networking"] == 1
+
+
+def test_external_id_field(store):
+    """Test that external_id field works correctly."""
+    msg = make_msg(external_id="ext-123", user_text="external message")
+    store.add_message(msg)
+
+    # Retrieve by external_id
+    retrieved = store.get_by_external_id("ext-123")
+    assert retrieved is not None
+    assert retrieved.external_id == "ext-123"
+    assert retrieved.user_text == "external message"
+
+
+def test_is_automated_field(store):
+    """Test that is_automated field works correctly."""
+    auto_msg = make_msg(user_text="[cron:123] Task done", is_automated=True)
+    normal_msg = make_msg(user_text="Normal message", is_automated=False)
+
+    store.add_message(auto_msg)
+    store.add_message(normal_msg)
+
+    # get_recent should exclude automated by default
+    recent = store.get_recent(10, include_automated=False)
+    assert len(recent) == 1
+    assert recent[0].id == normal_msg.id
+
+    # get_recent with include_automated=True should include all
+    recent_all = store.get_recent(10, include_automated=True)
+    assert len(recent_all) == 2
+
+
+def test_summary_field(store):
+    """Test that summary field works correctly."""
+    msg = make_msg(user_text="Long message that needs summarization")
+    store.add_message(msg)
+
+    # Set summary
+    store.set_summary(msg.id, "Short summary")
+
+    # Retrieve summary
+    summary = store.get_summary(msg.id)
+    assert summary == "Short summary"
+
+    # Retrieve full message
+    retrieved = store.get_by_id(msg.id)
+    assert retrieved.summary == "Short summary"
+
+
+def test_schema_version_tracking(store):
+    """Test that schema migrations are tracked."""
+    conn = store._conn()
+
+    # Check that schema_version table exists
+    cursor = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+    )
+    assert cursor.fetchone() is not None
+
+    # Check that migrations were recorded
+    cursor = conn.execute("SELECT version FROM schema_version ORDER BY version")
+    versions = [row[0] for row in cursor.fetchall()]
+
+    # Should have migrations 2, 3, 4 (external_id, summary, is_automated)
+    assert 2 in versions
+    assert 3 in versions
+    assert 4 in versions
+
+
+def test_migration_idempotency(tmp_path):
+    """Test that migrations are idempotent (can be run multiple times)."""
+    db_path = str(tmp_path / "test.db")
+
+    # Create store and add a message
+    store1 = MessageStore(db_path)
+    msg = make_msg(user_text="test")
+    store1.add_message(msg)
+
+    # Close and reopen (triggers migration check again)
+    store2 = MessageStore(db_path)
+    retrieved = store2.get_by_id(msg.id)
+    assert retrieved is not None
+    assert retrieved.user_text == "test"
+
+    # Should not crash or duplicate migrations
+    conn = store2._conn()
+    cursor = conn.execute("SELECT COUNT(*) as cnt FROM schema_version")
+    # Should have exactly 3 migration records (one per version)
+    assert cursor.fetchone()[0] == 3
+
+
+def test_get_non_automated(store):
+    """Test get_non_automated method."""
+    auto_msg1 = make_msg(user_text="[cron:123] Task 1", is_automated=True)
+    auto_msg2 = make_msg(user_text="HEARTBEAT_OK", is_automated=True)
+    normal_msg1 = make_msg(user_text="Normal 1", is_automated=False)
+    normal_msg2 = make_msg(user_text="Normal 2", is_automated=False)
+
+    store.add_message(auto_msg1)
+    store.add_message(normal_msg1)
+    store.add_message(auto_msg2)
+    store.add_message(normal_msg2)
+
+    non_auto = store.get_non_automated(limit=10)
+    assert len(non_auto) == 2
+    assert all(not msg.is_automated for msg in non_auto)

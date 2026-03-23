@@ -19,9 +19,10 @@ from store import Message, MessageStore
 from features import extract_features
 from tagger import assign_tags
 from assembler import ContextAssembler
+import config
 
 
-DB_PATH = str(Path.home() / ".tag-context" / "store.db")
+DB_PATH = str(config.DB_PATH)
 
 
 def cmd_add(args, store: MessageStore) -> None:

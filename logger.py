@@ -53,20 +53,27 @@ def _log_path(ts: float) -> Path:
 
 def _is_automated_turn(user_text: str) -> bool:
     """
-    Detect automated turns (cron jobs, heartbeats, local watcher) by inspecting user_text.
+    Detect automated turns (cron jobs, heartbeats, local watcher, subagent events) by inspecting user_text.
 
     Returns True if the message matches any of these patterns:
     - Starts with "[cron:" (cron job payloads)
     - Contains "Read HEARTBEAT.md if it exists" (heartbeat prompt)
     - Starts with "[local-watcher]" (file watcher events)
+    - Starts with "[subagent" (subagent completion events)
     - User text is exactly "HEARTBEAT_OK" (heartbeat acknowledgement)
-    """
-    import re
+    - Text starts with "[WORKFLOW_AUTO" (post-compaction automated workflow)
 
+    Length guard: If text exceeds 500 characters, return False. Long messages
+    likely contain real content even if they start with an automated prefix.
+    """
     # Normalize whitespace for consistent matching
     text = user_text.strip()
 
-    # Pattern 1: Cron job payloads
+    # Length guard: long messages likely have real content
+    if len(text) > 500:
+        return False
+
+    # Pattern 1: Cron job payloads (redundant pattern removed)
     if text.startswith("[cron:"):
         return True
 
@@ -82,8 +89,12 @@ def _is_automated_turn(user_text: str) -> bool:
     if text == "HEARTBEAT_OK":
         return True
 
-    # Pattern 5: UUID-style cron IDs (more specific cron pattern)
-    if re.match(r'^\[cron:[a-f0-9-]+', text):
+    # Pattern 5: Subagent completion events
+    if text.lower().startswith("[subagent"):
+        return True
+
+    # Pattern 6: WORKFLOW_AUTO / post-compaction detection
+    if text.startswith("[WORKFLOW_AUTO"):
         return True
 
     return False

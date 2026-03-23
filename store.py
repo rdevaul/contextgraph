@@ -81,6 +81,21 @@ class MessageStore:
             self._conn_obj = conn
         return self._conn_obj
 
+    # ── migrations ────────────────────────────────────────────────────────────
+
+    MIGRATIONS = {
+        2: """
+            ALTER TABLE messages ADD COLUMN external_id TEXT;
+            CREATE INDEX IF NOT EXISTS idx_messages_external_id ON messages(external_id);
+        """,
+        3: """
+            ALTER TABLE messages ADD COLUMN summary TEXT;
+        """,
+        4: """
+            ALTER TABLE messages ADD COLUMN is_automated INTEGER NOT NULL DEFAULT 0;
+        """,
+    }
+
     def _init_db(self) -> None:
         with self._lock:
             conn = self._conn()
@@ -103,40 +118,63 @@ class MessageStore:
                     PRIMARY KEY (message_id, tag)
                 );
                 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+
+                CREATE TABLE IF NOT EXISTS schema_version (
+                    version INTEGER PRIMARY KEY,
+                    applied_at REAL NOT NULL,
+                    description TEXT
+                );
             """)
             conn.commit()
 
-            # Migration: add external_id column if it doesn't exist
-            self._migrate_external_id(conn)
-            # Migration: add summary column if it doesn't exist
-            self._migrate_summary(conn)
-            # Migration: add is_automated column if it doesn't exist
-            self._migrate_is_automated(conn)
+            # Run pending migrations
+            self._run_migrations(conn)
 
-    def _migrate_external_id(self, conn: sqlite3.Connection) -> None:
-        """Add external_id column if it doesn't exist (backwards-compatible migration)."""
-        cursor = conn.execute("PRAGMA table_info(messages)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "external_id" not in columns:
-            conn.execute("ALTER TABLE messages ADD COLUMN external_id TEXT")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_external_id ON messages(external_id)")
-            conn.commit()
+    def _get_schema_version(self, conn: sqlite3.Connection) -> int:
+        """Get current schema version (0 if schema_version table doesn't exist yet)."""
+        try:
+            row = conn.execute(
+                "SELECT MAX(version) as v FROM schema_version"
+            ).fetchone()
+            return row["v"] if row["v"] is not None else 0
+        except sqlite3.OperationalError:
+            # schema_version table doesn't exist yet (very old DB)
+            return 0
 
-    def _migrate_summary(self, conn: sqlite3.Connection) -> None:
-        """Add summary column if it doesn't exist (backwards-compatible migration)."""
-        cursor = conn.execute("PRAGMA table_info(messages)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "summary" not in columns:
-            conn.execute("ALTER TABLE messages ADD COLUMN summary TEXT")
-            conn.commit()
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """Apply any pending migrations."""
+        import time
 
-    def _migrate_is_automated(self, conn: sqlite3.Connection) -> None:
-        """Add is_automated column if it doesn't exist (backwards-compatible migration)."""
-        cursor = conn.execute("PRAGMA table_info(messages)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "is_automated" not in columns:
-            conn.execute("ALTER TABLE messages ADD COLUMN is_automated INTEGER NOT NULL DEFAULT 0")
-            conn.commit()
+        current_version = self._get_schema_version(conn)
+
+        for version in sorted(self.MIGRATIONS.keys()):
+            if version <= current_version:
+                continue
+
+            migration_sql = self.MIGRATIONS[version]
+
+            try:
+                # Execute migration (handle duplicate column errors gracefully)
+                for statement in migration_sql.strip().split(';'):
+                    statement = statement.strip()
+                    if statement:
+                        try:
+                            conn.execute(statement)
+                        except sqlite3.OperationalError as e:
+                            # Idempotent: ignore "duplicate column" errors
+                            if "duplicate column" not in str(e).lower():
+                                raise
+
+                # Record migration
+                conn.execute(
+                    "INSERT INTO schema_version (version, applied_at, description) VALUES (?, ?, ?)",
+                    (version, time.time(), f"Migration v{version}")
+                )
+                conn.commit()
+
+            except Exception as e:
+                conn.rollback()
+                raise RuntimeError(f"Migration {version} failed: {e}")
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

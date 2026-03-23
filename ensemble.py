@@ -15,6 +15,8 @@ from features import MessageFeatures
 from tagger import TagAssignment, CORE_TAGS
 from quality import QualityAgent
 from tag_registry import get_registry
+from fixed_tagger import FixedTagger
+import config
 
 
 @dataclass
@@ -138,3 +140,61 @@ class EnsembleTagger:
             for tag in rejected:
                 lines.append(f"    {tag:<23} vote={result.tag_votes[tag]:.2f}")
         return "\n".join(lines)
+
+
+def build_ensemble(
+    mode: Optional[str] = None,
+    quality_agent: Optional[QualityAgent] = None,
+    vote_threshold: float = 0.4,
+) -> EnsembleTagger:
+    """
+    Build an ensemble tagger based on the specified mode.
+
+    Modes:
+    - "fixed": FixedTagger only (no GP, DEAP not required)
+    - "hybrid": FixedTagger + GP tagger (default)
+    - "gp-only": GP tagger only (legacy mode)
+
+    If mode is None, uses config.TAGGER_MODE (defaults to "fixed").
+    """
+    mode = mode or config.TAGGER_MODE
+    ensemble = EnsembleTagger(
+        quality_agent=quality_agent,
+        vote_threshold=vote_threshold,
+    )
+
+    if mode == "fixed":
+        # Fixed tagger only — no DEAP dependency required
+        fixed = FixedTagger(config.TAGS_CONFIG)
+        ensemble.register("fixed", fixed.assign, initial_weight=1.0)
+
+    elif mode == "hybrid":
+        # Fixed + GP tagger
+        fixed = FixedTagger(config.TAGS_CONFIG)
+        ensemble.register("fixed", fixed.assign, initial_weight=1.0)
+
+        # Import GP tagger only when needed
+        try:
+            from gp_tagger import StructuredProgramTagger
+            gp_tagger = StructuredProgramTagger()
+            ensemble.register("gp", gp_tagger.assign, initial_weight=1.0)
+        except ImportError as e:
+            raise ImportError(
+                f"GP tagger requires DEAP: pip install deap (error: {e})"
+            )
+
+    elif mode == "gp-only":
+        # Legacy mode: GP tagger only
+        try:
+            from gp_tagger import StructuredProgramTagger
+            gp_tagger = StructuredProgramTagger()
+            ensemble.register("gp", gp_tagger.assign, initial_weight=1.0)
+        except ImportError as e:
+            raise ImportError(
+                f"GP tagger requires DEAP: pip install deap (error: {e})"
+            )
+
+    else:
+        raise ValueError(f"Unknown tagger mode: {mode}. Use 'fixed', 'hybrid', or 'gp-only'.")
+
+    return ensemble

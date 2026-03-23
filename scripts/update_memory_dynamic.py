@@ -26,8 +26,12 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 
-WORKSPACE = Path.home() / ".openclaw/workspace"
-MEMORY_FILE = WORKSPACE / "MEMORY.md"
+# Add parent directory to path for config import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import config
+
+WORKSPACE = config.WORKSPACE
+MEMORY_FILE = config.MEMORY_FILE
 SHADOW_FILE = WORKSPACE / "SHADOWMEMORY.md"
 CONTEXT_API = "http://localhost:8300/assemble"
 

@@ -65,3 +65,50 @@ def api_available():
         return response.status_code == 200
     except requests.RequestException:
         pytest.skip("API is not running on port 8300. Start with: python3 -m api.server")
+
+
+@pytest.fixture
+def in_memory_store():
+    """Create an in-memory MessageStore for testing."""
+    from store import MessageStore
+    return MessageStore(":memory:")
+
+
+@pytest.fixture
+def sample_messages():
+    """Provide sample messages for testing."""
+    from store import Message
+    import time
+
+    base_time = time.time() - 3600  # 1 hour ago
+
+    return [
+        Message.new(
+            session_id="test",
+            user_id="user1",
+            timestamp=base_time,
+            user_text="How do I deploy to production?",
+            assistant_text="Use the deploy script in scripts/deploy.sh",
+            tags=["devops", "deployment"],
+            token_count=50,
+        ),
+        Message.new(
+            session_id="test",
+            user_id="user1",
+            timestamp=base_time + 60,
+            user_text="What's the nginx config?",
+            assistant_text="The nginx config is in /etc/nginx/sites-available/",
+            tags=["networking", "devops"],
+            token_count=40,
+        ),
+        Message.new(
+            session_id="test",
+            user_id="user1",
+            timestamp=base_time + 120,
+            user_text="[cron:abc-123] Daily backup completed",
+            assistant_text="Acknowledged",
+            tags=["monitoring"],
+            token_count=20,
+            is_automated=True,
+        ),
+    ]
