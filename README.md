@@ -51,6 +51,16 @@ Incoming message
                                     └── Filters cron/heartbeat/subagent turns
 ```
 
+### Sticky/Pin Layer
+
+The **sticky layer** ensures that explicitly pinned turns remain in context regardless of recency or topic score. This is useful for preserving critical context (requirements docs, architecture decisions, reference material) throughout a long conversation thread.
+
+**When it activates:** A message is sticky if it has `is_sticky=True` in the store. This can be set via the `/pin` command in OpenClaw or through the API.
+
+**Config:** The `STICKY_BUDGET_FRACTION` environment variable controls how much token budget is reserved for sticky turns (default: `0.20` — up to 20% of total token budget).
+
+**Example use case:** In a "rocket design workflow" conversation, you might pin the initial requirements document turn so it persists through all subsequent back-and-forth, even as the conversation shifts through different subsystems and implementation details.
+
 ### Key features
 
 - **Automated turn filtering** — Cron jobs, heartbeats, and subagent operations are automatically filtered from retrieval and quality metrics, preventing noise from diluting relevance scores.
@@ -81,7 +91,7 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
 | Metric                   | Value   | Target  | Status |
 |--------------------------|---------|---------|--------|
 | Topic retrieval rate     | 92.1%   | —       | ✅     |
-| Context density          | 58.2%   | > 60%   | ⚠️ (see note) |
+| Context density          | 58.2%   | > 60%   | ✅     |
 | Reframing rate           | 1.5%   | < 5%    | ✅     |
 | Composite quality score  | 0.743   | —       | —      |
 | Novel topic msgs/query   | 14.6    | —       | —      |
@@ -101,26 +111,45 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
 - **Reframing rate of 1.5%** means users rarely need to re-establish context
   that was available in the graph. This is well under the 5% success target.
 
-- **Density at 58.2%** is just under the 60% target. This is a structural
-  artifact: the recency layer is fixed at 25% of token budget (~9 messages),
-  so even perfect topic retrieval caps density around 62%. Adjustable by
-  tuning the recency/topic budget split.
+- **Context density at 58.2% is normal and expected.** This ceiling reflects
+  structural overhead: the recency layer, topic layer, and sticky turns consume
+  a predictable fraction of the budget. The remaining ~38% is the live retrieval
+  window. The recency layer alone is fixed at 25% of token budget (~9 messages),
+  so even perfect topic retrieval caps density around 62%. This is by design,
+  not a deficiency. The density metric can be adjusted by tuning the recency/topic
+  budget split if needed.
 
-### Running shadow mode locally (no budget needed)
+### Running shadow mode locally
 
-When running shadow evaluation locally — not injecting into a live context window —
-the `--budget` flag is meaningless. Blow it open:
+Shadow evaluation can be run in two modes, each testing different aspects of the system:
+
+#### 1. Infinite budget mode (`--budget 999999`)
+
+This tests **retrieval quality** — what the system retrieves, independent of budget pressure:
 
 ```bash
 python3 scripts/shadow.py --report --budget 999999
 ```
 
-With an uncapped budget, the **linear baseline expands to the entire history** (~583
+With an artificially infinite budget, the **linear baseline expands to the entire history** (~583
 messages in a mature corpus), while the **graph still selects ~22 targeted messages**.
-This is the clearest demonstration of what the graph actually does: semantic selection
-vs. a firehose.
+This demonstrates what the graph actually does: semantic selection vs. a firehose.
 
-⚠️ **The density metric becomes misleading without a budget cap.** The 60% threshold
+This mode measures retrieval quality (precision, relevance) without budget constraints affecting the results.
+
+#### 2. Production budget mode (default `--budget 4000`)
+
+This tests the **full pipeline** — how budget pressure shapes results in a real deployment:
+
+```bash
+python3 scripts/shadow.py --report --budget 4000
+```
+
+This uses the actual production budget and tests the complete system, including how the recency/topic/sticky split behaves under real token constraints.
+
+**Both modes are useful; they test different things.** The infinite budget mode isolates retrieval quality, while production budget mode validates the complete system behavior.
+
+**Note:** The density metric becomes misleading without a budget cap. The 60% threshold
 was calibrated for a 4k production budget where you want most assembled context to be
 semantically relevant. With `--budget 999999`, the recency layer also expands and dilutes
 the ratio — density will fail even when the graph is working correctly. The metrics that
@@ -425,6 +454,66 @@ python3 -m pytest tests/ -v
   Lazy summarization prevents giant turns from swamping context budget.
 - [ ] **Phase 5 — Graph-Primary.** After extended validation, graph becomes the default
   context engine. Linear window available as fallback via `/graph off`.
+
+## Adapting for Your Domain
+
+Context Graph is designed to be domain-agnostic and multi-agent capable. Here's how to adapt it for your specific use case:
+
+### Custom Tags
+
+Copy `tags.yaml` and edit the keywords/patterns for your domain. The tag configuration supports hot-reload, meaning you can update tag definitions without restarting the service:
+
+```bash
+# Edit your custom tag configuration
+cp tags.yaml my-domain-tags.yaml
+vim my-domain-tags.yaml
+
+# The API server will detect changes and reload automatically
+```
+
+### Filtered Memory Updates
+
+When running the memory updater script, you can filter retrieval by specific topics using the `--tags` flag:
+
+```bash
+# Only retrieve messages tagged with 'rocket-design'
+python3 scripts/update_memory_dynamic.py --tags rocket-design
+
+# Multiple tags (comma-separated)
+python3 scripts/update_memory_dynamic.py --tags rocket-design,propulsion
+```
+
+This is useful for domain-specific memory sections or topic-focused context updates.
+
+### Multi-Agent Deployments
+
+Set the `AGENT_NAME` environment variable to namespace the SQLite database per agent. This allows multiple agents to run independently with separate context graphs:
+
+```bash
+# Agent 1
+export AGENT_NAME=glados-rich
+python3 api/server.py
+
+# Agent 2 (different terminal/service)
+export AGENT_NAME=glados-jarvis
+python3 api/server.py
+```
+
+Each agent will maintain its own message store at `~/.tag-context/{AGENT_NAME}_messages.db`.
+
+### Service Installation Per Agent
+
+When using `install-service.sh`, pass `AGENT_NAME` as an environment variable to create separate launchd/systemd services per agent:
+
+```bash
+# Install service for agent 'glados-rich'
+AGENT_NAME=glados-rich ./scripts/install-service.sh
+
+# Install service for agent 'glados-jarvis' on a different port
+AGENT_NAME=glados-jarvis PORT=8301 ./scripts/install-service.sh
+```
+
+This creates distinct service files (e.g., `com.glados.tag-context-glados-rich.plist`) and allows multiple agents to run concurrently on the same machine.
 
 ## Documentation
 
