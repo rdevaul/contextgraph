@@ -25,12 +25,14 @@ class Message:
     external_id: Optional[str] = None  # OpenClaw AgentMessage.id or other external system ID
     summary: Optional[str] = None      # Summarized version for large messages
     is_automated: bool = False         # True for cron jobs, heartbeats, etc.
+    channel_label: Optional[str] = None  # Channel label for per-agent memory isolation
 
     @classmethod
     def new(cls, session_id: str, user_id: str, timestamp: float,
             user_text: str, assistant_text: str,
             tags: Optional[List[str]] = None, token_count: int = 0,
-            external_id: Optional[str] = None, is_automated: bool = False) -> "Message":
+            external_id: Optional[str] = None, is_automated: bool = False,
+            channel_label: Optional[str] = None) -> "Message":
         """Create a new Message with a generated UUID."""
         return cls(
             id=str(uuid.uuid4()),
@@ -43,6 +45,7 @@ class Message:
             token_count=token_count,
             external_id=external_id,
             is_automated=is_automated,
+            channel_label=channel_label,
         )
 
 
@@ -93,6 +96,10 @@ class MessageStore:
         """,
         4: """
             ALTER TABLE messages ADD COLUMN is_automated INTEGER NOT NULL DEFAULT 0;
+        """,
+        5: """
+            ALTER TABLE messages ADD COLUMN channel_label TEXT;
+            CREATE INDEX IF NOT EXISTS idx_messages_channel_label ON messages(channel_label);
         """,
     }
 
@@ -191,6 +198,7 @@ class MessageStore:
             external_id=row["external_id"] if "external_id" in row.keys() else None,
             summary=row["summary"] if "summary" in row.keys() else None,
             is_automated=bool(row["is_automated"]) if "is_automated" in row.keys() else False,
+            channel_label=row["channel_label"] if "channel_label" in row.keys() else None,
         )
 
     def _fetch_tags_for(self, conn: sqlite3.Connection, message_id: str) -> List[str]:
@@ -222,11 +230,12 @@ class MessageStore:
             conn = self._conn()
             conn.execute(
                 """INSERT INTO messages (id, session_id, user_id, timestamp,
-                   user_text, assistant_text, token_count, external_id, is_automated)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   user_text, assistant_text, token_count, external_id, is_automated,
+                   channel_label)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (msg.id, msg.session_id, msg.user_id, msg.timestamp,
                  msg.user_text, msg.assistant_text, msg.token_count, msg.external_id,
-                 1 if msg.is_automated else 0),
+                 1 if msg.is_automated else 0, msg.channel_label),
             )
             for tag in msg.tags:
                 conn.execute(
