@@ -145,10 +145,17 @@ This reads `service/com.contextgraph.api.plist.template`, substitutes paths,
 writes to `~/Library/LaunchAgents/`, and loads it.
 
 Install the OpenClaw plugin:
+
+> ⚠️ **Check first:** Run `openclaw plugins list | grep contextgraph` before installing.
+> If you see `loaded` — the plugin is already installed via auto-load. Do NOT copy files
+> again or add it to `openclaw.json`. Duplicate registration crashes the gateway.
+> See `plugin/README.md` for the full safe installation procedure.
+
 ```bash
+# Only if NOT already listed by `openclaw plugins list`:
 mkdir -p ~/.openclaw/extensions/contextgraph
-cp plugin/index.ts ~/.openclaw/extensions/contextgraph/index.ts
-openclaw gateway restart
+cp plugin/index.ts ~/.openclaw/extensions/contextgraph/
+openclaw gateway reload   # use reload, not restart — restart kills active sessions
 ```
 
 ---

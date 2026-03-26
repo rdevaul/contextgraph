@@ -6,7 +6,7 @@ This directory contains an OpenClaw plugin that bridges the ContextEngine interf
 
 When installed as an OpenClaw extension, this plugin replaces the default linear context window with graph-based, semantically-tagged context assembly — routing through the Python API at `http://localhost:8300`.
 
-**Graph mode is OFF by default.** The plugin acts as a transparent pass-through until explicitly enabled, so there's zero risk to existing behavior.
+**Graph mode is OFF by default.** The plugin acts as a transparent pass-through until explicitly enabled, so there is zero risk to existing behavior.
 
 ### Toggle graph mode
 
@@ -28,4 +28,61 @@ When installed as an OpenClaw extension, this plugin replaces the default linear
 
 ## Installation
 
-Copy or symlink this directory into `~/.openclaw/extensions/contextgraph/`, then restart the OpenClaw gateway.
+> ⚠️ **Check first — do not skip this step.**
+>
+> OpenClaw auto-loads plugins from `~/.openclaw/extensions/`. If contextgraph is already
+> installed there, adding it again to `openclaw.json` will cause a **duplicate registration**
+> crash-loop. Always verify before installing.
+
+### Step 1: Check if already installed
+
+```bash
+openclaw plugins list | grep contextgraph
+```
+
+- If you see `loaded` in the Status column → **plugin is already running, stop here.**
+- If you see nothing → proceed with Step 2.
+
+### Step 2: Copy plugin files
+
+```bash
+mkdir -p ~/.openclaw/extensions/contextgraph
+cp index.ts openclaw.plugin.json package.json ~/.openclaw/extensions/contextgraph/
+```
+
+### Step 3: Reload the gateway
+
+```bash
+openclaw gateway reload
+```
+
+> ⚠️ **Do NOT use `openclaw gateway restart`** unless the gateway is completely dead.
+> Restart kills all active sessions (Telegram, Discord, Voice). Use `reload` for plugin
+> changes — it hot-swaps the plugin with connections intact.
+
+### Step 4: Verify
+
+```bash
+openclaw plugins list | grep contextgraph
+# Should show: loaded   global:contextgraph/index.ts
+```
+
+### What NOT to do
+
+Do **not** add this plugin to `openclaw.json` under `plugins.allow` or `plugins.entries`.
+Auto-loading from `~/.openclaw/extensions/` is the correct and only installation path.
+Adding it to config while it is already auto-loaded will crash the gateway with a duplicate
+registration error.
+
+---
+
+## Updating the Plugin
+
+To deploy a new version of `index.ts`:
+
+```bash
+cp index.ts ~/.openclaw/extensions/contextgraph/index.ts
+openclaw gateway reload
+```
+
+That is all. No config changes needed.
