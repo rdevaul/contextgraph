@@ -379,8 +379,8 @@ class MessageStore:
 
     def count(self) -> int:
         """Return exact total number of messages in the store."""
-        with self._get_conn() as conn:
-            return conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        conn = self._conn()
+        return conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
     def get_non_automated(self, limit: int = 1000) -> List[Message]:
         """Return non-automated messages (excluding cron/heartbeat turns), newest first."""
