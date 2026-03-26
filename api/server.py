@@ -289,7 +289,7 @@ def assemble(request: AssembleRequest):
 @app.get("/health", response_model=dict)
 def health():
     try:
-        messages_in_store = len(store.get_recent(1000))  # Approximate count
+        messages_in_store = store.count()  # Exact count via SELECT COUNT(*)
         tags = store.get_all_tags()
         return {"status": "ok", "messages_in_store": messages_in_store, "tags": tags, "engine": "contextgraph"}
     except Exception as e:

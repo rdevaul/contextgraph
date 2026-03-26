@@ -377,6 +377,11 @@ class MessageStore:
         # Return in the same order as input, skipping missing
         return [msg_by_ext_id[eid] for eid in external_ids if eid in msg_by_ext_id]
 
+    def count(self) -> int:
+        """Return exact total number of messages in the store."""
+        with self._get_conn() as conn:
+            return conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+
     def get_non_automated(self, limit: int = 1000) -> List[Message]:
         """Return non-automated messages (excluding cron/heartbeat turns), newest first."""
         conn = self._conn()
