@@ -123,6 +123,11 @@ class ContextAssembler:
             if msg.id in seen_ids:
                 continue
             cost = _estimate_tokens(msg)
+            # Hard global cap: never exceed the total token budget regardless of layer.
+            # This catches cases where the first-message safety valve in a layer
+            # would push us over the overall budget.
+            if sticky_tokens + recency_tokens + cost > self.token_budget:
+                break
             # Skip messages that are individually larger than the per-message cap
             # (e.g. giant PR-review turns). Use summary if available, otherwise skip.
             if cost > single_msg_cap:
@@ -194,6 +199,9 @@ class ContextAssembler:
 
         for msg in topic_candidates:
             cost = _estimate_tokens(msg)
+            # Hard global cap: never exceed the total token budget regardless of layer.
+            if sticky_tokens + recency_tokens + topic_tokens + cost > self.token_budget:
+                break
             # Skip messages exceeding the per-message cap in topic layer too.
             # Use summary if available, otherwise skip.
             if cost > single_msg_cap:

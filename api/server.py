@@ -46,34 +46,34 @@ def _is_retrieval_turn(entry: dict) -> bool:
 app = FastAPI()
 
 class TagRequest(BaseModel):
-    user_text: str
-    assistant_text: str
+    user_text: str = Field(..., max_length=100_000)
+    assistant_text: str = Field(..., max_length=100_000)
 
 class IngestRequest(BaseModel):
-    id: str = Field(None, nullable=True)
-    session_id: str
-    user_text: str
-    assistant_text: str
-    timestamp: float
-    user_id: str = Field(None, nullable=True)
-    external_id: str = Field(None, nullable=True)  # OpenClaw AgentMessage.id or other external system ID
-    channel_label: str = Field(None, nullable=True)  # Channel label for per-agent memory isolation
+    id: str = Field(None, nullable=True, max_length=256)
+    session_id: str = Field(..., max_length=256)
+    user_text: str = Field(..., max_length=100_000)
+    assistant_text: str = Field(..., max_length=100_000)
+    timestamp: float = Field(..., ge=0)
+    user_id: str = Field(None, nullable=True, max_length=256)
+    external_id: str = Field(None, nullable=True, max_length=256)  # OpenClaw AgentMessage.id or other external system ID
+    channel_label: str = Field(None, nullable=True, max_length=256)  # Channel label for per-agent memory isolation
 
 class ToolState(BaseModel):
     last_turn_had_tools: bool
-    pending_chain_ids: list[str] = Field(default_factory=list)
+    pending_chain_ids: list[str] = Field(default_factory=list, max_length=100)
 
 class AssembleRequest(BaseModel):
-    user_text: str
-    tags: list[str] | None = None
-    token_budget: int = 4000
+    user_text: str = Field(..., max_length=100_000)
+    tags: list[str] | None = Field(None, max_length=50)
+    token_budget: int = Field(4000, ge=100, le=200_000)
     tool_state: ToolState | None = None
-    session_id: str | None = None
+    session_id: str | None = Field(None, max_length=256)
 
 class PinRequest(BaseModel):
-    message_ids: list[str]
-    reason: str
-    ttl_turns: int = 20
+    message_ids: list[str] = Field(..., max_length=100)
+    reason: str = Field(..., max_length=1000)
+    ttl_turns: int = Field(20, ge=1, le=1000)
 
 class UnpinRequest(BaseModel):
     pin_id: str
