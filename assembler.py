@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from store import Message, MessageStore
+from summarizer import summarize_message
 
 # Tags appearing in more than this fraction of the corpus are skipped in
 # topic retrieval. At >30% they're effectively stop words (e.g. "code",
@@ -129,19 +130,31 @@ class ContextAssembler:
             if sticky_tokens + recency_tokens + cost > self.token_budget:
                 break
             # Skip messages that are individually larger than the per-message cap
-            # (e.g. giant PR-review turns). Use summary if available, otherwise skip.
+            # (e.g. giant PR-review turns). Use summary if available, otherwise generate one.
             if cost > single_msg_cap:
-                if msg.summary:
+                summary_text = msg.summary
+                if not summary_text:
+                    # No summary exists — generate one and cache it
+                    try:
+                        summary_text = summarize_message(msg)
+                        self.store.set_summary(msg.id, summary_text)
+                    except Exception as e:
+                        # Fall back to truncation if summarization fails
+                        summary_text = None
+
+                if summary_text:
                     # Use the summary instead — create a lightweight proxy message
+                    # with truncated user_text instead of literal placeholder
+                    user_preview = msg.user_text[:200] + "..." if len(msg.user_text) > 200 else msg.user_text
                     summary_msg = Message(
                         id=msg.id,
                         session_id=msg.session_id,
                         user_id=msg.user_id,
                         timestamp=msg.timestamp,
-                        user_text=f"[Summary of large message]",
-                        assistant_text=msg.summary,
+                        user_text=user_preview,
+                        assistant_text=summary_text,
                         tags=msg.tags,
-                        token_count=len(msg.summary.split()),
+                        token_count=len(summary_text.split()),
                         external_id=msg.external_id,
                         summary=None
                     )
@@ -203,19 +216,31 @@ class ContextAssembler:
             if sticky_tokens + recency_tokens + topic_tokens + cost > self.token_budget:
                 break
             # Skip messages exceeding the per-message cap in topic layer too.
-            # Use summary if available, otherwise skip.
+            # Use summary if available, otherwise generate one.
             if cost > single_msg_cap:
-                if msg.summary:
+                summary_text = msg.summary
+                if not summary_text:
+                    # No summary exists — generate one and cache it
+                    try:
+                        summary_text = summarize_message(msg)
+                        self.store.set_summary(msg.id, summary_text)
+                    except Exception as e:
+                        # Fall back to truncation if summarization fails
+                        summary_text = None
+
+                if summary_text:
                     # Use the summary instead — create a lightweight proxy message
+                    # with truncated user_text instead of literal placeholder
+                    user_preview = msg.user_text[:200] + "..." if len(msg.user_text) > 200 else msg.user_text
                     summary_msg = Message(
                         id=msg.id,
                         session_id=msg.session_id,
                         user_id=msg.user_id,
                         timestamp=msg.timestamp,
-                        user_text=f"[Summary of large message]",
-                        assistant_text=msg.summary,
+                        user_text=user_preview,
+                        assistant_text=summary_text,
                         tags=msg.tags,
-                        token_count=len(msg.summary.split()),
+                        token_count=len(summary_text.split()),
                         external_id=msg.external_id,
                         summary=None
                     )
