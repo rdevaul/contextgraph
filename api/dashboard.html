@@ -405,6 +405,7 @@
         let healthData = null;
         let comparisonStats = null;
         let pinsData = null;
+        let qualityData = null;
         let charts = {};
 
         // Initialize dashboard
@@ -420,7 +421,8 @@
                     fetchMetrics(),
                     fetchHealth(),
                     fetchComparisonStats(),
-                    fetchPins()
+                    fetchPins(),
+                    fetchQuality()
                 ]);
                 renderDashboard();
             } catch (error) {
@@ -451,6 +453,11 @@
         async function fetchPins() {
             const response = await fetch('/pins');
             pinsData = await response.json();
+        }
+
+        async function fetchQuality() {
+            const response = await fetch('/quality');
+            qualityData = await response.json();
         }
 
         function renderDashboard() {
@@ -724,20 +731,18 @@
                 : '∞';
             const coverageColor = avgGraphTokens >= avgLinearTokens ? '#3fb950' : '#d29922';
 
-            // Zero return rate from quality endpoint (fetched separately)
+            // Zero return rate from quality endpoint (pre-fetched in refreshData)
             let zeroReturnHtml = '';
-            try {
-                const qResp = await fetch('/quality');
-                const qData = await qResp.json();
-                const zrr = (qData.zero_return_rate * 100).toFixed(1);
-                const zrrColor = qData.zero_return_rate <= 0.10 ? '#3fb950'
-                    : qData.zero_return_rate <= 0.25 ? '#d29922' : '#f85149';
+            if (qualityData && qualityData.zero_return_rate != null) {
+                const zrr = (qualityData.zero_return_rate * 100).toFixed(1);
+                const zrrColor = qualityData.zero_return_rate <= 0.10 ? '#3fb950'
+                    : qualityData.zero_return_rate <= 0.25 ? '#d29922' : '#f85149';
                 zeroReturnHtml = `
                     <div class="stat-card">
                         <div class="stat-value" style="color: ${zrrColor}">${zrr}%</div>
                         <div class="stat-label">Zero-Return Rate</div>
                     </div>`;
-            } catch(e) {}
+            }
 
             const statsHtml = `
                 <div class="stat-card">
