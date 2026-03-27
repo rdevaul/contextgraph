@@ -64,12 +64,9 @@ def strip_envelope(text: str) -> str:
 
     cleaned = cleaned.strip()
 
-    # Guard: if we stripped too aggressively (pure-metadata message with no
-    # semantic content), return a minimal placeholder rather than empty string.
-    if len(cleaned) < _MIN_USEFUL_LENGTH:
-        # If original was also short, return as-is; else return original
-        if len(text.strip()) < _MIN_USEFUL_LENGTH:
-            return text.strip()
-        return text.strip()  # preserve original if cleaning was too aggressive
+    # If stripping produced an empty result, the message was pure envelope
+    # metadata with no semantic content. Return a minimal placeholder.
+    if not cleaned:
+        return "[metadata-only message]"
 
     return cleaned
