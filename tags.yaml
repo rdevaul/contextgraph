@@ -124,13 +124,15 @@ tags:
     confidence: 1.0
 
   - name: question
-    description: User is asking a question
+    description: User is asking a question (DISABLED — too generic, fires on every message with ?)
+    enabled: false
     patterns:
       - "\\?"
     confidence: 0.7
 
   - name: has-url
-    description: Message contains a URL
+    description: Message contains a URL (DISABLED — too generic, no retrieval signal)
+    enabled: false
     patterns:
       - "https?://\\S+"
     confidence: 0.5

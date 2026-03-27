@@ -55,9 +55,9 @@ class TagRegistry:
     stale_days: int = 30
 
     # Salience weights
-    frequency_weight: float = 0.4
-    recency_weight: float = 0.4
-    distinctiveness_weight: float = 0.2
+    frequency_weight: float = 0.2
+    recency_weight: float = 0.3
+    distinctiveness_weight: float = 0.5
 
     # Internal state
     _tags: Dict[str, TagMetadata] = field(default_factory=dict)
