@@ -118,6 +118,18 @@ if gp_tagger_path.exists():
         ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
 
 from fixed_tagger import FixedTagger, USER_TAGS_DIR
+import re as _re
+
+# Validate channel labels to prevent path traversal attacks.
+# Labels must be alphanumeric with optional hyphens/underscores, 1-64 chars.
+_VALID_LABEL_RE = _re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
+
+def _validate_label(label: str) -> str:
+    """Validate a channel label to prevent path traversal. Raises HTTPException on invalid input."""
+    if not _VALID_LABEL_RE.match(label):
+        raise HTTPException(status_code=400, detail=f"Invalid channel label: '{label}'. Must be lowercase alphanumeric with hyphens/underscores, 1-64 chars.")
+    return label
+
 fixed_tagger_instance = FixedTagger()
 ensemble.register('fixed', fixed_tagger_instance.assign, 1.5)  # Higher weight — authoritative for personal assistant tags
 
@@ -280,6 +292,7 @@ def assemble(request: AssembleRequest):
         # Build channel-aware tagger if channel_label provided
         channel_label = request.channel_label
         if channel_label:
+            _validate_label(channel_label)
             from fixed_tagger import FixedTagger
             ch_tagger = FixedTagger.for_channel(channel_label)
         else:
@@ -659,6 +672,7 @@ def get_tags(channel_label: Optional[str] = Query(None, description="Channel lab
 
         user_tags_list = []
         if channel_label:
+            _validate_label(channel_label)
             user_reg = get_user_registry(channel_label)
             if user_reg:
                 user_tags_list = _build_tag_list(user_reg._tags, "user")
@@ -690,6 +704,7 @@ def get_system_tags():
 def get_user_tags(label: str):
     """Return user tags for a specific channel label."""
     try:
+        _validate_label(label)
         user_reg = get_user_registry(label)
         result = []
         if user_reg:
@@ -714,6 +729,7 @@ def add_user_tag(label: str, request: AddUserTagRequest):
     Also seeds the user registry with a candidate entry.
     """
     try:
+        _validate_label(label)
         import yaml as _yaml
 
         user_tags_path = USER_TAGS_DIR / f"{label}.yaml"
@@ -787,6 +803,7 @@ def archive_user_tag(label: str, tag_name: str):
     Updates the user registry to mark the tag as archived.
     """
     try:
+        _validate_label(label)
         user_reg = get_user_registry(label)
         if user_reg is None:
             raise HTTPException(status_code=404, detail=f"No registry for user '{label}'")
@@ -816,6 +833,7 @@ def retag_user_corpus(label: str):
     inference on the user's messages and updates their tags in the store.
     """
     try:
+        _validate_label(label)
         from fixed_tagger import FixedTagger
         from features import extract_features as _extract_features
 
