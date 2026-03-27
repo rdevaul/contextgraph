@@ -717,8 +717,27 @@
             const avgTagsPerQuery = comparisonStats.avg_tags_per_query || 0;
             const tokenSavingsPct = comparisonStats.token_savings_pct || 0;
 
-            // Color code based on savings (green if positive, red if negative)
-            const savingsColor = tokenSavingsPct >= 0 ? '#3fb950' : '#f85149';
+            // Coverage ratio: graph uses more budget to retrieve topically relevant context.
+            // Higher is better — means the graph is surfacing more relevant material.
+            const coverageRatio = avgLinearTokens > 0
+                ? ((avgGraphTokens / avgLinearTokens) * 100).toFixed(0)
+                : '∞';
+            const coverageColor = avgGraphTokens >= avgLinearTokens ? '#3fb950' : '#d29922';
+
+            // Zero return rate from quality endpoint (fetched separately)
+            let zeroReturnHtml = '';
+            try {
+                const qResp = await fetch('/quality');
+                const qData = await qResp.json();
+                const zrr = (qData.zero_return_rate * 100).toFixed(1);
+                const zrrColor = qData.zero_return_rate <= 0.10 ? '#3fb950'
+                    : qData.zero_return_rate <= 0.25 ? '#d29922' : '#f85149';
+                zeroReturnHtml = `
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: ${zrrColor}">${zrr}%</div>
+                        <div class="stat-label">Zero-Return Rate</div>
+                    </div>`;
+            } catch(e) {}
 
             const statsHtml = `
                 <div class="stat-card">
@@ -734,13 +753,14 @@
                     <div class="stat-label">Avg Linear Tokens</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: ${savingsColor}">${tokenSavingsPct >= 0 ? '+' : ''}${tokenSavingsPct.toFixed(1)}%</div>
-                    <div class="stat-label">Token Savings</div>
+                    <div class="stat-value" style="color: ${coverageColor}">${coverageRatio}%</div>
+                    <div class="stat-label">Graph Coverage vs Linear</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${avgTagsPerQuery.toFixed(1)}</div>
                     <div class="stat-label">Avg Tags/Query</div>
                 </div>
+                ${zeroReturnHtml}
             `;
             document.getElementById('overhead-stats').innerHTML = statsHtml;
 

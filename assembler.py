@@ -124,29 +124,24 @@ class ContextAssembler:
             if msg.id in seen_ids:
                 continue
             cost = _estimate_tokens(msg)
-            # Hard global cap: never exceed the total token budget regardless of layer.
-            # This catches cases where the first-message safety valve in a layer
-            # would push us over the overall budget.
-            if sticky_tokens + recency_tokens + cost > self.token_budget:
-                break
-            # Skip messages that are individually larger than the per-message cap
-            # (e.g. giant PR-review turns). Use summary if available, otherwise generate one.
+
+            # ── Oversized message handling ─────────────────────────────────
+            # Check for summary substitution BEFORE the global cap, so that
+            # a 5000-token message with a 100-token summary doesn't falsely
+            # trigger the break.
+            effective_msg = msg
             if cost > single_msg_cap:
                 summary_text = msg.summary
                 if not summary_text:
-                    # No summary exists — generate one and cache it
                     try:
                         summary_text = summarize_message(msg)
                         self.store.set_summary(msg.id, summary_text)
-                    except Exception as e:
-                        # Fall back to truncation if summarization fails
+                    except Exception:
                         summary_text = None
 
                 if summary_text:
-                    # Use the summary instead — create a lightweight proxy message
-                    # with truncated user_text instead of literal placeholder
                     user_preview = msg.user_text[:200] + "..." if len(msg.user_text) > 200 else msg.user_text
-                    summary_msg = Message(
+                    effective_msg = Message(
                         id=msg.id,
                         session_id=msg.session_id,
                         user_id=msg.user_id,
@@ -158,17 +153,17 @@ class ContextAssembler:
                         external_id=msg.external_id,
                         summary=None
                     )
-                    cost = _estimate_tokens(summary_msg)
-                    if not first_recency and recency_tokens + cost > recency_budget:
-                        break
-                    recency_msgs.append(summary_msg)
-                    recency_tokens += cost
-                    seen_ids.add(msg.id)
-                    first_recency = False
-                continue
+                    cost = _estimate_tokens(effective_msg)
+                else:
+                    # No summary available — skip this oversized message entirely
+                    continue
+
+            # Hard global cap: never exceed the total token budget.
+            if sticky_tokens + recency_tokens + cost > self.token_budget:
+                break
             if not first_recency and recency_tokens + cost > recency_budget:
                 break
-            recency_msgs.append(msg)
+            recency_msgs.append(effective_msg)
             recency_tokens += cost
             seen_ids.add(msg.id)
             first_recency = False
@@ -212,27 +207,21 @@ class ContextAssembler:
 
         for msg in topic_candidates:
             cost = _estimate_tokens(msg)
-            # Hard global cap: never exceed the total token budget regardless of layer.
-            if sticky_tokens + recency_tokens + topic_tokens + cost > self.token_budget:
-                break
-            # Skip messages exceeding the per-message cap in topic layer too.
-            # Use summary if available, otherwise generate one.
+
+            # ── Oversized message handling (same pattern as recency layer) ─
+            effective_msg = msg
             if cost > single_msg_cap:
                 summary_text = msg.summary
                 if not summary_text:
-                    # No summary exists — generate one and cache it
                     try:
                         summary_text = summarize_message(msg)
                         self.store.set_summary(msg.id, summary_text)
-                    except Exception as e:
-                        # Fall back to truncation if summarization fails
+                    except Exception:
                         summary_text = None
 
                 if summary_text:
-                    # Use the summary instead — create a lightweight proxy message
-                    # with truncated user_text instead of literal placeholder
                     user_preview = msg.user_text[:200] + "..." if len(msg.user_text) > 200 else msg.user_text
-                    summary_msg = Message(
+                    effective_msg = Message(
                         id=msg.id,
                         session_id=msg.session_id,
                         user_id=msg.user_id,
@@ -244,16 +233,16 @@ class ContextAssembler:
                         external_id=msg.external_id,
                         summary=None
                     )
-                    cost = _estimate_tokens(summary_msg)
-                    if not first_topic and topic_tokens + cost > topic_budget:
-                        break
-                    topic_msgs.append(summary_msg)
-                    topic_tokens += cost
-                    first_topic = False
-                continue
+                    cost = _estimate_tokens(effective_msg)
+                else:
+                    continue  # No summary — skip oversized message
+
+            # Hard global cap
+            if sticky_tokens + recency_tokens + topic_tokens + cost > self.token_budget:
+                break
             if not first_topic and topic_tokens + cost > topic_budget:
                 break
-            topic_msgs.append(msg)
+            topic_msgs.append(effective_msg)
             topic_tokens += cost
             first_topic = False
 
