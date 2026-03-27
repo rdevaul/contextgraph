@@ -55,6 +55,16 @@ _ENVELOPE_PATTERNS = [
     ),
     # Inter-session messages: "[Inter-session message] sourceSession=..."
     re.compile(r"^\[Inter-session message\].*?$", re.MULTILINE),
+    # Internal task completion events
+    re.compile(
+        r"^\[Internal task completion event\].*?(?=\n\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    ),
+    # Subagent task preambles: "[Subagent Task]: You are a..."
+    re.compile(
+        r"^\[Subagent Task\]:.*?(?=\n\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    ),
     # Generic timestamp prefix: "[Day YYYY-MM-DD HH:MM TZ] " at start of message
     re.compile(
         r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s*",
