@@ -191,18 +191,20 @@ class TestBug4ContextManagementTags:
 
 
 class TestContainsURLRule:
-    """Test that contains-url rule outputs 'has-url' instead of 'research'."""
+    """Test that contains-url rule outputs 'has-url' instead of 'research'.
+    NOTE: has-url tag was disabled (2026-03-27) as a stop-word — fires on
+    every message with a link, providing zero retrieval signal."""
 
-    def test_url_triggers_has_url_tag(self):
-        """URL presence should trigger 'has-url' tag, not 'research'."""
+    def test_url_does_not_trigger_has_url_when_disabled(self):
+        """has-url tag is disabled — URLs should not produce this tag."""
         user_text = "Check out https://example.com"
         assistant_text = ""
 
         features = extract_features(user_text, assistant_text)
         tags = assign_tags(features, user_text, assistant_text)
 
-        # Should contain 'has-url'
-        assert "has-url" in tags
+        # has-url was disabled as a stop-word tag
+        assert "has-url" not in tags
 
 
 class TestEdgeCases:

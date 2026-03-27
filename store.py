@@ -268,7 +268,8 @@ class MessageStore:
         tags = self._fetch_tags_for(conn, message_id)
         return self._row_to_message(row, tags)
 
-    def get_recent(self, n: int, include_automated: bool = False) -> List[Message]:
+    def get_recent(self, n: int, include_automated: bool = False,
+                   channel_label: Optional[str] = None) -> List[Message]:
         """Return the N most recent messages, newest first.
 
         Parameters
@@ -277,15 +278,27 @@ class MessageStore:
             Number of messages to return
         include_automated : bool
             If False (default), exclude automated turns (cron/heartbeat/etc)
+        channel_label : Optional[str]
+            If set, only return messages with this channel_label.
+            If None, return messages from all channels.
         """
         conn = self._conn()
 
-        if include_automated:
-            query = "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?"
-        else:
-            query = "SELECT * FROM messages WHERE is_automated = 0 ORDER BY timestamp DESC LIMIT ?"
+        conditions = []
+        params: list = []
 
-        rows = conn.execute(query, (n,)).fetchall()
+        if not include_automated:
+            conditions.append("is_automated = 0")
+
+        if channel_label is not None:
+            conditions.append("channel_label = ?")
+            params.append(channel_label)
+
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        query = f"SELECT * FROM messages {where_clause} ORDER BY timestamp DESC LIMIT ?"
+        params.append(n)
+
+        rows = conn.execute(query, params).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -301,7 +314,8 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
-    def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False) -> List[Message]:
+    def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False,
+                   channel_label: Optional[str] = None) -> List[Message]:
         """Return messages carrying `tag`, newest first.
 
         Parameters
@@ -312,23 +326,31 @@ class MessageStore:
             Maximum number of messages to return
         include_automated : bool
             If False (default), exclude automated turns (cron/heartbeat/etc)
+        channel_label : Optional[str]
+            If set, only return messages with this channel_label (user-scoped retrieval).
+            If None, return messages from all channels (system tag behaviour).
         """
         conn = self._conn()
 
-        if include_automated:
-            query = """SELECT m.* FROM messages m
-                       INNER JOIN tags t ON m.id = t.message_id
-                       WHERE t.tag = ?
-                       ORDER BY m.timestamp DESC
-                       LIMIT ?"""
-        else:
-            query = """SELECT m.* FROM messages m
-                       INNER JOIN tags t ON m.id = t.message_id
-                       WHERE t.tag = ? AND m.is_automated = 0
-                       ORDER BY m.timestamp DESC
-                       LIMIT ?"""
+        conditions = ["t.tag = ?"]
+        params: list = [tag]
 
-        rows = conn.execute(query, (tag, limit)).fetchall()
+        if not include_automated:
+            conditions.append("m.is_automated = 0")
+
+        if channel_label is not None:
+            conditions.append("m.channel_label = ?")
+            params.append(channel_label)
+
+        where_clause = " AND ".join(conditions)
+        query = f"""SELECT m.* FROM messages m
+                   INNER JOIN tags t ON m.id = t.message_id
+                   WHERE {where_clause}
+                   ORDER BY m.timestamp DESC
+                   LIMIT ?"""
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -416,3 +438,37 @@ class MessageStore:
             (summary, message_id),
         )
         conn.commit()
+
+    # ── backfill ──────────────────────────────────────────────────────────────
+
+    def backfill_channel_labels(self) -> dict:
+        """
+        One-time migration: set channel_label on existing messages based on session_id patterns.
+
+        Returns a dict of {label: count} showing how many rows were updated per label.
+        """
+        mappings = [
+            ("glados-dana", "dana"),
+            ("glados-terry", "terry"),
+            ("glados-household", "household"),
+            ("cron:", "cron"),
+        ]
+        counts: dict = {}
+        with self._lock:
+            conn = self._conn()
+            for pattern, label in mappings:
+                result = conn.execute(
+                    "UPDATE messages SET channel_label = ? "
+                    "WHERE session_id LIKE ? AND channel_label IS NULL",
+                    (label, f"%{pattern}%"),
+                )
+                counts[label] = result.rowcount
+
+            # Default: main agent sessions → 'rich'
+            result = conn.execute(
+                "UPDATE messages SET channel_label = 'rich' "
+                "WHERE channel_label IS NULL"
+            )
+            counts["rich"] = result.rowcount
+            conn.commit()
+        return counts

@@ -15,7 +15,7 @@ from ensemble import EnsembleTagger
 from assembler import ContextAssembler, _estimate_tokens
 from quality import QualityAgent
 from gp_tagger import GeneticTagger
-from tag_registry import get_registry
+from tag_registry import get_registry, get_user_registry, USER_REGISTRY_DIR
 from sticky import StickyPinManager
 from reframing import detect_reference
 from utils.text import strip_envelope
@@ -69,6 +69,13 @@ class AssembleRequest(BaseModel):
     token_budget: int = Field(4000, ge=100, le=200_000)
     tool_state: ToolState | None = None
     session_id: str | None = Field(None, max_length=256)
+    channel_label: str | None = Field(None, max_length=256)
+
+class AddUserTagRequest(BaseModel):
+    name: str = Field(..., max_length=100)
+    description: str = Field("", max_length=500)
+    keywords: list[str] | None = Field(None, max_length=100)
+    confidence: float = Field(1.0, ge=0.0, le=1.0)
 
 class PinRequest(BaseModel):
     message_ids: list[str] = Field(..., max_length=100)
@@ -110,7 +117,7 @@ if gp_tagger_path.exists():
         gp_tagger = pickle.load(f)
         ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
 
-from fixed_tagger import FixedTagger
+from fixed_tagger import FixedTagger, USER_TAGS_DIR
 fixed_tagger_instance = FixedTagger()
 ensemble.register('fixed', fixed_tagger_instance.assign, 1.5)  # Higher weight — authoritative for personal assistant tags
 
@@ -269,15 +276,39 @@ def assemble(request: AssembleRequest):
 
         # Strip envelope from query text for clean tag inference and similarity matching
         clean_query = strip_envelope(request.user_text)
+
+        # Build channel-aware tagger if channel_label provided
+        channel_label = request.channel_label
+        if channel_label:
+            from fixed_tagger import FixedTagger
+            ch_tagger = FixedTagger.for_channel(channel_label)
+        else:
+            ch_tagger = fixed_tagger_instance
+
         features = extract_features(clean_query, "")  # Empty assistant_text for incoming message
         if not request.tags:
-            request.tags = ensemble.assign(features, clean_query, "").tags
+            request.tags = ch_tagger.assign(features, clean_query, "").tags
+
+        # Determine user tags (tags that exist in user tag file)
+        user_tag_names: list[str] = []
+        if channel_label:
+            user_tags_path = USER_TAGS_DIR / f"{channel_label}.yaml"
+            if user_tags_path.exists():
+                from fixed_tagger import FixedTagger as _FT, _parse_tag_specs
+                import yaml as _yaml
+                with user_tags_path.open() as _f:
+                    _ud = _yaml.safe_load(_f)
+                user_tag_names = [s.name for s in _parse_tag_specs(_ud or {})]
 
         # Get pinned message IDs
         pinned_ids = pin_manager.get_pinned_message_ids()
 
         assembler = ContextAssembler(store, token_budget=request.token_budget)
-        result = assembler.assemble(clean_query, request.tags, pinned_message_ids=pinned_ids)
+        result = assembler.assemble(
+            clean_query, request.tags, pinned_message_ids=pinned_ids,
+            channel_label=channel_label,
+            user_tags=user_tag_names if user_tag_names else None,
+        )
 
         return {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
@@ -596,6 +627,242 @@ def get_comparison_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ── User Tag Endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/tags", response_model=dict)
+def get_tags(channel_label: Optional[str] = Query(None, description="Channel label for user tags")):
+    """
+    Return combined system + user tags with registry metadata.
+
+    If channel_label is provided, also returns user tags for that channel.
+    """
+    try:
+        import yaml as _yaml
+
+        registry = get_registry()
+        tag_counts_map = store.tag_counts()
+
+        def _build_tag_list(tags_dict, scope: str) -> list:
+            result = []
+            for name, meta in tags_dict.items():
+                result.append({
+                    "name": name,
+                    "state": meta.state,
+                    "hits": meta.hits,
+                    "scope": scope,
+                })
+            return sorted(result, key=lambda x: x["hits"], reverse=True)
+
+        all_sys = registry._tags
+        system_tags = _build_tag_list(all_sys, "system")
+
+        user_tags_list = []
+        if channel_label:
+            user_reg = get_user_registry(channel_label)
+            if user_reg:
+                user_tags_list = _build_tag_list(user_reg._tags, "user")
+
+        return {"system_tags": system_tags, "user_tags": user_tags_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/tags/system", response_model=dict)
+def get_system_tags():
+    """Return system tags only."""
+    try:
+        registry = get_registry()
+        result = []
+        for name, meta in registry._tags.items():
+            result.append({
+                "name": name,
+                "state": meta.state,
+                "hits": meta.hits,
+                "scope": "system",
+            })
+        return {"system_tags": sorted(result, key=lambda x: x["hits"], reverse=True)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/tags/user/{label}", response_model=dict)
+def get_user_tags(label: str):
+    """Return user tags for a specific channel label."""
+    try:
+        user_reg = get_user_registry(label)
+        result = []
+        if user_reg:
+            for name, meta in user_reg._tags.items():
+                result.append({
+                    "name": name,
+                    "state": meta.state,
+                    "hits": meta.hits,
+                    "scope": "user",
+                })
+        return {"user_tags": sorted(result, key=lambda x: x["hits"], reverse=True), "channel_label": label}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tags/user/{label}/add", response_model=dict)
+def add_user_tag(label: str, request: AddUserTagRequest):
+    """
+    Add a new user tag for a channel label.
+
+    Writes to ~/.tag-context/tags.user/<label>.yaml (hot-reloaded by tagger).
+    Also seeds the user registry with a candidate entry.
+    """
+    try:
+        import yaml as _yaml
+
+        user_tags_path = USER_TAGS_DIR / f"{label}.yaml"
+        USER_TAGS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Load existing or start fresh
+        if user_tags_path.exists():
+            with user_tags_path.open() as f:
+                data = _yaml.safe_load(f) or {}
+        else:
+            data = {"version": 1, "tags": []}
+
+        tags_list = data.get("tags", [])
+
+        # Check for duplicate
+        existing_names = [t["name"] for t in tags_list]
+        if request.name in existing_names:
+            raise HTTPException(status_code=409, detail=f"Tag '{request.name}' already exists for user '{label}'")
+
+        # Infer keywords from name if not provided
+        keywords = request.keywords
+        if not keywords:
+            # Generate keyword suggestions from tag name (replace hyphens/underscores with spaces)
+            keywords = [request.name.replace("-", " ").replace("_", " ")]
+
+        new_tag = {
+            "name": request.name,
+            "description": request.description,
+            "keywords": keywords,
+            "confidence": request.confidence,
+        }
+        tags_list.append(new_tag)
+        data["tags"] = tags_list
+
+        with user_tags_path.open("w") as f:
+            _yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+
+        # Seed registry candidate
+        import time as _time
+        user_reg = get_user_registry(label)
+        if user_reg and request.name not in user_reg._tags:
+            from tag_registry import TagMetadata
+            now = _time.time()
+            user_reg._tags[request.name] = TagMetadata(
+                name=request.name,
+                state="core",  # new user tags are immediately core
+                first_seen=now,
+                last_seen=now,
+                hits=0,
+                promoted_at=now,
+            )
+            user_reg.save()
+
+        return {
+            "success": True,
+            "tag": new_tag,
+            "inferred_keywords": keywords if not request.keywords else None,
+            "message": f"Tag '{request.name}' added for user '{label}'"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/tags/user/{label}/{tag_name}", response_model=dict)
+def archive_user_tag(label: str, tag_name: str):
+    """
+    Archive a user tag (move to archived state; do not delete from YAML).
+
+    Updates the user registry to mark the tag as archived.
+    """
+    try:
+        user_reg = get_user_registry(label)
+        if user_reg is None:
+            raise HTTPException(status_code=404, detail=f"No registry for user '{label}'")
+
+        if tag_name not in user_reg._tags:
+            raise HTTPException(status_code=404, detail=f"Tag '{tag_name}' not found for user '{label}'")
+
+        import time as _time
+        tag = user_reg._tags[tag_name]
+        tag.state = "archived"
+        tag.archived_at = _time.time()
+        user_reg.save()
+
+        return {"success": True, "message": f"Tag '{tag_name}' archived for user '{label}'"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tags/user/{label}/retag", response_model=dict)
+def retag_user_corpus(label: str):
+    """
+    Retag the user's corpus with current user tags.
+
+    Only touches messages with matching channel_label. This re-runs tag
+    inference on the user's messages and updates their tags in the store.
+    """
+    try:
+        from fixed_tagger import FixedTagger
+        from features import extract_features as _extract_features
+
+        ch_tagger = FixedTagger.for_channel(label)
+        messages = store.get_recent(10000, channel_label=label)
+
+        updated = 0
+        for msg in messages:
+            features = _extract_features(msg.user_text, msg.assistant_text)
+            new_tags = ch_tagger.assign(features, msg.user_text, msg.assistant_text).tags
+            if set(new_tags) != set(msg.tags):
+                # Clear old tags and re-add
+                with store._lock:
+                    conn = store._conn()
+                    conn.execute("DELETE FROM tags WHERE message_id = ?", (msg.id,))
+                    for tag in new_tags:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
+                            (msg.id, tag),
+                        )
+                    conn.commit()
+                updated += 1
+
+        return {
+            "success": True,
+            "channel_label": label,
+            "messages_processed": len(messages),
+            "messages_updated": updated,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Backfill Endpoint ──────────────────────────────────────────────────────────
+
+@app.post("/admin/backfill-channel-labels", response_model=dict)
+def backfill_channel_labels():
+    """
+    One-time migration: set channel_label on existing messages based on session_id patterns.
+    Safe to run multiple times (only updates NULL rows).
+    """
+    try:
+        counts = store.backfill_channel_labels()
+        return {"success": True, "updated": counts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ── Dashboard Endpoint ─────────────────────────────────────────────────────────
 

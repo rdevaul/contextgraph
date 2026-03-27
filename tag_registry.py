@@ -32,6 +32,9 @@ class TagMetadata:
     distinctiveness: float = 0.0  # inverse document frequency-like score
 
 
+USER_REGISTRY_DIR = Path.home() / ".tag-context" / "tags.user.registry"
+
+
 @dataclass
 class TagRegistry:
     """
@@ -41,6 +44,9 @@ class TagRegistry:
     Promotion: Candidates with sufficient salience become core tags.
     Demotion: Stale core tags move to archived.
     Persistence: State saved to tag_registry.json.
+
+    User registries are stored at ~/.tag-context/tags.user.registry/<label>.json
+    and manage per-user tag lifecycle independently from the system registry.
     """
 
     data_dir: Path = field(default_factory=lambda: Path(__file__).parent / "data")
@@ -135,6 +141,23 @@ class TagRegistry:
             tag.name for tag in self._tags.values()
             if tag.state in ("core", "candidate")
         }
+
+    def get_active_tags_for_channel(self, channel_label: Optional[str]) -> Set[str]:
+        """
+        Return combined active tags for a channel: system active + user active.
+
+        If channel_label is None or has no user registry, returns system active
+        tags only. Otherwise merges system + per-user active tags.
+        """
+        system_active = self.get_active_tags()
+        if not channel_label:
+            return system_active
+
+        user_reg = get_user_registry(channel_label)
+        if user_reg is None:
+            return system_active
+
+        return system_active | user_reg.get_active_tags()
 
     def get_core_tags(self) -> Set[str]:
         """Return set of core tags only."""
@@ -386,3 +409,40 @@ def get_registry() -> TagRegistry:
     if _registry_instance is None:
         _registry_instance = TagRegistry()
     return _registry_instance
+
+
+# Per-user registry cache
+_user_registry_cache: Dict[str, "TagRegistry"] = {}
+
+
+def get_user_registry(channel_label: str) -> Optional["TagRegistry"]:
+    """
+    Get (or create) the TagRegistry for a specific user channel.
+
+    User registries are stored at ~/.tag-context/tags.user.registry/<label>.json.
+    Returns None if the user registry directory doesn't exist yet.
+    """
+    USER_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+
+    if channel_label not in _user_registry_cache:
+        registry_path = USER_REGISTRY_DIR / f"{channel_label}.json"
+        # Only create a registry object if the file already exists OR we're
+        # bootstrapping for the first time (dir exists from mkdir above).
+        user_reg = TagRegistry(
+            data_dir=USER_REGISTRY_DIR,
+            registry_file=f"{channel_label}.json",
+        )
+        # Don't bootstrap with system core tags — user registries start empty
+        if not registry_path.exists():
+            user_reg._tags = {}
+            # Save an empty registry
+            user_reg.save()
+        _user_registry_cache[channel_label] = user_reg
+
+    return _user_registry_cache[channel_label]
+
+
+def clear_user_registry_cache() -> None:
+    """Clear the user registry cache (useful for testing)."""
+    global _user_registry_cache
+    _user_registry_cache = {}

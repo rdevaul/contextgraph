@@ -222,32 +222,6 @@ tags:
 
   # ── Domain-specific tags (enable/customize as needed) ──────────────────
 
-  - name: yapCAD
-    description: yapCAD agentic CAD/CAM system
-    keywords:
-      - yapcad
-      - yap-cad
-      - gel-native
-      - agentic cad
-      - agentic cam
-      - geometry engine
-      - ycpkg
-      - step file
-      - stl file
-      - boolean operation
-    confidence: 1.0
-
-  - name: openclaw
-    description: OpenClaw platform, sessions, skills
-    keywords:
-      - openclaw
-      - heartbeat
-      - session
-      - workflow_auto
-      - compaction safeguard
-      - skill
-    confidence: 1.0
-
   - name: memory-system
     description: Memory files, harvester, context graph integration
     keywords:
@@ -259,28 +233,6 @@ tags:
       - contextgraph
       - store.db
       - interaction log
-    confidence: 1.0
-
-  - name: voice-pwa
-    description: Voice PWA, STT, TTS, push-to-talk
-    keywords:
-      - voice pwa
-      - push to talk
-      - voxtral
-      - whisper
-      - piper tts
-      - openai tts
-      - voice backend
-      - voice frontend
-    confidence: 1.0
-
-  - name: shopping-list
-    description: Shopping list bot, items, grocery
-    keywords:
-      - shopping list
-      - grocery
-      - shopbot
-      - add to list
     confidence: 1.0
 
   # ── Personal assistant tags ─────────────────────────────────────────────
@@ -371,23 +323,6 @@ tags:
       - moving
       - utility
       - internet service
-    confidence: 1.0
-
-  - name: family
-    description: Family, relationships, kids, partners, parenting
-    keywords:
-      - dana
-      - terry
-      - lynae
-      - lily
-      - ivy
-      - daycare
-      - family
-      - partner
-      - relationship
-      - parenting
-      - school
-      - birthday
     confidence: 1.0
 
   - name: calendar
@@ -523,41 +458,6 @@ tags:
       - manipulation
       - autonomous
       - sensor fusion
-    confidence: 1.0
-
-  - name: zheng-survey
-    description: Zheng consulting survey platform project
-    keywords:
-      - zheng
-      - lily zheng
-      - lilyzhengfair
-      - survey platform
-      - culture assessment
-      - consulting survey
-    confidence: 1.0
-
-  - name: skill-registry
-    description: ClawHub skill registry and signing system
-    keywords:
-      - skill-registry
-      - skill-signer
-      - clawhub
-      - skill signing
-      - manifest signing
-      - skill publish
-    confidence: 1.0
-
-  - name: project-status
-    description: Project status queries, progress checks, summaries
-    keywords:
-      - status of
-      - progress on
-      - where are we
-      - what happened with
-      - summarize the
-      - update on
-      - how is the
-      - current state of
     confidence: 1.0
 
   # ── Example domain tags (disabled — copy and enable for your domain) ───

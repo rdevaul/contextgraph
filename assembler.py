@@ -57,6 +57,10 @@ class ContextAssembler:
     When sticky layer is empty, budget reallocates to recency (25%) and topic (75%).
 
     Final result is sorted oldest-first for natural reading order.
+
+    User-scoped assembly: if channel_label is provided, the topic layer filters
+    messages to that user's channel for user-scoped tags, while system tags
+    retrieve from all channels. Pass user_tags to specify which tags are user-scoped.
     """
 
     def __init__(self, store: MessageStore, token_budget: int = 4000) -> None:
@@ -65,7 +69,9 @@ class ContextAssembler:
 
     def assemble(self, incoming_text: str,
                  inferred_tags: List[str],
-                 pinned_message_ids: Optional[List[str]] = None) -> AssemblyResult:
+                 pinned_message_ids: Optional[List[str]] = None,
+                 channel_label: Optional[str] = None,
+                 user_tags: Optional[List[str]] = None) -> AssemblyResult:
         """
         Build a context window for `incoming_text` given `inferred_tags`.
 
@@ -78,6 +84,12 @@ class ContextAssembler:
         pinned_message_ids : Optional[List[str]]
             Message IDs that should be pinned in the sticky layer.
             If None, sticky layer is skipped.
+        channel_label : Optional[str]
+            If set, user-scoped tags (in `user_tags`) will only retrieve messages
+            from this channel. System tags always retrieve from all channels.
+        user_tags : Optional[List[str]]
+            Tags that are user-scoped (should be filtered by channel_label).
+            If None, all tags are treated as system tags (no channel filter).
         """
         # ── Sticky layer ───────────────────────────────────────────────────
         sticky_msgs: List[Message] = []
@@ -192,8 +204,13 @@ class ContextAssembler:
             useful_tags = sorted(inferred_tags, key=lambda t: tag_counts.get(t, 0))
             useful_tags = useful_tags[: max(1, len(useful_tags) // 2)]
 
+        # Build a set of user-scoped tag names for channel filtering
+        user_tag_set = set(user_tags) if user_tags else set()
+
         for tag in useful_tags:
-            for msg in self.store.get_by_tag(tag, limit=20):
+            # Apply channel_label filter only for user-scoped tags
+            tag_channel = channel_label if (channel_label and tag in user_tag_set) else None
+            for msg in self.store.get_by_tag(tag, limit=20, channel_label=tag_channel):
                 if msg.id not in seen_ids:
                     topic_candidates.append(msg)
                     seen_ids.add(msg.id)
