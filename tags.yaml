@@ -18,7 +18,27 @@ tags:
 
   - name: code
     description: Message contains or discusses code
-    keywords: []
+    keywords:
+      - coding
+      - codebase
+      - refactor
+      - debug
+      - compile
+      - syntax
+      - function
+      - variable
+      - repository
+      - commit
+      - pull request
+      - merge
+      - branch
+      - git
+      - github
+      - source code
+      - implementation
+      - bug fix
+      - test suite
+      - unit test
     patterns:
       - "```[\\s\\S]*?```"   # code block
       - "^    \\S"            # 4-space indent
@@ -503,6 +523,41 @@ tags:
       - manipulation
       - autonomous
       - sensor fusion
+    confidence: 1.0
+
+  - name: zheng-survey
+    description: Zheng consulting survey platform project
+    keywords:
+      - zheng
+      - lily zheng
+      - lilyzhengfair
+      - survey platform
+      - culture assessment
+      - consulting survey
+    confidence: 1.0
+
+  - name: skill-registry
+    description: ClawHub skill registry and signing system
+    keywords:
+      - skill-registry
+      - skill-signer
+      - clawhub
+      - skill signing
+      - manifest signing
+      - skill publish
+    confidence: 1.0
+
+  - name: project-status
+    description: Project status queries, progress checks, summaries
+    keywords:
+      - status of
+      - progress on
+      - where are we
+      - what happened with
+      - summarize the
+      - update on
+      - how is the
+      - current state of
     confidence: 1.0
 
   # ── Example domain tags (disabled — copy and enable for your domain) ───
