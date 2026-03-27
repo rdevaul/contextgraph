@@ -65,6 +65,8 @@ _ENVELOPE_PATTERNS = [
         r"^\[Subagent Task\]:.*?(?=\n\n|\Z)",
         re.DOTALL | re.MULTILINE,
     ),
+    # Scheduled reminder triggers
+    re.compile(r"^A scheduled reminder has been triggered\..*?$", re.MULTILINE),
     # Generic timestamp prefix: "[Day YYYY-MM-DD HH:MM TZ] " at start of message
     re.compile(
         r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s*",
