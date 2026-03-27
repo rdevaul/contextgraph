@@ -34,6 +34,32 @@ _ENVELOPE_PATTERNS = [
     ),
     # "System: [timestamp] ..." event lines
     re.compile(r"^System:\s*\[.*?\].*?$", re.MULTILINE),
+    # OpenClaw runtime context block: "[Day YYYY-MM-DD HH:MM TZ] OpenClaw runtime context (internal):\nThis context is runtime-ge..."
+    # Strip the entire runtime context preamble up to the first real user content
+    re.compile(
+        r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s+"
+        r"OpenClaw runtime context \(internal\):.*?(?=\n\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    ),
+    # Subagent context prefix: "[Day YYYY-MM-DD HH:MM TZ] [Subagent Context] You are running as a subagent..."
+    re.compile(
+        r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s+"
+        r"\[Subagent Context\].*?(?=\n\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    ),
+    # Fact-checker preamble: "[Day YYYY-MM-DD HH:MM TZ] You are an independent fact-checking agent..."
+    re.compile(
+        r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s+"
+        r"You are an independent fact-checking agent.*?(?=\n\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    ),
+    # Inter-session messages: "[Inter-session message] sourceSession=..."
+    re.compile(r"^\[Inter-session message\].*?$", re.MULTILINE),
+    # Generic timestamp prefix: "[Day YYYY-MM-DD HH:MM TZ] " at start of message
+    re.compile(
+        r"^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+\w+\]\s*",
+        re.MULTILINE,
+    ),
     # Voice PWA prefix: "[HH:MM:SS] [Voice PWA] "
     re.compile(r"^\[[\d:]+\]\s*\[Voice PWA\]\s*", re.MULTILINE),
     # Media attachment lines: "[media attached: ...]"
