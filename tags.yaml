@@ -261,6 +261,248 @@ tags:
       - add to list
     confidence: 1.0
 
+  # ── Personal assistant tags ─────────────────────────────────────────────
+
+  - name: recommendation
+    description: Recommendations for services, products, restaurants, vendors
+    keywords:
+      - recommend
+      - recommendation
+      - suggest
+      - suggestion
+      - best place
+      - where can i
+      - where should
+      - any good
+      - looking for a
+      - know a good
+      - dentist
+      - doctor
+      - mechanic
+      - restaurant
+      - plumber
+      - electrician
+      - contractor
+      - barber
+      - vet
+      - veterinarian
+      - lawyer
+      - accountant
+    confidence: 1.0
+
+  - name: travel
+    description: Travel planning, flights, hotels, trips
+    keywords:
+      - travel
+      - flight
+      - hotel
+      - airbnb
+      - itinerary
+      - trip
+      - vacation
+      - road trip
+      - booking
+      - airline
+      - airport
+      - passport
+      - visa
+      - packing
+      - destination
+    confidence: 1.0
+
+  - name: health
+    description: Health, medical, fitness, wellness
+    keywords:
+      - health
+      - medical
+      - doctor
+      - appointment
+      - prescription
+      - symptom
+      - fitness
+      - exercise
+      - diet
+      - sleep
+      - dentist
+      - dental
+      - therapy
+      - mental health
+      - insurance
+    confidence: 1.0
+
+  - name: household
+    description: Home management, chores, repairs, maintenance
+    keywords:
+      - house
+      - apartment
+      - landlord
+      - lease
+      - repair
+      - maintenance
+      - plumbing
+      - electrical
+      - hvac
+      - cleaning
+      - furniture
+      - appliance
+      - move
+      - moving
+      - utility
+      - internet service
+    confidence: 1.0
+
+  - name: family
+    description: Family, relationships, kids, partners, parenting
+    keywords:
+      - dana
+      - terry
+      - lynae
+      - lily
+      - ivy
+      - daycare
+      - family
+      - partner
+      - relationship
+      - parenting
+      - school
+      - birthday
+    confidence: 1.0
+
+  - name: calendar
+    description: Scheduling, events, reminders, meetings
+    keywords:
+      - calendar
+      - schedule
+      - meeting
+      - event
+      - reminder
+      - appointment
+      - rsvp
+      - block time
+      - free time
+      - available
+    confidence: 1.0
+
+  - name: email
+    description: Email management, inbox, messages
+    keywords:
+      - email
+      - inbox
+      - unread
+      - gmail
+      - reply to
+      - forward
+      - newsletter
+      - spam
+    confidence: 1.0
+
+  - name: finance-personal
+    description: Personal finance, bills, banking, budget
+    keywords:
+      - bank account
+      - credit card
+      - bill
+      - payment
+      - budget
+      - savings
+      - tax
+      - invoice
+      - rent
+      - mortgage
+      - venmo
+      - zelle
+    confidence: 1.0
+
+  - name: food
+    description: Cooking, recipes, restaurants, meal planning
+    keywords:
+      - recipe
+      - cook
+      - restaurant
+      - takeout
+      - delivery
+      - meal
+      - dinner
+      - breakfast
+      - lunch
+      - grocery
+      - ingredients
+    confidence: 1.0
+
+  - name: weather
+    description: Weather queries, forecasts
+    keywords:
+      - weather
+      - forecast
+      - temperature
+      - rain
+      - snow
+      - wind
+      - humidity
+      - sunny
+      - cloudy
+    confidence: 1.0
+
+  - name: location
+    description: Location-specific queries, local services, geography
+    keywords:
+      - san pedro
+      - long beach
+      - los angeles
+      - bay area
+      - san francisco
+      - local
+      - nearby
+      - near me
+      - in the area
+      - neighborhood
+    confidence: 1.0
+
+  # ── Domain-specific tags ───────────────────────────────────────────────
+
+  - name: reinforcement-learning
+    description: RL, reward modeling, policy optimization
+    keywords:
+      - reinforcement learning
+      - reward model
+      - policy gradient
+      - q-learning
+      - rlhf
+      - ppo
+      - dpo
+      - reward hacking
+    confidence: 1.0
+
+  - name: space
+    description: Space, aerospace, launch vehicles, propulsion
+    keywords:
+      - rocket
+      - launch vehicle
+      - propulsion
+      - spacecraft
+      - orbit
+      - satellite
+      - spacex
+      - nasa
+      - relativity
+      - dark matter lab
+      - aerospace
+      - thrust
+    confidence: 1.0
+
+  - name: robotics
+    description: Robots, actuators, kinematics, control
+    keywords:
+      - robot
+      - actuator
+      - servo
+      - kinematics
+      - control loop
+      - manipulation
+      - autonomous
+      - sensor fusion
+    confidence: 1.0
+
   # ── Example domain tags (disabled — copy and enable for your domain) ───
 
   - name: rocket

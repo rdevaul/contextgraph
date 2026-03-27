@@ -956,49 +956,55 @@
         }
 
         function renderAssemblyComparison(data) {
-            const { graph_assembly, linear_window } = data;
+            const { inferred_tags, graph_assembly, linear_window } = data;
+
+            const inferredHtml = (inferred_tags && inferred_tags.length > 0)
+                ? inferred_tags.map(tag => `<span class="message-tag" style="background:#a371f7">${tag}</span>`).join(' ')
+                : '<em style="color:#8b949e">No tags inferred</em>';
 
             const html = `
+                <div class="section" style="margin-bottom:15px; padding:15px;">
+                    <strong>Query Tags Inferred:</strong> ${inferredHtml}
+                </div>
                 <div class="comparison">
                     <div class="comparison-panel">
                         <h3>Graph Assembly</h3>
                         <div class="tag-meta">
-                            Total Tokens: ${graph_assembly.total_tokens}<br>
-                            Recency Messages: ${graph_assembly.recency_count}<br>
-                            Topic Messages: ${graph_assembly.topic_count}<br>
-                            Tags Used: ${graph_assembly.tags_used.join(', ') || 'none'}
+                            Total Tokens: ${graph_assembly.total_tokens} · 
+                            Recency: ${graph_assembly.recency_count} · 
+                            Topic: ${graph_assembly.topic_count}<br>
+                            Tags Used for Retrieval: ${graph_assembly.tags_used.map(t => `<span class="message-tag">${t}</span>`).join(' ') || '<em>none</em>'}
                         </div>
                         <div class="message-list">
-                            ${graph_assembly.messages.slice(0, 10).map(msg => `
+                            ${graph_assembly.messages.slice(0, 15).map(msg => `
                                 <div class="message-item">
-                                    <strong>User:</strong> ${msg.user_text.substring(0, 100)}${msg.user_text.length > 100 ? '...' : ''}
+                                    <strong>User:</strong> ${msg.user_text.substring(0, 150)}${msg.user_text.length > 150 ? '...' : ''}
                                     <div class="message-tags">
                                         ${msg.tags.map(tag => `<span class="message-tag">${tag}</span>`).join('')}
                                     </div>
                                 </div>
                             `).join('')}
-                            ${graph_assembly.messages.length > 10 ? `<div class="tag-meta">...and ${graph_assembly.messages.length - 10} more</div>` : ''}
+                            ${graph_assembly.messages.length > 15 ? `<div class="tag-meta">...and ${graph_assembly.messages.length - 15} more</div>` : ''}
                         </div>
                     </div>
 
                     <div class="comparison-panel">
                         <h3>Linear Window (Baseline)</h3>
                         <div class="tag-meta">
-                            Total Tokens: ${linear_window.total_tokens}<br>
+                            Total Tokens: ${linear_window.total_tokens} · 
                             Messages: ${linear_window.recency_count}<br>
-                            Topics Covered: ${linear_window.topic_count}<br>
-                            Tags: ${linear_window.tags_used.join(', ') || 'none'}
+                            Tags Present: ${linear_window.tags_used.map(t => `<span class="message-tag">${t}</span>`).join(' ') || '<em>none</em>'}
                         </div>
                         <div class="message-list">
-                            ${linear_window.messages.slice(0, 10).map(msg => `
+                            ${linear_window.messages.slice(0, 15).map(msg => `
                                 <div class="message-item">
-                                    <strong>User:</strong> ${msg.user_text.substring(0, 100)}${msg.user_text.length > 100 ? '...' : ''}
+                                    <strong>User:</strong> ${msg.user_text.substring(0, 150)}${msg.user_text.length > 150 ? '...' : ''}
                                     <div class="message-tags">
                                         ${msg.tags.map(tag => `<span class="message-tag">${tag}</span>`).join('')}
                                     </div>
                                 </div>
                             `).join('')}
-                            ${linear_window.messages.length > 10 ? `<div class="tag-meta">...and ${linear_window.messages.length - 10} more</div>` : ''}
+                            ${linear_window.messages.length > 15 ? `<div class="tag-meta">...and ${linear_window.messages.length - 15} more</div>` : ''}
                         </div>
                     </div>
                 </div>

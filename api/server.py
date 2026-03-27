@@ -79,6 +79,7 @@ class UnpinRequest(BaseModel):
     pin_id: str
 
 class CompareResponse(BaseModel):
+    inferred_tags: list[str] = []
     graph_assembly: dict
     linear_window: dict
 
@@ -108,6 +109,10 @@ if gp_tagger_path.exists():
     with open(gp_tagger_path, 'rb') as f:
         gp_tagger = pickle.load(f)
         ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
+
+from fixed_tagger import FixedTagger
+fixed_tagger_instance = FixedTagger()
+ensemble.register('fixed', fixed_tagger_instance.assign, 1.5)  # Higher weight — authoritative for personal assistant tags
 
 baseline_tagger = lambda features, user_text, assistant_text: assign_tags(features, user_text, assistant_text)
 ensemble.register('baseline', baseline_tagger, 1.0)
@@ -453,7 +458,7 @@ def compare(request: TagRequest):
             "tags_used": list(set(tag for msg in linear_window_messages for tag in msg.tags))
         }
 
-        return CompareResponse(graph_assembly=graph_assembly, linear_window=linear_window)
+        return CompareResponse(inferred_tags=inferred_tags, graph_assembly=graph_assembly, linear_window=linear_window)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
