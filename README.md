@@ -61,11 +61,94 @@ The **sticky layer** ensures that explicitly pinned turns remain in context rega
 
 **Example use case:** In a "rocket design workflow" conversation, you might pin the initial requirements document turn so it persists through all subsequent back-and-forth, even as the conversation shifts through different subsystems and implementation details.
 
+### User-Scoped Tags
+
+Context Graph supports **user-specific tag definitions** alongside the global tag taxonomy. This allows individual users to customize tag ontology without affecting the shared baseline.
+
+**Directory structure:**
+```
+tags.main/          # Global tag ontology (shared across all users)
+  ├── base.yaml
+  ├── code.yaml
+  ├── personal-assistant.yaml
+  └── ...
+tags.user/          # User-specific tag definitions
+  ├── alice.yaml
+  ├── bob.yaml
+  └── ...
+```
+
+**How it works:**
+- The system loads tags from both `tags.main/` (global) and `tags.user/` (user-specific) directories
+- User tags can override or extend global tags with domain-specific keywords
+- Each user's tags are isolated to their namespace to prevent conflicts
+
+**API endpoints:**
+```bash
+# List all tags for user 'alice'
+GET /tags/user/alice
+
+# Add a new tag definition for user 'alice'
+POST /tags/user/alice/add
+Body: {"tag": "rocket-design", "keywords": ["propulsion", "nozzle", "thrust"]}
+
+# Delete a tag definition for user 'alice'
+DELETE /tags/user/alice/delete?tag=rocket-design
+```
+
+**Path traversal protection:** The API validates all user names to prevent directory traversal attacks (e.g., `../../../etc/passwd` is rejected).
+
+**Use cases:**
+- Personal assistant interactions with user-specific vocabulary (task management, reminders, scheduling, health tracking)
+- Project-specific keywords for active work (e.g., `zheng-survey`, `skill-registry`)
+- Domain experts with specialized terminology
+
+### Channel Labels
+
+Messages can be **channel-labeled** to scope context assembly per conversation or channel. This prevents context leakage between unrelated conversations when multiple channels share the same Context Graph instance.
+
+**How it works:**
+- Messages include an optional `channel_label` field during ingestion
+- The OpenClaw plugin's `ContextEngine` includes `inferChannelLabel()` to automatically detect channel from conversation metadata
+- Context assembly can be scoped to a specific channel by passing `channel_label` to the `/assemble` endpoint
+
+**Example workflow:**
+1. User sends message in Telegram channel `@rocket-team`
+2. Plugin calls `inferChannelLabel()` → returns `"telegram:rocket-team"`
+3. Message is ingested with `channel_label: "telegram:rocket-team"`
+4. On context assembly for the next turn, plugin passes `channel_label: "telegram:rocket-team"`
+5. Only messages from that channel are retrieved (recency + topic layers)
+
+**API support:**
+```bash
+# Ingest with channel label
+POST /ingest
+Body: {
+  "user_text": "...",
+  "assistant_text": "...",
+  "channel_label": "telegram:rocket-team"
+}
+
+# Assemble context scoped to channel
+POST /assemble
+Body: {
+  "user_text": "...",
+  "channel_label": "telegram:rocket-team"
+}
+```
+
+**Benefits:**
+- Prevents cross-channel context pollution in multi-tenant deployments
+- Allows the same Context Graph instance to serve multiple isolated conversations
+- Maintains per-channel topic continuity without manual namespace management
+
 ### Key features of the contextgraph system
 
 - **Automated turn filtering** — Cron jobs, heartbeats, and subagent operations are automatically filtered from retrieval and quality metrics, preventing noise from diluting relevance scores.
 
 - **Lazy message summarization** — When individual messages exceed 35% of the token budget, they're summarized on-the-fly using Claude Haiku (configurable model). This prevents giant turns from dominating the context window while preserving semantic content.
+
+- **Degenerate text filtering** — Ingestion automatically rejects messages with excessive repetition (>40% duplicate 4-grams) or very short content (<10 characters), preventing noise from degrading tag quality and retrieval relevance.
 
 - **IDF tag filtering** — Over-generic tags that apply to nearly all messages (e.g., "code", "openclaw") are automatically down-weighted using inverse document frequency, ensuring topic retrieval remains discriminative.
 
@@ -278,6 +361,161 @@ python3 cli.py recent [--n 10]
 # Run Phase 2 shadow evaluation
 python3 scripts/shadow.py --report --verbose
 ```
+
+## API Reference
+
+The Context Graph API provides the following endpoints:
+
+### Core Endpoints
+
+#### POST `/ingest`
+Ingest a user/assistant message pair into the graph.
+
+**Request body:**
+```json
+{
+  "user_text": "How do I fix the gateway?",
+  "assistant_text": "To fix the gateway, you need to...",
+  "channel_label": "telegram:rocket-team",  // optional
+  "is_sticky": false,  // optional
+  "skip_automated_detection": false  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message_id": 1234,
+  "tags": ["networking", "infrastructure", "debugging"]
+}
+```
+
+#### POST `/assemble`
+Assemble context for an incoming message using the graph (recency + topic layers).
+
+**Request body:**
+```json
+{
+  "user_text": "What was the propulsion design decision?",
+  "budget": 4000,  // optional, defaults to 4000
+  "channel_label": "telegram:rocket-team"  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "context": "...",  // assembled context (oldest-first)
+  "messages_included": 23,
+  "tokens_used": 3421,
+  "tags_used": ["rocket-design", "propulsion"],
+  "sticky_count": 2
+}
+```
+
+#### GET `/health`
+Health check endpoint. Returns service status and basic stats.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "messages_in_store": 1024,
+  "engine": "contextgraph"
+}
+```
+
+#### GET `/quality`
+Retrieval quality metrics. Returns zero-return rate, tag entropy, and alert status.
+
+**Response:**
+```json
+{
+  "turns_evaluated": 50,
+  "zero_return_rate": 0.04,
+  "tag_entropy": 3.65,
+  "alert": false,
+  "alert_reasons": [],
+  "top_tags": ["code", "infrastructure", "networking"]
+}
+```
+
+### User Tag Endpoints
+
+#### GET `/tags/user/<name>`
+List all tag definitions for a specific user.
+
+**Example:**
+```bash
+curl http://localhost:8300/tags/user/alice
+```
+
+**Response:**
+```json
+{
+  "user": "alice",
+  "tags": {
+    "rocket-design": {
+      "keywords": ["propulsion", "nozzle", "thrust"],
+      "patterns": ["rocket.*design", "engine.*test"]
+    },
+    "personal-tasks": {
+      "keywords": ["todo", "reminder", "deadline"]
+    }
+  }
+}
+```
+
+#### POST `/tags/user/<name>/add`
+Add or update a tag definition for a user.
+
+**Request body:**
+```json
+{
+  "tag": "rocket-design",
+  "keywords": ["propulsion", "nozzle", "thrust"],
+  "patterns": ["rocket.*design"]  // optional
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "user": "alice",
+  "tag": "rocket-design"
+}
+```
+
+#### DELETE `/tags/user/<name>/delete?tag=<tag_name>`
+Delete a tag definition for a user.
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8300/tags/user/alice/delete?tag=rocket-design
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "user": "alice",
+  "tag": "rocket-design",
+  "deleted": true
+}
+```
+
+### Other Endpoints
+
+#### GET `/dashboard`
+Web-based dashboard with Chart.js visualizations of token efficiency, quality metrics, and tag distribution.
+
+#### GET `/comparison-log`
+Returns the full comparison log (graph vs linear) as JSON.
+
+#### POST `/compare`
+Compare graph vs linear context for a given turn. Used by the plugin to generate comparison logs.
 
 ## Deployment (Python API as a Service)
 

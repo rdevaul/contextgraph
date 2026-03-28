@@ -70,6 +70,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.0-rc2] - 2026-03-27
+
+**Release candidate 2** — User-scoped tag taxonomy, channel-labeled ingestion, degenerate text filtering, and OpenClaw plugin synchronization. Expanded tag ontology with personal assistant categories and project-specific keywords.
+
+### Major Features
+
+#### User-Scoped Tag Taxonomy
+- **User-specific tag definitions** — New `tags.user/` YAML directory allows per-user tag customization alongside global `tags.main/` ontology
+- **API endpoints for user tags** — `/tags/user/<name>`, `/tags/user/<name>/add`, `/tags/user/<name>/delete` endpoints support runtime tag management
+- **Path traversal protection** — User tag API validates filenames to prevent directory traversal attacks
+- **Personal assistant taxonomy** — Added comprehensive tag set for personal assistant interactions (tasks, reminders, scheduling, goals, finance, health, etc.)
+- **Project-specific keywords** — New tags for active projects: `zheng-survey`, `skill-registry`, `project-status`
+
+#### Channel-Labeled Ingestion
+- **`channel_label` field** — Messages can now include a `channel_label` field to scope context assembly per conversation/channel
+- **Plugin support** — OpenClaw plugin's `ContextEngine` includes `inferChannelLabel()` to detect channel from conversation metadata
+- **Per-channel assembly** — Context retrieval can be scoped to specific channels, preventing cross-channel leakage
+
+#### Degenerate Text Filtering
+- **Repetitive text detection** — Ingestion now rejects messages with excessive repetition (>40% duplicate 4-grams)
+- **Short message filtering** — Messages under 10 characters automatically rejected
+- **Quality protection** — Prevents noise from degrading tag quality and retrieval relevance
+
+### OpenClaw Plugin Updates
+- **Full engine sync** — Live plugin files synchronized back into repo (`engine.ts`, `api-client.ts`, `index.ts`)
+- **Typed API client** — `api-client.ts` provides typed interface for all Context Graph endpoints with `channel_label` support
+- **Plugin registration safety** — Documentation updated to prevent duplicate registration crashes
+
+### Tag System Enhancements
+- **Code keyword tags** — Added tags for programming concepts: `code-review`, `debugging`, `refactoring`, `testing`, `documentation`
+- **Improved salience weighting** — Rebalanced tag scoring to favor distinctiveness over raw frequency
+- **Disabled low-signal tags** — `question` and `has-url` tags disabled due to poor discrimination
+
+### Bug Fixes
+- **Dashboard JavaScript parse error** — Fixed syntax error preventing dashboard rendering
+- **Message summary substitution** — Literal `[summary ...]` placeholders now replaced with actual summaries
+- **Oversized message handling** — Messages exceeding size limits now properly bypass summary substitution
+- **Hard global budget cap** — Assembler now enforces strict token budget to prevent overruns
+- **Health endpoint performance** — `/health` now capped at 1000 messages to prevent timeout on large databases
+- **Store method corrections** — Fixed `_conn()` method usage in `store.count()`
+- **Envelope metadata cleaning** — OpenClaw runtime/subagent/timestamp prefixes stripped from stored messages
+- **Automated message marking** — Scheduled reminder messages correctly marked as automated
+- **Task prefix stripping** — Internal task/subagent prefixes removed from indexed content
+
+### Documentation
+- **Plugin registration safety** — Added warning about duplicate registration crashes
+- **User-scoped tags** — (To be added in this release)
+- **Channel labels** — (To be added in this release)
+- **Updated API reference** — (To be added in this release)
+
+---
+
 ## [Unreleased]
 
 ### Planned for Phase 5
@@ -80,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **v1.0-rc2** (2026-03-27) — User-scoped tags, channel labels, degenerate text filtering, plugin sync
 - **v1.0-rc1** (2026-03-22) — Memory integration live, turn filtering, lazy summarization, dashboard
 - **Phase 3** (2026-03) — Native OpenClaw plugin, `/graph on|off` toggle, comparison logging
 - **Phase 2** (2026-03) — Shadow mode validation, 11.8% token efficiency vs linear baseline
@@ -87,4 +140,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[v1.0-rc2]: https://github.com/rarebreed/tag-context/releases/tag/v1.0-rc2
 [v1.0-rc1]: https://github.com/rarebreed/tag-context/releases/tag/v1.0-rc1

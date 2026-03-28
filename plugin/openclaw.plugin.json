@@ -1,14 +1,12 @@
 {
   "id": "contextgraph",
-  "name": "Context Graph Engine",
+  "name": "Context Graph",
   "version": "1.0.0",
-  "description": "Graph-based context engine that bridges OpenClaw's ContextEngine interface to the contextgraph Python FastAPI server. Enables semantic topic-tagged context assembly instead of linear windowing.",
-  "openclaw": {
-    "extensions": ["./index.ts"]
-  },
+  "description": "DAG-based context management system for LLMs that replaces linear sliding windows with tag-based retrieval",
+  "kind": "context-engine",
   "configSchema": {
     "type": "object",
-    "properties": {},
-    "additionalProperties": true
+    "additionalProperties": false,
+    "properties": {}
   }
 }

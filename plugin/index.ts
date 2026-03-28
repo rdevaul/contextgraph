@@ -157,6 +157,17 @@ function hasToolUse(msg: AgentMessage): boolean {
   );
 }
 
+function countToolCalls(msg: AgentMessage): number {
+  // Count discrete tool_use / toolCall blocks in a single message.
+  const content = (msg as { content?: unknown }).content;
+  if (!Array.isArray(content)) return 0;
+  return content.filter(
+    (b) => b && typeof b === "object" &&
+      ((b as { type?: string }).type === "tool_use" ||
+       (b as { type?: string }).type === "toolCall")
+  ).length;
+}
+
 function safeRecentSlice(messages: AgentMessage[], maxMessages: number): AgentMessage[] {
   if (messages.length === 0) return [];
   let startIdx = Math.max(0, messages.length - maxMessages);
@@ -428,12 +439,22 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       const GRAPH_TOKEN_BUDGET = 8000;
       const budget = Math.min(tokenBudget ?? GRAPH_TOKEN_BUDGET, GRAPH_TOKEN_BUDGET);
 
-      // Detect tool use in recent messages for sticky threads
-      const recentAssistant = messages.filter(m => m.role === "assistant").slice(-5);
-      const lastTurnHadTools = recentAssistant.some(m => hasToolUse(m));
-      const pendingChainIds = lastTurnHadTools
-        ? (toolChainIds.get(sessionId) ?? [])
-        : [];
+      // Detect tool use in the most recent assistant turn only — not the last N turns.
+      // Sticky threads are for multi-turn operations (code reviews, extended dev work)
+      // where losing thread continuity would break the work. Single incidental tool calls
+      // (heartbeats, memory lookups, simple queries) should NOT activate sticky.
+      //
+      // Activation rules:
+      //   - 3+ tool calls in the last turn → new chain or continuation
+      //   - 1-2 tool calls AND we're already mid-chain → continuation only
+      //   - 0 tool calls → clear the chain
+      const lastAssistant = messages.filter(m => m.role === "assistant").slice(-1);
+      const lastTurnToolCount = lastAssistant.reduce((n, m) => n + countToolCalls(m), 0);
+      const existingChain = toolChainIds.get(sessionId) ?? [];
+      const lastTurnHadTools =
+        lastTurnToolCount >= 3 ||
+        (lastTurnToolCount >= 1 && existingChain.length > 0);
+      const pendingChainIds = lastTurnHadTools ? existingChain : [];
 
       const result = await apiPost(
         "/assemble",
@@ -538,12 +559,21 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // Use stable turnId for external_id tracking
       const turnId = `turn-${sessionId}-${Date.now()}`;
 
-      // Detect tool use in this turn
-      const hadTools = assistantMessages.some(m => hasToolUse(m));
+      // Detect tool use in this turn.
+      // Only grow the chain if this turn had 3+ tool calls (starts or extends a chain)
+      // OR had 1-2 calls while already mid-chain (continues an established chain).
+      // Turns with zero tool calls implicitly clear the chain by not appending.
+      const turnToolCount = assistantMessages.reduce((n, m) => n + countToolCalls(m), 0);
+      const existingIds = toolChainIds.get(sessionId) ?? [];
+      const hadTools =
+        turnToolCount >= 3 ||
+        (turnToolCount >= 1 && existingIds.length > 0);
       if (hadTools) {
-        const ids = toolChainIds.get(sessionId) ?? [];
-        ids.push(turnId);
-        toolChainIds.set(sessionId, ids.slice(-10));
+        existingIds.push(turnId);
+        toolChainIds.set(sessionId, existingIds.slice(-10));
+      } else {
+        // Non-qualifying turn — clear the chain so stale state doesn't persist
+        toolChainIds.delete(sessionId);
       }
 
       await apiPost(
@@ -571,20 +601,17 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
             writeComparisonLog({
               timestamp: new Date().toISOString(),
               sessionId,
-              had_tools: hadTools,
-              graph_assembly: {
-                tokens: comparison.graph_assembly?.total_tokens ?? 0,
-                messages: comparison.graph_assembly?.messages?.length ?? 0,
-                tags: comparison.graph_assembly?.tags_used ?? [],
-                recency: comparison.graph_assembly?.recency_count ?? 0,
-                topic: comparison.graph_assembly?.topic_count ?? 0,
-                sticky_count: comparison.graph_assembly?.sticky_count ?? 0,
-              },
-              linear_would_have: {
-                tokens: comparison.linear_window?.total_tokens ?? 0,
-                messages: comparison.linear_window?.messages?.length ?? 0,
-                tags: comparison.linear_window?.tags_used ?? [],
-              },
+              userText: userText.slice(0, 200),
+              graphMsgCount: comparison.graph_assembly?.messages?.length ?? 0,
+              graphTokens: comparison.graph_assembly?.total_tokens ?? 0,
+              graphTags: comparison.graph_assembly?.tags_used ?? [],
+              graphRecency: comparison.graph_assembly?.recency_count ?? 0,
+              graphTopic: comparison.graph_assembly?.topic_count ?? 0,
+              linearMsgCount: comparison.linear_window?.messages?.length ?? 0,
+              linearTokens: comparison.linear_window?.total_tokens ?? 0,
+              linearTags: comparison.linear_window?.tags_used ?? [],
+              stickyPins: comparison.graph_assembly?.sticky_count ?? 0,
+              hadTools,
             });
           }
         } catch {
@@ -650,108 +677,6 @@ export default function register(api: OpenClawPluginApi): void {
       const modeLabel = enabled ? "🟢 ON" : "⚪ OFF";
       return {
         text: `**Context Graph Engine**\nMode: ${modeLabel}\nPython API: ${apiStatus}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
-      };
-    },
-  });
-
-  // Register /memory command
-  api.registerCommand({
-    name: "memory",
-    description: "Memory system status + mode control. Args: context-graph [on|off], memory-graph [on|off]",
-    acceptsArgs: true,
-    handler: async (ctx) => {
-      const arg = (ctx.args ?? "").trim().toLowerCase();
-
-      // /memory context-graph on|off  — toggle context graph (same as /graph on|off)
-      if (arg === "context-graph on" || arg === "cg on") {
-        writeGraphMode(true);
-        return { text: "🔀 **Context Graph ON** — semantic DAG-based context assembly active." };
-      }
-      if (arg === "context-graph off" || arg === "cg off") {
-        writeGraphMode(false);
-        return { text: "🔀 **Context Graph OFF** — linear context window." };
-      }
-
-      // /memory memory-graph on|off  — toggle memory graph ghost mode
-      if (arg === "memory-graph on" || arg === "mg on") {
-        const flagPath = path.join(os.homedir(), ".tag-context", "memory-graph-mode.json");
-        fs.mkdirSync(path.dirname(flagPath), { recursive: true });
-        fs.writeFileSync(flagPath, JSON.stringify({ enabled: true, updatedAt: new Date().toISOString() }));
-        return { text: "👻 **Memory Graph ON** — memory graph harvesting active (ghost mode: harvests but doesn't inject)." };
-      }
-      if (arg === "memory-graph off" || arg === "mg off") {
-        const flagPath = path.join(os.homedir(), ".tag-context", "memory-graph-mode.json");
-        fs.mkdirSync(path.dirname(flagPath), { recursive: true });
-        fs.writeFileSync(flagPath, JSON.stringify({ enabled: false, updatedAt: new Date().toISOString() }));
-        return { text: "⏸️ **Memory Graph OFF** — memory graph harvesting paused." };
-      }
-
-      // Status (no args)
-      const home = os.homedir();
-      const workspace = path.join(home, ".openclaw", "workspace");
-      const today = new Date().toISOString().slice(0, 10);
-
-      // MEMORY.md
-      let memoryLine = "❌ missing";
-      try {
-        const stat = fs.statSync(path.join(workspace, "MEMORY.md"));
-        const kb = (stat.size / 1024).toFixed(1);
-        const age = Math.round((Date.now() - stat.mtimeMs) / 60000);
-        memoryLine = `✅ ${kb} KB — updated ${age}m ago`;
-      } catch { /* missing */ }
-
-      // Today's daily log
-      let dailyLine = "❌ missing";
-      try {
-        const dailyPath = path.join(workspace, "memory", "daily", `${today}.md`);
-        const stat = fs.statSync(dailyPath);
-        const kb = (stat.size / 1024).toFixed(1);
-        const age = Math.round((Date.now() - stat.mtimeMs) / 60000);
-        dailyLine = `✅ ${kb} KB — updated ${age}m ago`;
-      } catch { /* missing */ }
-
-      // Context graph status
-      const graphEnabled = readGraphMode();
-      const graphLabel = graphEnabled ? "🟢 ACTIVE" : "⚪ OFF";
-      let apiLine = "unknown";
-      let storeCount = 0;
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch(`${PYTHON_API_BASE}/health`, { signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          const data = await res.json() as any;
-          storeCount = data.messages_in_store ?? 0;
-          apiLine = `✅ running`;
-        } else {
-          apiLine = `⚠️ error (${res.status})`;
-        }
-      } catch {
-        apiLine = "❌ unreachable";
-      }
-
-      // Memory graph ghost mode status
-      let ghostLine = "⚪ not found";
-      try {
-        const compLog = path.join(home, ".tag-context", "comparison-log.jsonl");
-        const stat = fs.statSync(compLog);
-        const lines = fs.readFileSync(compLog, "utf8").trim().split("\n").filter(Boolean);
-        ghostLine = `👻 GHOST MODE — ${lines.length} comparison entries, last ${Math.round((Date.now() - stat.mtimeMs) / 60000)}m ago`;
-      } catch { /* missing */ }
-
-      return {
-        text: [
-          "**🧠 Memory System Status**",
-          "",
-          `**MEMORY.md:** ${memoryLine}`,
-          `**Daily log (${today}):** ${dailyLine}`,
-          "",
-          `**Context Graph:** ${graphLabel} | API: ${apiLine} | ${storeCount} messages stored`,
-          `**Memory Graph:** ${ghostLine}`,
-          "",
-          "Toggle: `/memory context-graph on|off` · `/memory memory-graph on|off`",
-        ].join("\n"),
       };
     },
   });
