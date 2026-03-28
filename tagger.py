@@ -29,8 +29,8 @@ CORE_TAGS = {
     "planning", "research", "question", "personal", "has-url",
     # Memory / context system
     "memory-system", "contextgraph",
-    # Trading / finance
-    "trading", "options", "maxrisk", "spreads", "finance",
+    # Trading / finance (only seeded if actually used)
+    "maxrisk", "finance",
     # Hardware / compute
     "hardware", "framework1", "local-compute", "ollama", "litellm",
     # Agents
@@ -235,16 +235,18 @@ RULES: List[TagRule] = [
         tags=["memory-system", "contextgraph"],
     ),
 
-    # Trading / finance / options
+    # Trading / finance / options — TIGHTENED: only multi-word finance phrases
+    # to avoid false positives on common words like "option", "trade", "position"
     TagRule(
         name="trading",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["trading", "trade", "option", "options", "spread", "spreads",
-                   "debit spread", "call spread", "put spread", "expiry", "strike",
-                   "delta", "theta", "gamma", "vega", "iv rank", "implied vol",
-                   "tradier", "maxrisk", "max risk", "portfolio", "position",
-                   "ticker", "spy", "qqq", "stock", "equity", "market open",
-                   "market close", "earnings", "volatility"]
+            u, a, ["options trading", "stock trading", "day trading",
+                   "debit spread", "call spread", "put spread", "credit spread",
+                   "iron condor", "covered call", "straddle", "strangle",
+                   "options chain", "implied volatility", "iv rank",
+                   "tradier", "maxrisk", "max risk", "brokerage account",
+                   "strike price", "expiry date", "days to expiry",
+                   "market open", "market close", "earnings report"]
         ),
         tags=["trading", "finance"],
     ),
@@ -255,7 +257,7 @@ RULES: List[TagRule] = [
         predicate=lambda f, u, a: _text_contains_any(
             u, a, ["call option", "put option", "debit spread", "credit spread",
                    "iron condor", "covered call", "straddle", "strangle",
-                   "options chain", "dte", "days to expiry", "otm", "itm", "atm",
+                   "options chain", "days to expiry",
                    "maxrisk", "max risk capital", "defined risk"]
         ),
         tags=["options", "maxrisk", "trading"],

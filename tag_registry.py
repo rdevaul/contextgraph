@@ -234,6 +234,61 @@ class TagRegistry:
 
         self.save()
 
+    # Common English words that should never become tags
+    _ENTITY_STOPWORDS = {
+        # Pronouns, articles, conjunctions, prepositions
+        "the", "and", "for", "but", "not", "you", "all", "can", "her", "was",
+        "one", "our", "out", "are", "his", "how", "its", "let", "may", "new",
+        "now", "old", "see", "way", "who", "did", "get", "has", "him", "had",
+        "any", "use", "also", "been", "both", "each", "from", "have", "here",
+        "just", "like", "make", "more", "much", "need", "only", "over", "some",
+        "such", "than", "that", "them", "then", "they", "this", "very", "what",
+        "when", "will", "with", "your", "about", "after", "could", "every",
+        "first", "great", "other", "their", "there", "these", "thing", "those",
+        "would", "being", "still", "where", "which", "while", "should",
+        # Common chat words
+        "yeah", "yes", "nope", "okay", "sure", "cool", "nice", "good", "done",
+        "right", "sorry", "thanks", "please", "hello", "hey", "well", "sounds",
+        "excellent", "perfect", "hmm", "nah", "looks", "love", "mean",
+        "happy", "important", "quick", "almost", "already", "because",
+        "before", "continue", "continuing", "everything", "however", "maybe",
+        "nothing", "something", "starting", "thinking", "understood", "honest",
+        "second", "those", "doing", "more", "normal", "answer", "another",
+        # Time words
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+        "sunday", "morning", "evening", "today", "march", "february",
+        "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+        # Generic verbs / actions
+        "add", "ask", "bad", "big", "build", "built", "check", "checking",
+        "clean", "close", "commit", "consider", "create", "delete", "deploy",
+        "explain", "edit", "ensure", "error", "failed", "filter", "find",
+        "fix", "follow", "found", "full", "generate", "give", "going", "gone",
+        "got", "handle", "help", "hook", "implement", "keep", "kill", "last",
+        "linked", "list", "load", "look", "looking", "made", "make", "model",
+        "note", "once", "open", "plan", "plese", "prepare", "proceed",
+        "read", "ready", "received", "remind", "removed", "respond",
+        "result", "results", "return", "review", "reviewed", "route", "run",
+        "running", "search", "send", "sending", "sent", "setup", "show",
+        "start", "status", "still", "stop", "stopped", "task", "tell",
+        "test", "three", "total", "try", "turn", "update", "updating",
+        "verify", "visit", "wait", "working", "write",
+        # Generic nouns
+        "access", "action", "agent", "analysis", "approach", "architecture",
+        "auto", "book", "bug", "changes", "client", "code", "codebase",
+        "complete", "components", "content", "context", "count", "coverage",
+        "current", "data", "date", "design", "disk", "document", "domain",
+        "domains", "effect", "emails", "entry", "evidence", "file", "flow",
+        "graph", "high", "information", "input", "internal", "job", "key",
+        "label", "library", "low", "message", "messages", "metric", "name",
+        "new", "operation", "output", "password", "phase", "plugin",
+        "problem", "program", "project", "projects", "query", "repo",
+        "repository", "resource", "response", "schema", "scope", "server",
+        "service", "services", "session", "shared", "source", "spec",
+        "stack", "stage", "state", "stats", "store", "summary", "system",
+        "tag", "tags", "tier", "turn", "type", "user", "users", "voice",
+        "window", "zero",
+    }
+
     def _normalize_entity_to_tag(self, entity: str) -> Optional[str]:
         """
         Normalize entity to tag name (lowercase, dashes, no spaces).
@@ -249,6 +304,15 @@ class TagRegistry:
         if len(tag) > 30:  # too long
             return None
         if not tag.replace('-', '').replace('_', '').isalnum():  # contains weird chars
+            return None
+
+        # Filter out common English words that aren't meaningful tags
+        if tag in self._ENTITY_STOPWORDS:
+            return None
+
+        # Multi-word: check if ALL words are stopwords (e.g. "the-one" → reject)
+        parts = tag.split('-')
+        if len(parts) > 1 and all(p in self._ENTITY_STOPWORDS for p in parts):
             return None
 
         return tag
