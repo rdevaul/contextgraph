@@ -166,6 +166,23 @@ _INJECTION_PATTERNS = [
 # Strip zero-width characters that bypass pattern matching
 _ZERO_WIDTH = re.compile(r'[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff\u00ad]')
 
+def _is_degenerate_text(text: str, threshold: float = 0.7) -> bool:
+    """Detect garbage/repetitive text that would poison the graph.
+    
+    Returns True if the text is mostly repeated words (e.g. 'word word word...').
+    Threshold is the ratio of most-common-word occurrences to total words.
+    """
+    if not text:
+        return False
+    words = text.lower().split()
+    if len(words) < 10:
+        return False
+    from collections import Counter
+    counts = Counter(words)
+    most_common_count = counts.most_common(1)[0][1]
+    return (most_common_count / len(words)) >= threshold
+
+
 def _sanitize_for_storage(text: str) -> str:
     """Strip prompt injection patterns before storing in the graph."""
     if not text:
@@ -187,6 +204,10 @@ def ingest(request: IngestRequest):
         clean_user = strip_envelope(request.user_text)
         # HIGH-01 fix: sanitize injection patterns before storage
         clean_user = _sanitize_for_storage(clean_user)
+
+        # Reject degenerate/garbage messages (e.g. "word word word..." repeated)
+        if _is_degenerate_text(clean_user):
+            return {"status": "skipped", "reason": "degenerate text detected"}
 
         # Auto-detect automated turns (cron, heartbeat, local-watcher)
         is_automated = _is_automated_turn(request.user_text)
