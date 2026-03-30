@@ -106,6 +106,16 @@ def _is_automated_turn(user_text: str) -> bool:
     if text.startswith("System: [") and ("\n" not in text or text.count("\n") <= 2):
         return True
 
+    # Pattern 9: Scheduled reminders (⏰ REMINDER: ... Handle this reminder internally)
+    if text.startswith("⏰ REMINDER:") or text.startswith("⏰ PARTNER CALL") or (
+        "REMINDER" in text[:30] and "Handle this reminder internally" in text
+    ):
+        return True
+
+    # Pattern 10: OpenClaw internal action messages
+    if "Handle this reminder internally. Do not relay" in text:
+        return True
+
     return False
 
 
