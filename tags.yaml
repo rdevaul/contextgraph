@@ -240,7 +240,25 @@ tags:
   - name: vendor-recommendation
     description: Recommendations for local services, vendors, restaurants, healthcare providers — NOT technical/code recommendations
     keywords:
-      - best place
+      - best place to eat
+      - good place to eat
+      - where to eat
+      - place to eat
+      - good place for food
+      - good place for lunch
+      - good place for dinner
+      - good place for breakfast
+      - best place to get food
+      - best place to get coffee
+      - best place nearby
+      - best place for food
+      - best place for lunch
+      - best place for dinner
+      - best place for breakfast
+      - best place for tacos
+      - best place for coffee
+      - best spot for
+      - best restaurant
       - where can i find
       - where should i go
       - any good
@@ -248,10 +266,13 @@ tags:
       - know a good
       - can you recommend a
       - who do you recommend
+      - where is a good
       - good dentist
       - good doctor
       - good mechanic
       - good restaurant
+      - good bar
+      - good coffee
       - find a dentist
       - find a doctor
       - find a plumber
