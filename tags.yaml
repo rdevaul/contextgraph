@@ -427,18 +427,26 @@ tags:
     confidence: 1.0
 
   - name: location
-    description: Location-specific queries, local services, geography
+    description: Geographic location queries — physical places, local services, directions. NOT "local" in technical sense (local compute, localhost, local file).
     keywords:
       - san pedro
       - long beach
       - los angeles
       - bay area
       - san francisco
-      - local
+      - downtown
       - nearby
       - near me
       - in the area
-      - neighborhood
+      - in the neighborhood
+      - local restaurant
+      - local coffee
+      - local business
+      - local service
+      - local shop
+      - local store
+      - in my neighborhood
+      - close to me
     confidence: 1.0
 
   # ── Domain-specific tags ───────────────────────────────────────────────
