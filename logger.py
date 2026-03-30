@@ -96,6 +96,16 @@ def _is_automated_turn(user_text: str) -> bool:
     if text.startswith("[WORKFLOW_AUTO"):
         return True
 
+    # Pattern 7: Multi-line System: prefix blocks (cron result delivery,
+    # X mentions reports, heartbeat system events delivered back to main session)
+    # These have the form "System: \nSystem: ...\nSystem: ..." throughout.
+    if text.startswith("System:") and text.count("\nSystem:") >= 2:
+        return True
+
+    # Pattern 8: Single System: line events (timestamps, model switches, etc.)
+    if text.startswith("System: [") and ("\n" not in text or text.count("\n") <= 2):
+        return True
+
     return False
 
 

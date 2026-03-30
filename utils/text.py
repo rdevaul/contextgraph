@@ -32,8 +32,10 @@ _ENVELOPE_PATTERNS = [
         r"Replied message \(untrusted.*?\):\s*```(?:json)?\s*\{.*?\}\s*```\s*",
         re.DOTALL,
     ),
-    # "System: [timestamp] ..." event lines
+    # "System: [timestamp] ..." single event lines
     re.compile(r"^System:\s*\[.*?\].*?$", re.MULTILINE),
+    # Multi-line "System: \nSystem: ..." blocks (cron result delivery, X mentions reports)
+    re.compile(r"^(System:\s*\n)+System:.*", re.DOTALL | re.MULTILINE),
     # OpenClaw runtime context block: "[Day YYYY-MM-DD HH:MM TZ] OpenClaw runtime context (internal):\nThis context is runtime-ge..."
     # Strip the entire runtime context preamble up to the first real user content
     re.compile(
