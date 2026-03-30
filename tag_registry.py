@@ -310,10 +310,43 @@ class TagRegistry:
         if tag in self._ENTITY_STOPWORDS:
             return None
 
+        # Reject tags with bad prefixes
+        bad_prefixes = ['the-', 'if-', 'when-', 'your-', 'hey-', 'hi-', 'no-']
+        if any(tag.startswith(prefix) for prefix in bad_prefixes):
+            return None
+
+        # Reject tags containing problematic terms
+        bad_terms = ['specifically', 'explicitly', 'strongly', 'biggest', 'starting',
+                     'verified', 'authenticated', 'registered', 'synchronizing',
+                     'committed', 'continued']
+        if any(term in tag for term in bad_terms):
+            return None
+
         # Multi-word: check if ALL words are stopwords (e.g. "the-one" → reject)
         parts = tag.split('-')
         if len(parts) > 1 and all(p in self._ENTITY_STOPWORDS for p in parts):
             return None
+
+        # Reject tags with too many components (likely partial sentences)
+        if len(parts) > 4:
+            return None
+
+        # Reject partial sentences: 3+ words where most are common verbs/adjectives
+        if len(parts) >= 3:
+            common_verbs_adjectives = {
+                'make', 'making', 'get', 'getting', 'have', 'having', 'do', 'doing',
+                'go', 'going', 'take', 'taking', 'see', 'seeing', 'know', 'knowing',
+                'think', 'thinking', 'come', 'coming', 'want', 'wanting', 'use', 'using',
+                'find', 'finding', 'give', 'giving', 'tell', 'telling', 'work', 'working',
+                'call', 'calling', 'try', 'trying', 'ask', 'asking', 'need', 'needing',
+                'feel', 'feeling', 'become', 'becoming', 'leave', 'leaving', 'put', 'putting',
+                'good', 'better', 'best', 'bad', 'worse', 'worst', 'new', 'old', 'big', 'small',
+                'long', 'short', 'high', 'low', 'great', 'little', 'own', 'different', 'same',
+                'important', 'large', 'available', 'popular', 'able', 'basic', 'known', 'various',
+            }
+            verb_adj_count = sum(1 for p in parts if p in common_verbs_adjectives)
+            if verb_adj_count >= len(parts) - 1:  # Most parts are common verbs/adjectives
+                return None
 
         return tag
 
@@ -436,6 +469,25 @@ class TagRegistry:
         tag.archived_at = time.time()
         self.save()
         return True
+
+    def purge_junk_candidates(self, min_hits: int = 2) -> int:
+        """
+        Archive all candidate tags with hits < min_hits.
+        Returns count of archived candidates.
+        """
+        archived_count = 0
+        now = time.time()
+
+        for tag_name, tag in list(self._tags.items()):
+            if tag.state == "candidate" and tag.hits < min_hits:
+                tag.state = "archived"
+                tag.archived_at = now
+                archived_count += 1
+
+        if archived_count > 0:
+            self.save()
+
+        return archived_count
 
     def get_all_tags(self) -> Dict[str, Dict]:
         """Return all tags with full metadata (for API/dashboard)."""

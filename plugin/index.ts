@@ -281,6 +281,21 @@ function splitUserAssistant(messages: AgentMessage[]): {
   return { userParts, assistantParts };
 }
 
+// ── Channel label inference ────────────────────────────────────────────────
+
+/**
+ * Infer a channel label from a sender ID or session context.
+ * Used to scope user tags to the correct person.
+ */
+function inferChannelLabel(senderId?: string): string {
+  // Known sender IDs → labels
+  if (senderId === "994902066") return "rich";
+  if (senderId === "900606288") return "dana";
+  if (senderId === "7686402653") return "terry";
+  // Default to "rich" for the main agent
+  return "rich";
+}
+
 // ── Context Engine implementation ──────────────────────────────────────────
 
 function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextEngine {
@@ -537,14 +552,21 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       return { ok: true, compacted: false, reason: "graph-engine-no-compaction" };
     },
 
-    async afterTurn({ sessionId, messages }): Promise<void> {
+    async afterTurn({ sessionId, messages, prePromptMessageCount }): Promise<void> {
       if (!readGraphMode()) return;
 
+      // Only ingest messages from THIS turn — not the full session history.
+      // prePromptMessageCount tells us how many messages existed before the prompt
+      // was sent; everything after that index is new this turn.
+      // This is critical: without this slice, every message gets tagged with
+      // every topic ever discussed in the session (mega-tag contamination).
+      const turnMessages = messages.slice(prePromptMessageCount);
+
       // Ingest new assistant messages from this turn
-      const assistantMessages = messages.filter((m) => m.role === "assistant");
+      const assistantMessages = turnMessages.filter((m) => m.role === "assistant");
       if (assistantMessages.length === 0) return;
 
-      const userMessages = messages.filter((m) => m.role === "user");
+      const userMessages = turnMessages.filter((m) => m.role === "user");
       const userText = userMessages
         .map((m) => extractTextFromMessage(m))
         .filter(Boolean)
@@ -677,6 +699,242 @@ export default function register(api: OpenClawPluginApi): void {
       const modeLabel = enabled ? "🟢 ON" : "⚪ OFF";
       return {
         text: `**Context Graph Engine**\nMode: ${modeLabel}\nPython API: ${apiStatus}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
+      };
+    },
+  });
+
+  // Register /tags command
+  api.registerCommand({
+    name: "tags",
+    description: "View and manage context graph tags (system + user)",
+    acceptsArgs: true,
+    handler: async (ctx) => {
+      const args = (ctx.args ?? "").trim();
+      const parts = args.split(/\s+/).filter(Boolean);
+      const subcommand = parts[0]?.toLowerCase() ?? "";
+
+      // Infer channel label from sender context
+      const channelLabel = inferChannelLabel(ctx.senderId);
+
+      // ── /tags (no args) — overview ───────────────────────────────
+      if (!subcommand) {
+        const [tagsData, qualityData] = await Promise.all([
+          apiGet(`/tags?channel_label=${channelLabel}`, logger),
+          apiGet("/quality", logger),
+        ]);
+
+        if (!tagsData) {
+          return { text: "❌ Context graph API unreachable." };
+        }
+
+        const { system_tags, user_tags } = tagsData as {
+          system_tags: Array<{ name: string; state: string; hits: number; corpus_pct?: number }>;
+          user_tags: Array<{ name: string; state: string; hits: number }>;
+        };
+
+        const core = system_tags
+          .filter((t) => t.state === "core" && t.hits > 0)
+          .sort((a, b) => b.hits - a.hits);
+        const userActive = user_tags.filter((t) => t.state !== "archived");
+        const userArchived = user_tags.filter((t) => t.state === "archived");
+
+        const q = qualityData as {
+          tag_entropy?: number;
+          zero_return_rate?: number;
+          corpus_size?: number;
+        } | null;
+
+        const lines: string[] = [];
+        lines.push("**📊 Context Graph Tags**");
+        lines.push("");
+        lines.push(
+          `**${core.length}** system core · **${userActive.length}** user` +
+            (userArchived.length ? ` · ${userArchived.length} archived` : "") +
+            (q
+              ? ` · entropy ${q.tag_entropy?.toFixed(2)} · zero-return ${((q.zero_return_rate ?? 0) * 100).toFixed(1)}% · corpus ${q.corpus_size}`
+              : "")
+        );
+        lines.push("");
+
+        // Top 10 system tags
+        lines.push("**System (top 10):**");
+        for (const t of core.slice(0, 10)) {
+          lines.push(`• \`${t.name}\` — ${t.hits.toLocaleString()}`);
+        }
+        if (core.length > 10) {
+          lines.push(`• _(+${core.length - 10} more)_`);
+        }
+        lines.push("");
+
+        // User tags
+        if (userActive.length > 0 || userArchived.length > 0) {
+          lines.push(`**User (\`${channelLabel}\`):**`);
+          for (const t of userActive) {
+            lines.push(`• \`${t.name}\` — ${t.hits}`);
+          }
+          for (const t of userArchived) {
+            lines.push(`• ~~\`${t.name}\`~~ — archived`);
+          }
+        } else {
+          lines.push(`_No user tags for \`${channelLabel}\`._`);
+        }
+
+        lines.push("");
+        lines.push(
+          "Commands: `/tags system` · `/tags user` · `/tags user add <name>` · `/tags user del <name>`"
+        );
+
+        return { text: lines.join("\n") };
+      }
+
+      // ── /tags system ─────────────────────────────────────────────
+      if (subcommand === "system") {
+        const data = await apiGet("/tags/system", logger);
+        if (!data) {
+          return { text: "❌ Context graph API unreachable." };
+        }
+
+        const { tags } = data as {
+          tags: Array<{ name: string; state: string; hits: number; corpus_pct?: number }>;
+        };
+
+        const core = tags
+          .filter((t) => t.state === "core")
+          .sort((a, b) => b.hits - a.hits);
+        const emerging = tags.filter((t) => t.state === "emerging");
+        const archived = tags.filter((t) => t.state === "archived");
+
+        const lines: string[] = [];
+        lines.push(`**🏷️ System Tags** (${core.length} core, ${emerging.length} emerging, ${archived.length} archived)`);
+        lines.push("");
+
+        for (const t of core) {
+          const pct = t.corpus_pct != null ? ` (${(t.corpus_pct * 100).toFixed(1)}%)` : "";
+          lines.push(`• \`${t.name}\` — ${t.hits.toLocaleString()}${pct}`);
+        }
+
+        if (emerging.length > 0) {
+          lines.push("");
+          lines.push("**Emerging:**");
+          for (const t of emerging) {
+            lines.push(`• \`${t.name}\` — ${t.hits}`);
+          }
+        }
+
+        return { text: lines.join("\n") };
+      }
+
+      // ── /tags user [add|del] ─────────────────────────────────────
+      if (subcommand === "user") {
+        const action = parts[1]?.toLowerCase() ?? "";
+        const tagName = parts.slice(2).join("-").toLowerCase();
+
+        // /tags user add <name>
+        if (action === "add") {
+          if (!tagName) {
+            return { text: "Usage: `/tags user add <tag-name>`" };
+          }
+
+          const result = await apiPost(
+            `/tags/user/${channelLabel}/add`,
+            { name: tagName },
+            logger
+          );
+
+          if (!result) {
+            return { text: `❌ Failed to add user tag \`${tagName}\`. API error.` };
+          }
+
+          const r = result as { status: string; tag?: { name: string; keywords?: string[] }; error?: string };
+          if (r.status === "error" || r.error) {
+            return { text: `❌ ${r.error || "Failed to add tag."}` };
+          }
+
+          const kw = r.tag?.keywords?.length
+            ? `\nKeywords: ${r.tag.keywords.map((k: string) => `\`${k}\``).join(", ")}`
+            : "";
+          return {
+            text: `✅ Added user tag \`${tagName}\` for \`${channelLabel}\`.${kw}\n\nRun \`/tags user retag\` to backfill existing messages.`,
+          };
+        }
+
+        // /tags user del <name>
+        if (action === "del" || action === "delete" || action === "rm") {
+          if (!tagName) {
+            return { text: "Usage: `/tags user del <tag-name>`" };
+          }
+
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+          try {
+            const res = await fetch(
+              `${PYTHON_API_BASE}/tags/user/${channelLabel}/${tagName}`,
+              { method: "DELETE", signal: controller.signal }
+            );
+            clearTimeout(timer);
+
+            if (!res.ok) {
+              const body = await res.text();
+              return { text: `❌ Failed to archive \`${tagName}\`: ${body}` };
+            }
+
+            return { text: `🗑️ Archived user tag \`${tagName}\`.` };
+          } catch (err: unknown) {
+            clearTimeout(timer);
+            const msg = err instanceof Error ? err.message : String(err);
+            return { text: `❌ API error: ${msg}` };
+          }
+        }
+
+        // /tags user retag
+        if (action === "retag") {
+          const result = await apiPost(`/tags/user/${channelLabel}/retag`, {}, logger);
+          if (!result) {
+            return { text: "❌ Retag failed — API error." };
+          }
+          const r = result as { retagged?: number; status?: string };
+          return {
+            text: `🔄 Retagged ${r.retagged ?? 0} messages with user tags for \`${channelLabel}\`.`,
+          };
+        }
+
+        // /tags user (list)
+        const data = await apiGet(`/tags/user/${channelLabel}`, logger);
+        if (!data) {
+          return { text: "❌ Context graph API unreachable." };
+        }
+
+        const { tags } = data as {
+          tags: Array<{ name: string; state: string; hits: number; keywords?: string[] }>;
+        };
+
+        if (tags.length === 0) {
+          return {
+            text: `_No user tags for \`${channelLabel}\`._\n\nAdd one: \`/tags user add <name>\``,
+          };
+        }
+
+        const lines: string[] = [];
+        lines.push(`**👤 User Tags** (\`${channelLabel}\`)`);
+        lines.push("");
+
+        for (const t of tags) {
+          const state = t.state === "archived" ? " _(archived)_" : "";
+          const kw =
+            t.keywords?.length ? ` — keywords: ${t.keywords.join(", ")}` : "";
+          lines.push(`• \`${t.name}\` — ${t.hits} hits${kw}${state}`);
+        }
+
+        lines.push("");
+        lines.push(
+          "Commands: `/tags user add <name>` · `/tags user del <name>` · `/tags user retag`"
+        );
+
+        return { text: lines.join("\n") };
+      }
+
+      return {
+        text: `Unknown subcommand: \`${subcommand}\`\n\nUsage:\n• \`/tags\` — overview\n• \`/tags system\` — system tags\n• \`/tags user\` — user tags\n• \`/tags user add <name>\`\n• \`/tags user del <name>\``,
       };
     },
   });

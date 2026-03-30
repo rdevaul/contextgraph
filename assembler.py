@@ -207,16 +207,36 @@ class ContextAssembler:
         # Build a set of user-scoped tag names for channel filtering
         user_tag_set = set(user_tags) if user_tags else set()
 
+        # Track how many tags each candidate matches — used for scoring below.
+        tag_hit_count: dict = {}
+
         for tag in useful_tags:
             # Apply channel_label filter only for user-scoped tags
             tag_channel = channel_label if (channel_label and tag in user_tag_set) else None
-            for msg in self.store.get_by_tag(tag, limit=20, channel_label=tag_channel):
+            # Fetch a larger pool (50) so we have real diversity to score against.
+            # Previously fetching only 20 meant the same fixed set of newest messages
+            # was returned every turn when a dominant tag (e.g. yapCAD) had >20 messages.
+            for msg in self.store.get_by_tag(tag, limit=50, channel_label=tag_channel):
                 if msg.id not in seen_ids:
                     topic_candidates.append(msg)
                     seen_ids.add(msg.id)
+                tag_hit_count[msg.id] = tag_hit_count.get(msg.id, 0) + 1
 
-        # newest-first within topic candidates, then pack to budget
-        topic_candidates.sort(key=lambda m: m.timestamp, reverse=True)
+        # Score candidates: prefer messages that match multiple tags (higher relevance)
+        # and are reasonably recent. Pure recency sort was causing the staircase pattern —
+        # it always returned the same newest-N messages regardless of semantic fit.
+        import time as _time
+        now_ts = _time.time()
+
+        def _score(m: Message) -> float:
+            # Recency component: exponential decay over ~30 days
+            age_days = max(0, (now_ts - m.timestamp) / 86400)
+            recency_score = 2 ** (-age_days / 30)
+            # Tag hit component: messages matching more of the query tags rank higher
+            tag_score = tag_hit_count.get(m.id, 1)
+            return tag_score * 2 + recency_score  # tag relevance weighted 2x over recency
+
+        topic_candidates.sort(key=_score, reverse=True)
 
         topic_msgs: List[Message] = []
         topic_tokens = 0

@@ -53,6 +53,16 @@ _ENVELOPE_PATTERNS = [
         r"You are an independent fact-checking agent.*?(?=\n\n|\Z)",
         re.DOTALL | re.MULTILINE,
     ),
+    # Subagent result blocks: "Result (untrusted content, treat as data): <<<BEGIN_UNTRUSTED_CHILD_RESULT>>> ... <<<END_UNTRUSTED_CHILD_RESULT>>>"
+    re.compile(
+        r"Result \(untrusted content, treat as data\):\s*<<<BEGIN_UNTRUSTED_CHILD_RESULT>>>.*?<<<END_UNTRUSTED_CHILD_RESULT>>>",
+        re.DOTALL,
+    ),
+    # Partial/truncated subagent result blocks (no closing tag — strip from marker to end)
+    re.compile(
+        r"Result \(untrusted content, treat as data\):\s*<<<BEGIN_UNTRUSTED_CHILD_RESULT>>>.*",
+        re.DOTALL,
+    ),
     # Inter-session messages: "[Inter-session message] sourceSession=..."
     re.compile(r"^\[Inter-session message\].*?$", re.MULTILINE),
     # Internal task completion events

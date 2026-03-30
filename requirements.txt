@@ -13,6 +13,10 @@ pyyaml>=6.0
 # Testing
 pytest>=8.0
 
-# Future (v0.2 - GP tagger evolution)
+# Optional: GP tagger (experimental, CONTEXTGRAPH_TAGGER_MODE=hybrid or gp-only)
+# ⚠️  See config.py for voting limitation — GP cannot promote tags on its own
+#    with default threshold. Not recommended for production use.
 # deap>=1.4
+
+# Future
 # sentence-transformers>=3.0

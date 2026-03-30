@@ -69,11 +69,10 @@ def _is_automated_turn(user_text: str) -> bool:
     # Normalize whitespace for consistent matching
     text = user_text.strip()
 
-    # Length guard: long messages likely have real content
-    if len(text) > 500:
-        return False
-
-    # Pattern 1: Cron job payloads (redundant pattern removed)
+    # Pattern 1: Cron job payloads — checked BEFORE the length guard because
+    # "[cron:" is an unambiguous machine prefix. Cron prompts are routinely
+    # 2000-4000 chars (full task instructions), so the length guard was
+    # incorrectly letting them through as non-automated.
     if text.startswith("[cron:"):
         return True
 

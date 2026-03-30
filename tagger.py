@@ -26,7 +26,7 @@ CORE_TAGS = {
     # Project-specific (extend as needed)
     "voice-pwa", "shopping-list", "openclaw", "yapCAD",
     # General
-    "planning", "research", "question", "personal", "has-url",
+    "planning", "research", "question", "has-url",
     # Memory / context system
     "memory-system", "contextgraph",
     # Trading / finance (only seeded if actually used)
@@ -34,7 +34,7 @@ CORE_TAGS = {
     # Hardware / compute
     "hardware", "framework1", "local-compute", "ollama", "litellm",
     # Agents
-    "agents", "sub-agents", "vera", "garro",
+    "agents", "vera", "garro",
     # Monitoring
     "monitoring", "watchdog", "cron",
 }
@@ -82,6 +82,14 @@ def _strip_metadata(text: str) -> str:
     # Remove common boilerplate phrases
     text = re.sub(r"\[Voice PWA\]", "", text)
     text = re.sub(r"\[cron:.*?\]", "", text)
+    # Remove heartbeat prompts
+    text = re.sub(r"^.*Read HEARTBEAT\.md.*?(?=\n\n|\Z)", "", text, flags=re.MULTILINE | re.DOTALL)
+    # Remove cron envelope headers
+    text = re.sub(r"\[cron:[^\]]+\]", "", text)
+    # Remove OpenClaw runtime blocks
+    text = re.sub(r"## Runtime\n.*?(?=\n## |\Z)", "", text, flags=re.DOTALL)
+    # Remove compaction placeholder text
+    text = re.sub(r"\[Summary of large message\]", "", text)
     return text.strip()
 
 
@@ -89,21 +97,45 @@ def _strip_metadata(text: str) -> str:
 
 RULES: List[TagRule] = [
 
-    # Code presence
+    # Code presence — requires BOTH code block AND programming keywords
     TagRule(
         name="code-block",
-        predicate=lambda f, u, a: f.contains_code,
+        predicate=lambda f, u, a: f.contains_code and _text_contains_any(
+            u, a, ["function", "class", "import", "def", "const", "var", "return",
+                   "async", "await", "module", "export", "require", "lambda", "struct",
+                   "enum", "interface", "implements", "extends", "package", "namespace",
+                   "throws", "catch", "try", "except", "yield", "decorator", "annotation",
+                   "override", "abstract", "static", "void", "int", "float", "string",
+                   "bool", "array", "dict", "list", "tuple", "set", "map", "vector",
+                   "pointer", "reference", "nullptr", "malloc", "free", "print", "println",
+                   "printf", "fmt", "std", "self", "cls", "super", "init", "constructor",
+                   "prototype", "promise", "callback", "middleware", "endpoint", "router",
+                   "handler", "schema", "migration", "query", "mutation", "resolver",
+                   "component", "render", "hook", "state", "props", "redux", "dispatch",
+                   "reducer", "observable", "subscriber", "publisher", "listener", "emitter"]
+        ),
         tags=["code"],
     ),
 
-    # Networking / infrastructure entities
+    # Networking entities
     TagRule(
         name="networking-entities",
         predicate=lambda f, u, a: _any_entity_match(
-            f, ["tailscale", "caddy", "nginx", "gateway", "vpn", "dns",
+            f, ["tailscale", "caddy", "nginx", "vpn", "dns",
                 "websocket", "tcp", "http", "ssl", "tls", "port", "firewall"]
-        ) or _text_contains_any(u, a, ["tailscale", "caddy", "gateway", "vpn"]),
-        tags=["networking", "infrastructure"],
+        ) or _text_contains_any(u, a, ["tailscale", "caddy", "vpn", "websocket",
+                                        "ssl/tls", "firewall"]),
+        tags=["networking"],
+    ),
+
+    # Infrastructure / cloud compute
+    TagRule(
+        name="infrastructure",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["server", "ec2", "aws", "vps", "compute instance",
+                   "load balancer", "cdn"]
+        ),
+        tags=["infrastructure"],
     ),
 
     # Security topics
@@ -142,12 +174,13 @@ RULES: List[TagRule] = [
         tags=["context-management"],
     ),
 
-    # Voice PWA
+    # Voice PWA — keep terms specific to avoid misfires on "speech", "tts", "whisper" in other contexts
     TagRule(
         name="voice-pwa",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["voice pwa", "voice-pwa", "push-to-talk", "whisper",
-                   "speech", "tts", "voice backend", "voice frontend"]
+            u, a, ["voice pwa", "voice-pwa", "push-to-talk",
+                   "whisper transcri", "voice backend", "voice frontend",
+                   "voxtral", "voice interface", "piper tts", "voice server"]
         ),
         tags=["voice-pwa"],
     ),
@@ -156,8 +189,8 @@ RULES: List[TagRule] = [
     TagRule(
         name="openclaw",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["openclaw", "claw", "heartbeat", "cron job", "session",
-                   "workflow_auto", "compaction safeguard"]
+            u, a, ["openclaw", "open claw", "clawd", "compaction", "bootstrap",
+                   "plugin", "gateway", "webhook", "workspace", "skill registry"]
         ),
         tags=["openclaw"],
     ),
@@ -183,15 +216,24 @@ RULES: List[TagRule] = [
         tags=["shopping-list"],
     ),
 
-    # Deployment / devops
+    # DevOps / infrastructure operations
     TagRule(
         name="devops",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["deploy to", "launchd", "launchctl", "docker compose",
-                   "docker run", "npm run build", "git push", "systemctl",
-                   "daemon reload", "ci/cd pipeline"]
+            u, a, ["launchd", "launchctl", "docker compose", "docker run",
+                   "systemctl", "daemon reload", "ci/cd pipeline", "ci/cd"]
         ),
-        tags=["devops", "deployment"],
+        tags=["devops"],
+    ),
+
+    # Deployment operations
+    TagRule(
+        name="deployment",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["deploy", "deploying", "deployed", "rsync", "pushed to production",
+                   "release", "staging", "rollback", "blue-green", "canary deploy"]
+        ),
+        tags=["deployment"],
     ),
 
     # URL present
@@ -228,11 +270,19 @@ RULES: List[TagRule] = [
         predicate=lambda f, u, a: _text_contains_any(
             u, a, ["memory.md", "memory/", "memory system", "memory file",
                    "harvester", "harvest", "memory harvest", "daily log",
-                   "memory_search", "memory_get", "long-term memory",
-                   "contextgraph", "context graph", "store.db", "interaction log",
-                   "replay.py", "ingest", "assemble", "tag-context", "tagger"]
+                   "memory_search", "memory_get", "long-term memory"]
         ),
-        tags=["memory-system", "contextgraph"],
+        tags=["memory-system"],
+    ),
+
+    # Context graph system
+    TagRule(
+        name="contextgraph",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["context graph", "tag-context", "tagger", "assembler",
+                   "store.db", "context assembly", "tag registry"]
+        ),
+        tags=["contextgraph"],
     ),
 
     # Trading / finance / options — TIGHTENED: only multi-word finance phrases
@@ -276,26 +326,48 @@ RULES: List[TagRule] = [
         tags=["hardware", "local-compute", "llm"],
     ),
 
-    # Agents / sub-agents
+    # Agents (including sub-agents)
     TagRule(
         name="agents",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["sub-agent", "subagent", "spawn agent", "vera", "garro",
+            u, a, ["agent", "sub-agent", "subagent", "spawn agent", "vera", "garro",
                    "agent: vera", "agent: garro", "agent: mei", "agent: sysadmin",
                    "sessions_spawn", "isolated session", "pbar", "research loop"]
         ),
-        tags=["agents", "sub-agents"],
+        tags=["agents"],
     ),
 
     # Monitoring / watchdog
     TagRule(
         name="monitoring",
         predicate=lambda f, u, a: _text_contains_any(
-            u, a, ["watchdog", "monitoring", "health check", "healthcheck",
-                   "heartbeat", "cron job", "scheduled", "alert", "uptime",
-                   "infra.db", "metrics", "dashboard"]
+            u, a, ["watchdog", "uptime", "health check", "healthcheck",
+                   "service down", "process crash", "infra.db", "metrics endpoint",
+                   "monitoring dashboard", "alert threshold", "service health", "disk usage"]
         ),
-        tags=["monitoring", "cron"],
+        tags=["monitoring"],
+    ),
+
+    # API / web services
+    TagRule(
+        name="api",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["api endpoint", "rest api", "graphql", "api key", "api call",
+                   "webhook url", "rate limit", "api response", "status code",
+                   "http method"]
+        ),
+        tags=["api"],
+    ),
+
+    # Debugging / troubleshooting
+    TagRule(
+        name="debugging",
+        predicate=lambda f, u, a: _text_contains_any(
+            u, a, ["stack trace", "traceback", "error log", "segfault",
+                   "core dump", "breakpoint", "debugger", "bug fix",
+                   "root cause", "regression"]
+        ),
+        tags=["debugging"],
     ),
 ]
 

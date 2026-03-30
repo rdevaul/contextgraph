@@ -21,6 +21,7 @@ from reframing import detect_reference
 from utils.text import strip_envelope
 from summarizer import summarize_message
 from logger import _is_automated_turn
+import config
 import pickle
 import os
 import json
@@ -111,11 +112,33 @@ def _background_summarize(message_id: str) -> None:
         import logging
         logging.error(f"Background summarization failed for {message_id}: {e}")
 
-gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
-if gp_tagger_path.exists():
-    with open(gp_tagger_path, 'rb') as f:
-        gp_tagger = pickle.load(f)
-        ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
+# ── GP tagger (optional, experimental) ───────────────────────────────────────
+# The GP tagger is DISABLED by default. To enable it, set:
+#   CONTEXTGRAPH_TAGGER_MODE=hybrid   (fixed + gp)
+#   CONTEXTGRAPH_TAGGER_MODE=gp-only  (gp only, not recommended)
+#
+# ⚠️  VOTING LIMITATION: With the current weighted-vote ensemble
+# (fixed=1.5, baseline=1.0, gp=1.0, total=3.5, threshold=0.4),
+# the GP's normalised weight is 1.0/3.5 ≈ 0.286 — BELOW the threshold.
+# This means the GP can NEVER promote a tag on its own; it can only
+# reinforce tags that fixed or baseline already found. Any unique tags
+# the GP fires are always pruned. Until the voting system is redesigned
+# (e.g. threshold lowered to 0.2, or GP given higher weight), the GP
+# provides no recall improvement over fixed+baseline alone.
+if config.TAGGER_MODE in ("hybrid", "gp-only"):
+    gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
+    if gp_tagger_path.exists():
+        try:
+            with open(gp_tagger_path, 'rb') as f:
+                gp_tagger = pickle.load(f)
+                ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
+            print(f"[contextgraph] GP tagger loaded (experimental mode={config.TAGGER_MODE})")
+        except Exception as e:
+            print(f"[contextgraph] WARNING: GP tagger failed to load, continuing without it: {e}")
+    else:
+        print(f"[contextgraph] GP tagger mode={config.TAGGER_MODE} but no pkl found at {gp_tagger_path}, skipping")
+else:
+    print(f"[contextgraph] Tagger mode={config.TAGGER_MODE} — GP tagger disabled (default)")
 
 from fixed_tagger import FixedTagger, USER_TAGS_DIR
 import re as _re
@@ -139,6 +162,11 @@ ensemble.register('baseline', baseline_tagger, 1.0)
 @app.on_event("startup")
 async def startup_event():
     store.get_all_tags()  # Initialize the store
+    # One-time purge of junk candidates with < 2 hits
+    registry = get_registry()
+    purged = registry.purge_junk_candidates(min_hits=2)
+    if purged > 0:
+        print(f"[startup] Purged {purged} junk candidate tags with < 2 hits")
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):
@@ -501,12 +529,15 @@ def compare(request: TagRequest):
         }
 
         # Simulated Linear Window — pack to 4000 token budget, newest-first
+        # Use the same _estimate_tokens() function as the assembler for an apples-to-apples
+        # comparison. Previously used raw word count (no 1.3x multiplier), which made the
+        # linear window appear ~30% smaller than graph mode at equivalent budgets.
         linear_window_messages = []
         linear_tokens = 0
         budget = 4000
 
         for msg in store.get_recent(100):  # Fetch enough to fill budget
-            msg_tokens = len(msg.user_text.split()) + len(msg.assistant_text.split())
+            msg_tokens = _estimate_tokens(msg)
             if linear_tokens + msg_tokens > budget:
                 break
             linear_window_messages.append(msg)
@@ -882,6 +913,44 @@ def retag_user_corpus(label: str):
             "success": True,
             "channel_label": label,
             "messages_processed": len(messages),
+            "messages_updated": updated,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Admin: Global Retag ────────────────────────────────────────────────────────
+
+@app.post("/admin/retag", response_model=dict)
+def retag_all(batch_size: int = Query(500, ge=50, le=5000)):
+    """
+    Re-tag the entire corpus with current system tagger rules.
+
+    This re-runs the ensemble tagger on every stored message and updates tags.
+    Use after changing tagger rules to backfill the new logic.
+    Safe to run multiple times. Returns count of updated messages.
+    """
+    try:
+        messages = store.get_recent(100_000)  # All messages
+        updated = 0
+        total = len(messages)
+        for msg in messages:
+            features = extract_features(msg.user_text, msg.assistant_text)
+            new_tags = ensemble.assign(features, msg.user_text, msg.assistant_text).tags
+            if set(new_tags) != set(msg.tags):
+                with store._lock:
+                    conn = store._conn()
+                    conn.execute("DELETE FROM tags WHERE message_id = ?", (msg.id,))
+                    for tag in new_tags:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
+                            (msg.id, tag),
+                        )
+                    conn.commit()
+                updated += 1
+        return {
+            "success": True,
+            "messages_processed": total,
             "messages_updated": updated,
         }
     except Exception as e:
