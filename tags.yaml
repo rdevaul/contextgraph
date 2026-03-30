@@ -380,7 +380,7 @@ tags:
     confidence: 1.0
 
   - name: finance-personal
-    description: Personal finance, bills, banking, budget
+    description: Personal finance, bills, banking, budget, retirement, investment planning
     keywords:
       - bank account
       - credit card
@@ -394,6 +394,12 @@ tags:
       - mortgage
       - venmo
       - zelle
+      - 401k
+      - retirement account
+      - portfolio allocation
+      - financial planning
+      - investment strategy
+      - net worth
     confidence: 1.0
 
   - name: food

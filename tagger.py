@@ -296,7 +296,7 @@ RULES: List[TagRule] = [
                    "options chain", "implied volatility", "iv rank",
                    "tradier", "maxrisk", "max risk", "brokerage account",
                    "strike price", "expiry date", "days to expiry",
-                   "market open", "market close", "earnings report"]
+                   ]
         ),
         tags=["trading", "finance"],
     ),

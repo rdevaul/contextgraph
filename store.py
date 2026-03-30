@@ -363,12 +363,30 @@ class MessageStore:
         ).fetchall()
         return [r["tag"] for r in rows]
 
-    def tag_counts(self) -> dict:
-        """Return {tag: message_count} for all tags."""
+    def tag_counts(self, include_automated: bool = False) -> dict:
+        """Return {tag: message_count} for all tags.
+
+        Parameters
+        ----------
+        include_automated : bool
+            If False (default), exclude automated turns (cron/heartbeat/etc)
+            from tag frequency counts. This prevents automated messages from
+            inflating tag frequencies in the dashboard/quality metrics.
+        """
         conn = self._conn()
-        rows = conn.execute(
-            "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
-        ).fetchall()
+        if include_automated:
+            rows = conn.execute(
+                "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT t.tag, COUNT(*) as cnt
+                   FROM tags t
+                   JOIN messages m ON t.message_id = m.id
+                   WHERE m.is_automated = 0
+                   GROUP BY t.tag
+                   ORDER BY cnt DESC"""
+            ).fetchall()
         return {r["tag"]: r["cnt"] for r in rows}
 
     def get_by_external_id(self, external_id: str) -> Optional[Message]:
