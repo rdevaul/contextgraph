@@ -237,6 +237,16 @@ def ingest(request: IngestRequest):
         if _is_degenerate_text(clean_user):
             return {"status": "skipped", "reason": "degenerate text detected"}
 
+        # Reject test/benchmark sessions — these come from pytest runs and
+        # should never be stored in the live graph.
+        if request.session_id and (
+            request.session_id.startswith("test-") or
+            request.session_id.startswith("test_") or
+            request.session_id.startswith("pytest-") or
+            request.session_id == "test"
+        ):
+            return {"status": "skipped", "reason": "test session rejected"}
+
         # Auto-detect automated turns (cron, heartbeat, local-watcher)
         is_automated = _is_automated_turn(request.user_text)
 
