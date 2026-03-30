@@ -86,14 +86,19 @@ def _extract_text(message: dict) -> str:
 def _clean_user_text(text: str) -> str:
     """Strip OpenClaw metadata envelopes and prefixes from user messages."""
     import re
+    # Strip "Sender (untrusted metadata): ```json ... ```"
+    text = re.sub(
+        r"Sender \(untrusted metadata\):\s*```(?:json)?\s*\{.*?\}\s*```\s*",
+        "", text, flags=re.DOTALL
+    )
     # Strip "Conversation info (untrusted metadata): ```json ... ```"
     text = re.sub(
-        r"Conversation info \(untrusted metadata\):\s*```json\s*\{.*?\}\s*```\s*",
+        r"Conversation info \(untrusted metadata\):\s*```(?:json)?\s*\{.*?\}\s*```\s*",
         "", text, flags=re.DOTALL
     )
     # Strip "Replied message (untrusted, for context): ```json ... ```"
     text = re.sub(
-        r"Replied message \(untrusted.*?\):\s*```json\s*\{.*?\}\s*```\s*",
+        r"Replied message \(untrusted.*?\):\s*```(?:json)?\s*\{.*?\}\s*```\s*",
         "", text, flags=re.DOTALL
     )
     # Strip voice PWA timestamp prefix: "[Mon 2026-02-23 07:59 PST] [Voice PWA] "
