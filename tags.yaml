@@ -548,3 +548,36 @@ tags:
       - phased array
       - rectenna
     confidence: 1.0
+
+  # ── Rich's open source projects ──────────────────────────────────────────
+
+  - name: prompt-lint
+    description: prompt-lint project — prompt injection detection tool
+    keywords:
+      - prompt-lint
+      - promptlint
+      - prompt lint
+      - prompt injection detector
+      - prompt injection detection
+      - injection scanner
+    confidence: 1.0
+
+  - name: skill-signer
+    description: skill-signer project — cryptographic signing for AI agent skills
+    keywords:
+      - skill-signer
+      - skillsigner
+      - skill signer
+      - skill signing
+      - signed skill
+      - sign a skill
+    confidence: 1.0
+
+  - name: skill-registry
+    description: skill-registry project — registry for signed AI agent skills
+    keywords:
+      - skill-registry
+      - skill registry
+      - skillregistry
+      - skill hub
+    confidence: 1.0
