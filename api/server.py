@@ -167,6 +167,65 @@ async def startup_event():
     purged = registry.purge_junk_candidates(min_hits=2)
     if purged > 0:
         print(f"[startup] Purged {purged} junk candidate tags with < 2 hits")
+    _seed_registry_from_yaml()
+
+
+def _seed_registry_from_yaml() -> None:
+    """
+    Auto-seed the tag registry with any enabled tags in tags.yaml that
+    aren't already registered. This means adding a tag to tags.yaml is
+    all that's needed — no manual registry surgery required.
+    """
+    import logging
+    try:
+        import yaml
+    except ImportError:
+        logging.warning("pyyaml not installed; skipping tags.yaml registry seed")
+        return
+
+    tags_yaml_path = Path(__file__).parent.parent / "tags.yaml"
+    if not tags_yaml_path.exists():
+        return
+
+    try:
+        with tags_yaml_path.open() as f:
+            data = yaml.safe_load(f)
+    except Exception as e:
+        logging.warning(f"Failed to load tags.yaml for registry seeding: {e}")
+        return
+
+    registry = get_registry()
+    active_tags = registry.get_active_tags()  # core + candidate
+    archived_tags = set(registry.get_archived().keys())
+
+    import time
+    now = time.time()
+    seeded = []
+
+    for entry in data.get("tags", []):
+        name = entry.get("name")
+        if not name:
+            continue
+        if not entry.get("enabled", True):
+            continue  # skip disabled tags
+        if name in active_tags or name in archived_tags:
+            continue  # already known to the registry
+
+        # New tag in yaml — seed it as core so it's immediately active
+        from tag_registry import TagMetadata
+        registry._tags[name] = TagMetadata(
+            name=name,
+            state="core",
+            first_seen=now,
+            last_seen=now,
+            hits=0,
+            promoted_at=now,
+        )
+        seeded.append(name)
+
+    if seeded:
+        registry.save()
+        print(f"[startup] Registry seeded {len(seeded)} new tag(s) from tags.yaml: {seeded}")
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):
