@@ -237,30 +237,35 @@ tags:
 
   # ── Personal assistant tags ─────────────────────────────────────────────
 
-  - name: recommendation
-    description: Recommendations for services, products, restaurants, vendors
+  - name: vendor-recommendation
+    description: Recommendations for local services, vendors, restaurants, healthcare providers — NOT technical/code recommendations
     keywords:
-      - recommend
-      - recommendation
-      - suggest
-      - suggestion
       - best place
-      - where can i
-      - where should
+      - where can i find
+      - where should i go
       - any good
-      - looking for a
+      - looking for a good
       - know a good
-      - dentist
-      - doctor
-      - mechanic
-      - restaurant
+      - can you recommend a
+      - who do you recommend
+      - good dentist
+      - good doctor
+      - good mechanic
+      - good restaurant
+      - find a dentist
+      - find a doctor
+      - find a plumber
+      - find a lawyer
+      - find an accountant
+      - dentist in
+      - doctor in
+      - mechanic in
       - plumber
       - electrician
       - contractor
       - barber
       - vet
       - veterinarian
-      - lawyer
       - accountant
     confidence: 1.0
 
