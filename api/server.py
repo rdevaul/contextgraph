@@ -771,9 +771,11 @@ def get_comparison_stats(since: Optional[str] = Query(None, description="ISO tim
             efficiency_ratio = 0
             token_savings_pct = 0
 
-        # Time series data (most recent 50 entries, chronological order)
+        # Time series data: if a window filter is active, show all filtered entries (already scoped);
+        # for all-time, cap at 500 to avoid sending huge payloads.
         time_series = []
-        recent_entries = entries[-50:] if len(entries) > 50 else entries
+        max_points = 500 if cutoff_dt is None else len(entries)
+        recent_entries = entries[-max_points:] if len(entries) > max_points else entries
         for i, entry in enumerate(recent_entries):
             time_series.append({
                 "index": i,
