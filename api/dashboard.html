@@ -467,8 +467,7 @@
         async function onWindowChange() {
             currentWindow = document.getElementById('stats-window').value;
             await fetchComparisonStats();
-            renderOverheadStats();
-            renderTokensTimeseriesChart();
+            renderOverhead();        // renders stats cards + time series chart
             renderTagFrequencyChart();
         }
 
@@ -751,12 +750,9 @@
             const avgTagsPerQuery = comparisonStats.avg_tags_per_query || 0;
             const tokenSavingsPct = comparisonStats.token_savings_pct || 0;
 
-            // Coverage ratio: graph uses more budget to retrieve topically relevant context.
-            // Higher is better — means the graph is surfacing more relevant material.
-            const coverageRatio = avgLinearTokens > 0
-                ? ((avgGraphTokens / avgLinearTokens) * 100).toFixed(0)
-                : '∞';
-            const coverageColor = avgGraphTokens >= avgLinearTokens ? '#3fb950' : '#d29922';
+            // Token savings: positive = graph uses fewer tokens than linear (good), negative = graph costs more
+            const savingsColor = tokenSavingsPct >= 0 ? '#3fb950' : '#f85149';
+            const savingsDisplay = (tokenSavingsPct >= 0 ? '+' : '') + tokenSavingsPct.toFixed(1) + '%';
 
             // Zero return rate from quality endpoint (pre-fetched in refreshData)
             let zeroReturnHtml = '';
@@ -785,8 +781,8 @@
                     <div class="stat-label">Avg Linear Tokens</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: ${coverageColor}">${coverageRatio}%</div>
-                    <div class="stat-label">Graph Coverage vs Linear</div>
+                    <div class="stat-value" style="color: ${savingsColor}">${savingsDisplay}</div>
+                    <div class="stat-label">Token Savings</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${avgTagsPerQuery.toFixed(1)}</div>
