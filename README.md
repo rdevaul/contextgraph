@@ -287,7 +287,7 @@ Low-data tags (0.495): `api`, `debugging`, `personal`, `yapCAD`
 | `scripts/replay.py` | Ensemble retagging of full corpus |
 | `scripts/shadow.py` | Phase 2 shadow mode evaluation |
 | `utils/text.py` | Shared text utilities: `strip_envelope()` strips channel metadata before indexing |
-| `scripts/update_memory_dynamic.py` | Inject assembled context into MEMORY.md (shadow → live) |
+| `scripts/update_memory_dynamic.py` | *(removed — superseded by per-turn plugin retrieval)* |
 
 ## Operations
 
@@ -302,20 +302,11 @@ Context Graph runs as two launchd services on this machine:
 
 The API server provides context assembly (`/assemble`), ingestion (`/ingest`), and quality monitoring endpoints for the OpenClaw plugin.
 
-### 2. Memory Updater (`update-memory`)
-- **Schedule:** Every 4 hours
-- **Script:** `scripts/update_memory_dynamic.py --live`
-- **Target:** `~/.openclaw/workspace/MEMORY.md`
-- **Logs:** `/tmp/update_memory_dynamic.log`
-
-The memory updater queries `/assemble` and writes a `## Dynamic Context` section into MEMORY.md, providing persistent memory integration with the existing memory paradigm.
-
 ### Service management
 
 ```bash
 # Check status
 launchctl list | grep tag-context
-launchctl list | grep update-memory
 
 # Restart API server (after code changes)
 launchctl unload ~/Library/LaunchAgents/com.glados.tag-context.plist
@@ -323,8 +314,11 @@ launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
 
 # View logs
 tail -f /tmp/tag-context.log
-tail -f /tmp/update_memory_dynamic.log
 ```
+
+> **Note:** The `update-memory` launchd service and `update_memory_dynamic.py` script
+> were removed 2026-03-31. Context is now delivered per-turn by the OpenClaw plugin's
+> assembler — no static MEMORY.md injection needed.
 
 ### Dashboard
 
@@ -700,12 +694,10 @@ python3 -m pytest tests/ -v
   writes `~/.tag-context/comparison-log.jsonl` every turn. Dashboard at `/dashboard`
   provides real-time quality and efficiency metrics. See [`docs/PLAN_B_NATIVE_PLUGIN.md`](docs/PLAN_B_NATIVE_PLUGIN.md)
   for the full implementation plan.
-- [x] **Phase 4 — Memory Integration Live (v1.0-rc1).** `scripts/update_memory_dynamic.py`
-  runs every 4 hours via launchd (`com.glados.update-memory`), querying `/assemble`
-  and writing a `## Dynamic Context` section directly to `MEMORY.md`. Replace-section
-  logic uses HTML comment markers so curated long-term memory is never touched.
-  Automated turn filtering ensures only retrieval-relevant turns affect quality metrics.
-  Lazy summarization prevents giant turns from swamping context budget.
+- [x] **Phase 4 — Memory Integration (v1.0-rc1, then deprecated).**
+  Originally used `update_memory_dynamic.py` to inject context into MEMORY.md every
+  4 hours. Removed 2026-03-31 — superseded by per-turn plugin retrieval which provides
+  fresher, more relevant context without bloating MEMORY.md.
 - [ ] **Phase 5 — Graph-Primary.** After extended validation, graph becomes the default
   context engine. Linear window available as fallback via `/graph off`.
 
@@ -731,13 +723,13 @@ When running the memory updater script, you can filter retrieval by specific top
 
 ```bash
 # Only retrieve messages tagged with 'rocket-design'
-python3 scripts/update_memory_dynamic.py --tags rocket-design
+curl -s 'http://localhost:8300/assemble?tags=rocket-design&budget=2000'
 
 # Multiple tags (comma-separated)
-python3 scripts/update_memory_dynamic.py --tags rocket-design,propulsion
+curl -s 'http://localhost:8300/assemble?tags=rocket-design,propulsion&budget=2000'
 ```
 
-This is useful for domain-specific memory sections or topic-focused context updates.
+This is useful for querying domain-specific context via the API directly.
 
 ### Multi-Agent Deployments
 

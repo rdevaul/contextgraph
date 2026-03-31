@@ -182,30 +182,11 @@ Skips cron/hook/group sessions (too noisy). Harvests:
 - `agent:main:telegram:*` — Telegram DMs
 - `agent:main:voice*` — Voice PWA sessions
 
-### Shadow Memory Injection (Phase 3.5)
+### Memory Injection (Deprecated)
 
-```bash
-cd ~/Projects/tag-context
-source venv/bin/activate
-
-# Shadow mode (writes to ~/.openclaw/workspace/SHADOWMEMORY.md)
-python3 scripts/update_memory_dynamic.py
-
-# Dry run (print only, no write)
-python3 scripts/update_memory_dynamic.py --dry-run
-
-# Live mode (writes to ~/.openclaw/workspace/MEMORY.md)
-# ⚠️  Only use after shadow mode has been validated for several days
-python3 scripts/update_memory_dynamic.py --live
-```
-
-The script queries `/assemble` with a broad query, formats the result
-as a `## Dynamic Context` section, and injects it between HTML comment
-markers. On subsequent runs it **replaces** (not appends) the section.
-Safe: skips write if result is empty.
-
-**Current mode:** Shadow (`SHADOWMEMORY.md`). Switch to `--live` once
-daily shadow output has been confirmed clean and stable.
+> **Removed 2026-03-31.** The `update_memory_dynamic.py` script and associated
+> launchd services have been removed. Context is now delivered per-turn by the
+> OpenClaw plugin's assembler — no static MEMORY.md injection needed.
 
 ### GP Tagger Evolution (periodic retraining)
 
@@ -245,7 +226,7 @@ evolving a new GP tagger.
 | `scripts/harvester.py` | Collect turns from OpenClaw session logs |
 | `scripts/evolve.py` | Retrain GP tagger |
 | `scripts/replay.py` | Retag full corpus |
-| `scripts/update_memory_dynamic.py` | Shadow/live memory injection |
+| `scripts/update_memory_dynamic.py` | *(removed — superseded by per-turn plugin retrieval)* |
 | `utils/text.py` | `strip_envelope()` — strips channel metadata before indexing/querying |
 | `scripts/install-service.sh` | launchd service installer |
 | `service/*.plist.template` | launchd plist templates (path-substituted) |
@@ -393,8 +374,7 @@ Only use `stop`/`restart` as a last resort when the gateway is already dead.
   `unload`/`load` after changing environment variables or the plist itself.
 - **`data/tag_registry.json` is gitignored** — it's a live runtime file
   that accumulates real conversation tags. Don't try to commit it.
-- **`--live` flag for `update_memory_dynamic.py`** writes directly to
-  `MEMORY.md`. Don't flip this without first confirming shadow output
-  looks clean and representative for at least 1 day of shadow runs.
+- **`update_memory_dynamic.py` has been removed** (2026-03-31) — context
+  is now delivered per-turn by the plugin assembler.
 - The `com.glados.tag-context` label is local convention. The template
   installer uses `com.contextgraph.api`. Both are fine — just don't run both.

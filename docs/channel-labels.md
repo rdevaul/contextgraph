@@ -51,14 +51,9 @@ When calling `/ingest`, pass the `channel_label` field:
 
 ### Memory Assembly
 
-Use `--agent-id` with `update_memory_dynamic.py` to filter turns:
-
-```bash
-python3 scripts/update_memory_dynamic.py --agent-id glados-dana --output-file /path/to/dana-memory.md
-```
-
-Only turns labeled with channels in `glados-dana`'s access list (`dana-dm`,
-`rich-household`) will be included.
+> **Note:** The `update_memory_dynamic.py` script has been removed (2026-03-31).
+> Per-agent context filtering is now handled by the plugin assembler at query time,
+> using channel labels to scope retrieval to the appropriate agent's access list.
 
 ### Memory Synthesis
 
