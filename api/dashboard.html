@@ -350,8 +350,18 @@
 
         <!-- Section 1: Overhead Analysis (MOST VALUABLE - MOVED TO TOP) -->
         <div class="section">
-            <h2>Token Overhead Analysis</h2>
-            <div id="overhead-stats" class="stats-grid"></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                <h2 style="margin:0;">Token Overhead Analysis</h2>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="color:#8b949e; font-size:13px;">Window:</label>
+                    <select id="stats-window" onchange="onWindowChange()" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">
+                        <option value="all">All Time</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="1d" selected>Last 24 Hours</option>
+                    </select>
+                </div>
+            </div>
+            <div id="overhead-stats" class="stats-grid" style="margin-top:12px;"></div>
 
             <div class="chart-container">
                 <canvas id="tokens-timeseries-chart"></canvas>
@@ -404,8 +414,10 @@
         let metricsData = null;
         let healthData = null;
         let comparisonStats = null;
+        let currentWindow = '1d';  // default to last 24h
         let pinsData = null;
         let qualityData = null;
+        let tagsData = null;
         let charts = {};
 
         // Initialize dashboard
@@ -422,7 +434,8 @@
                     fetchHealth(),
                     fetchComparisonStats(),
                     fetchPins(),
-                    fetchQuality()
+                    fetchQuality(),
+                    fetchTagsData()
                 ]);
                 renderDashboard();
             } catch (error) {
@@ -446,13 +459,27 @@
         }
 
         async function fetchComparisonStats() {
-            const response = await fetch('/comparison-stats');
+            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const response = await fetch(`/comparison-stats${qs}`);
             comparisonStats = await response.json();
+        }
+
+        async function onWindowChange() {
+            currentWindow = document.getElementById('stats-window').value;
+            await fetchComparisonStats();
+            renderOverheadStats();
+            renderTokensTimeseriesChart();
+            renderTagFrequencyChart();
         }
 
         async function fetchPins() {
             const response = await fetch('/pins');
             pinsData = await response.json();
+        }
+
+        async function fetchTagsData() {
+            const response = await fetch('/tags');
+            tagsData = await response.json();
         }
 
         async function fetchQuality() {
@@ -871,14 +898,25 @@
         }
 
         function renderTagFrequencyChart() {
-            if (!comparisonStats || !comparisonStats.tag_frequency) return;
-
             const ctx = document.getElementById('tag-frequency-chart');
             if (!ctx) return;
 
-            const tagFreq = comparisonStats.tag_frequency;
-            const tags = Object.keys(tagFreq);
-            const frequencies = Object.values(tagFreq);
+            // Prefer live registry hits from /tags; fall back to comparison-stats
+            let tags, frequencies;
+            if (tagsData && tagsData.system_tags && tagsData.system_tags.length > 0) {
+                const sorted = [...tagsData.system_tags]
+                    .filter(t => t.hits > 0)
+                    .sort((a, b) => b.hits - a.hits)
+                    .slice(0, 20);
+                tags = sorted.map(t => t.name);
+                frequencies = sorted.map(t => t.hits);
+            } else if (comparisonStats && comparisonStats.tag_frequency) {
+                const tagFreq = comparisonStats.tag_frequency;
+                tags = Object.keys(tagFreq);
+                frequencies = Object.values(tagFreq);
+            } else {
+                return;
+            }
 
             if (tags.length === 0) return;
 
@@ -892,7 +930,7 @@
                 data: {
                     labels: tags,
                     datasets: [{
-                        label: 'Tag Usage Count',
+                        label: 'Tag Hits (live)',
                         data: frequencies,
                         backgroundColor: '#58a6ff',
                         borderColor: '#58a6ff',
@@ -908,7 +946,7 @@
                         },
                         title: {
                             display: true,
-                            text: 'Top Tags by Frequency',
+                            text: 'Top Tags by Hits (live registry)',
                             color: '#c9d1d9'
                         }
                     },

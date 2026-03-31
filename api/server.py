@@ -2,6 +2,7 @@ import sys
 import re
 import time
 import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -654,10 +655,34 @@ def get_comparison_log(limit: Optional[int] = Query(None, description="Maximum n
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/comparison-stats", response_model=dict)
-def get_comparison_stats():
-    """Compute aggregate statistics from the comparison log."""
+def get_comparison_stats(since: Optional[str] = Query(None, description="ISO timestamp or hours suffix e.g. '24h', '7d' to filter entries")):
+    """Compute aggregate statistics from the comparison log.
+    
+    Optional ?since= param filters entries to a time window:
+      - ISO 8601 string: since=2026-03-23T00:00:00Z
+      - Hours suffix:    since=24h
+      - Days suffix:     since=7d
+    """
     try:
+        from datetime import timezone
         log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
+        
+        # Parse since param into a cutoff datetime
+        cutoff_dt = None
+        if since:
+            import re as _re
+            m = _re.match(r'^(\d+(?:\.\d+)?)(h|d)$', since.strip().lower())
+            if m:
+                amount, unit = float(m.group(1)), m.group(2)
+                hours = amount if unit == 'h' else amount * 24
+                cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=hours)
+            else:
+                try:
+                    cutoff_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+                    if cutoff_dt.tzinfo is None:
+                        cutoff_dt = cutoff_dt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    pass  # Ignore unparseable since values
         if not log_path.exists():
             return {
                 "total_turns": 0,
@@ -677,6 +702,22 @@ def get_comparison_stats():
             for line in f:
                 if line.strip():
                     entries.append(json.loads(line))
+
+        # Apply time window filter if cutoff_dt was parsed
+        if cutoff_dt is not None:
+            from datetime import timezone as _tz
+            def _entry_ts(e):
+                ts = e.get("timestamp", "")
+                if not ts:
+                    return None
+                try:
+                    dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=_tz.utc)
+                    return dt
+                except ValueError:
+                    return None
+            entries = [e for e in entries if (ts := _entry_ts(e)) is not None and ts >= cutoff_dt]
 
         if not entries:
             return {
