@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.0-rc2] - 2026-03-30
+
+**Release candidate 2** — Dashboard accuracy and usability improvements. Tag frequency now sourced from live registry. Token overhead analysis now supports time-windowed views with stats and chart in sync.
+
+### Dashboard Fixes
+
+#### Time Window Selector
+- **Window selector** — All Time / Last 7 Days / Last 24 Hours dropdown added to Token Overhead Analysis section
+- **Unified filtering** — changing the window updates both the stats cards (token savings, overhead percentages) and the time series chart together; they always reflect the same dataset
+- **Backend filtering** — `/comparison-stats?since=1d|7d` filters the `time_series` payload server-side; windowed requests return all filtered entries (up to 500 for all-time)
+- Previously the chart always showed the same 50 most-recent points regardless of window — fixed
+
+#### Tag Frequency Chart
+- **Live registry data** — "Top Tags by Frequency" now reads from `/tags` (live `hits` counts) instead of `/comparison-stats` `tag_frequency` (cumulative comparison log counts that never reset)
+- Chart label updated to "Tag Hits (live registry)" for clarity
+- Stale dashboard counts (e.g. `trading` showing 422 vs actual 188) no longer appear after hard reload
+
+#### Token Savings Stat Card
+- **Renamed** — "Graph Coverage vs Linear" → "Token Savings" (the old name was misleading)
+- **Color coded** — green for positive savings, red when graph costs more than linear
+
+---
+
 ## [v1.0-rc1] - 2026-03-22
 
 **Release candidate 1** — Memory integration live, automated turn filtering, lazy summarization, and production dashboard. Context Graph is production-ready with 11.8% token efficiency gains over linear retrieval.

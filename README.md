@@ -331,10 +331,13 @@ tail -f /tmp/update_memory_dynamic.log
 The Chart.js dashboard at http://localhost:8300/dashboard provides:
 - **Scatterplot** — token efficiency visualization (graph vs linear)
 - **Quality metrics** — density, reframing rate, cache hit rate
-- **Efficiency lead** — cumulative token savings over time
-- **Tag distribution** — most-used tags with counts
+- **Token Savings** — percentage saved vs linear retrieval (green = saving, red = costing more)
+- **Token overhead time series** — graph vs linear token usage over time
+- **Tag distribution** — live tag hit counts from the registry (not cached historical counts)
 
-All metrics are computed from the last 580+ retrieval turns (filtered to exclude cron/heartbeat/subagent operations).
+All metrics support a **time window selector** (All Time / Last 7 Days / Last 24 Hours). Changing the window updates both the stats cards and the chart together — they always reflect the same dataset.
+
+Tag frequency counts are sourced from the live `/tags` registry endpoint, not the comparison log, so they stay accurate without cache invalidation.
 
 ## Setup
 
