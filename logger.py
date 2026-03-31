@@ -76,8 +76,9 @@ def _is_automated_turn(user_text: str) -> bool:
     if text.startswith("[cron:"):
         return True
 
-    # Pattern 2: Heartbeat prompt
-    if "Read HEARTBEAT.md if it exists" in text:
+    # Pattern 2: Heartbeat prompt (first 500 chars only — full-body search
+    # false-positives on compacted messages that embed prior heartbeat context)
+    if "Read HEARTBEAT.md if it exists" in text[:500]:
         return True
 
     # Pattern 3: Local watcher events
@@ -107,13 +108,16 @@ def _is_automated_turn(user_text: str) -> bool:
         return True
 
     # Pattern 9: Scheduled reminders (⏰ REMINDER: ... Handle this reminder internally)
+    # Only check the first 500 chars — these patterns can appear inside compacted
+    # summaries of prior turns embedded in otherwise-real messages.
+    head = text[:500]
     if text.startswith("⏰ REMINDER:") or text.startswith("⏰ PARTNER CALL") or (
-        "REMINDER" in text[:30] and "Handle this reminder internally" in text
+        "REMINDER" in head[:30] and "Handle this reminder internally" in head
     ):
         return True
 
-    # Pattern 10: OpenClaw internal action messages
-    if "Handle this reminder internally. Do not relay" in text:
+    # Pattern 10: OpenClaw internal action messages (first 500 chars only)
+    if "Handle this reminder internally. Do not relay" in head:
         return True
 
     return False
