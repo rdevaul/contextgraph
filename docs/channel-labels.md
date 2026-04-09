@@ -1,75 +1,72 @@
-# Channel Labels & Per-Agent Memory Assembly
+# Channel Labels — Cross-Channel User Identity
 
-## Overview
+By default, the contextgraph plugin scopes user tags to the `senderId` provided
+by the channel (e.g. Telegram user ID `994902066`). This works perfectly for
+single-channel installs with no configuration needed.
 
-Channel labels provide memory isolation between different users/contexts in the
-contextgraph system. Each ingested turn can carry a `channel_label` that identifies
-which communication channel it originated from. During memory assembly, turns are
-filtered based on the requesting agent's access rules.
+For multi-channel deployments — where the same person interacts via Telegram,
+Discord, Signal, etc. — sender IDs differ per channel, which would create
+separate user-tag profiles for the same person. The channel labels config
+provides a **many-to-one** mapping from any sender ID to a single canonical
+username, unifying the profile across channels.
 
-## Label Taxonomy
+---
 
-| Label | Description |
-|-------|-------------|
-| `rich-dm` | Rich's direct messages (private 1:1 with GLaDOS) |
-| `rich-household` | Household shared channel (visible to all household agents) |
-| `dana-dm` | Dana's direct messages |
-| `terry-dm` | Terry's direct messages |
-| `lily-dm` | Lily's direct messages |
-| `lynae-dm` | Lynae's direct messages |
+## Configuration
 
-## Agent Access Rules
+Two options are supported. **Config file takes precedence** over env var.
+If both are set, a warning is logged at startup.
 
-Each agent can only see turns from channels it has access to. Unlabeled turns
-(legacy data without `channel_label`) are excluded from filtered queries.
+### Option 1 — Config File (recommended)
 
-| Agent ID | Accessible Channels |
-|----------|-------------------|
-| `main` | `rich-dm`, `rich-household` |
-| `glados-rich` | `rich-dm`, `rich-household` |
-| `glados-household` | `rich-household` |
-| `glados-dana` | `dana-dm`, `rich-household` |
-| `glados-terry` | `terry-dm`, `rich-household` |
-| `glados-lily` | `lily-dm` |
-| `glados-lynae` | `lynae-dm` |
+Create `<sybilclaw-config-dir>/contextgraph/channel_labels.yaml`:
 
-## How It Works
+```yaml
+# Maps channel sender IDs to canonical usernames.
+# Many-to-one: multiple IDs can map to the same user.
+# Unquoted values are fine; quotes are optional.
 
-### Ingestion
+# Rich — Telegram + Discord
+"994902066": rich
+"510637988242522133": rich
 
-When calling `/ingest`, pass the `channel_label` field:
+# Dana — Telegram
+"900606288": dana
 
-```json
-{
-  "session_id": "...",
-  "user_text": "...",
-  "assistant_text": "...",
-  "timestamp": 1711234567.0,
-  "channel_label": "rich-dm"
-}
+# Terry — Telegram
+"7686402653": terry
 ```
 
-### Memory Assembly
+Default config dir is `~/.sybilclaw`. Override with `SYBILCLAW_CONFIG_DIR`
+or `OPENCLAW_CONFIG_DIR` env vars.
 
-> **Note:** The `update_memory_dynamic.py` script has been removed (2026-03-31).
-> Per-agent context filtering is now handled by the plugin assembler at query time,
-> using channel labels to scope retrieval to the appropriate agent's access list.
+### Option 2 — Environment Variable
 
-### Memory Synthesis
-
-Use `synthesize_memory.py` to combine system-wide and per-agent memory:
+Set `CONTEXTGRAPH_SENDER_LABELS` as a JSON object:
 
 ```bash
-python3 scripts/synthesize_memory.py \
-  --system-file /path/to/SYSTEM_MEMORY.md \
-  --user-file /path/to/agent-specific-memory.md \
-  --output-file /path/to/MEMORY_ACTIVE.md
+export CONTEXTGRAPH_SENDER_LABELS='{"994902066":"rich","510637988242522133":"rich","900606288":"dana","7686402653":"terry"}'
 ```
 
-The script checks mtimes and only regenerates when sources have changed.
+Useful for container/CI deployments where file-based config is inconvenient.
 
-## Adding New Channels/Agents
+---
 
-1. Add the channel label to the taxonomy above
-2. Update `AGENT_CHANNEL_ACCESS` in `scripts/channel_access.py`
-3. Add corresponding tests in `tests/test_channel_access.py`
+## Resolution Order
+
+1. **Structured session key** — `agent:<prefix>-<user>:<channel>` → extracts `<user>`
+   (for custom deployments that emit structured session IDs)
+2. **Config file or env var lookup** — `senderId → canonical username`
+3. **Raw senderId** — used directly as the label (single-channel installs, no config needed)
+4. **`"unknown"`** — safe fallback, no user tags loaded
+
+---
+
+## Notes
+
+- If no mapping is configured and you only use one channel, everything works
+  automatically — the senderId is used directly and consistently as the label.
+- The server stores user tags in `USER_TAGS_DIR/{label}.yaml`, so any consistent
+  string is valid as a label.
+- Restart the SybilClaw gateway after editing `channel_labels.yaml` — labels
+  are loaded once at plugin startup.

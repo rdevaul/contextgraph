@@ -284,28 +284,108 @@ function splitUserAssistant(messages: AgentMessage[]): {
 // ── Channel label inference ────────────────────────────────────────────────
 
 /**
+ * Channel label map: senderId → canonical username.
+ *
+ * Loaded once at startup. Supports many-to-one mappings so a user who
+ * interacts via multiple channels (Telegram, Discord, etc.) gets a single
+ * unified user-tag profile.
+ *
+ * Configuration (in priority order):
+ *
+ *   1. Config file: <sybilclaw-config-dir>/contextgraph/channel_labels.yaml
+ *      Format:
+ *        "994902066": rich           # Telegram - Rich
+ *        "510637988242522133": rich  # Discord  - Rich
+ *        "900606288": dana           # Telegram - Dana
+ *
+ *   2. Env var: CONTEXTGRAPH_SENDER_LABELS (JSON object)
+ *      e.g. CONTEXTGRAPH_SENDER_LABELS='{"994902066":"rich"}'
+ *
+ *   If both are set, the config file takes precedence and a warning is logged.
+ *   If neither is set, senderId is used directly (works for single-channel installs).
+ */
+
+const CONFIG_DIR = process.env.SYBILCLAW_CONFIG_DIR
+  ?? process.env.OPENCLAW_CONFIG_DIR
+  ?? path.join(os.homedir(), ".sybilclaw");
+const CHANNEL_LABELS_FILE = path.join(CONFIG_DIR, "contextgraph", "channel_labels.yaml");
+
+let _channelLabels: Record<string, string> | null = null;
+let _channelLabelsSource: "file" | "env" | "none" | null = null;
+
+function loadChannelLabels(logger?: OpenClawPluginApi["logger"]): Record<string, string> {
+  if (_channelLabels !== null) return _channelLabels;
+
+  const hasFile = fs.existsSync(CHANNEL_LABELS_FILE);
+  const hasEnv = !!process.env.CONTEXTGRAPH_SENDER_LABELS;
+
+  if (hasFile && hasEnv) {
+    const warn = `[contextgraph] WARNING: Both channel_labels.yaml and CONTEXTGRAPH_SENDER_LABELS env var are set. Config file takes precedence. Unset the env var to silence this warning.`;
+    logger?.warn(warn) ?? console.warn(warn);
+  }
+
+  if (hasFile) {
+    try {
+      // Simple YAML parse: only handles flat key: value string pairs
+      const raw = fs.readFileSync(CHANNEL_LABELS_FILE, "utf8");
+      const result: Record<string, string> = {};
+      for (const line of raw.split("\n")) {
+        const trimmed = line.replace(/#.*$/, "").trim();
+        if (!trimmed) continue;
+        const m = trimmed.match(/^["']?([^"':]+)["']?\s*:\s*["']?([^"'#\s]+)["']?/);
+        if (m) result[m[1].trim()] = m[2].trim();
+      }
+      _channelLabels = result;
+      _channelLabelsSource = "file";
+      return result;
+    } catch (e) {
+      const err = `[contextgraph] Failed to parse channel_labels.yaml: ${e}. Falling back to env var or senderId.`;
+      logger?.warn(err) ?? console.warn(err);
+    }
+  }
+
+  if (hasEnv) {
+    try {
+      _channelLabels = JSON.parse(process.env.CONTEXTGRAPH_SENDER_LABELS!);
+      _channelLabelsSource = "env";
+      return _channelLabels!;
+    } catch (e) {
+      const err = `[contextgraph] Failed to parse CONTEXTGRAPH_SENDER_LABELS env var: ${e}. Falling back to senderId.`;
+      logger?.warn(err) ?? console.warn(err);
+    }
+  }
+
+  _channelLabels = {};
+  _channelLabelsSource = "none";
+  return {};
+}
+
+/**
  * Infer a channel label from a session ID and/or sender ID.
  * Used to scope user tags to the correct person.
- *
- * The server stores user tags in a file named by this label, so any
- * consistent string works — it does not need to be a human-readable name.
  *
  * Resolution order:
  *   1. Session ID pattern: agent:<prefix>-<user>:<channel>  →  <user>
  *      e.g. agent:glados-rich:main → "rich" (structured deployments)
- *   2. Raw senderId — e.g. Telegram user ID "994902066"
- *      Works for all standard OpenClaw/SybilClaw installs since the
- *      gateway passes the channel sender ID and uses UUID session keys.
- *   3. "unknown" — safe degradation, no user tags loaded
+ *   2. channel_labels.yaml or CONTEXTGRAPH_SENDER_LABELS lookup by senderId
+ *      Enables many-to-one mapping (same user on Telegram + Discord → same label)
+ *   3. Raw senderId — consistent within a single channel, no config needed
+ *   4. "unknown" — safe degradation, no user tags loaded
  */
-function inferChannelLabel(senderId?: string, sessionId?: string): string {
-  // 1. Try session ID pattern: agent:<prefix>-<user>:<rest>
+function inferChannelLabel(senderId?: string, sessionId?: string, logger?: OpenClawPluginApi["logger"]): string {
+  // 1. Try structured session key pattern
   if (sessionId) {
     const match = sessionId.match(/^agent:[^-]+-([^:]+):/);
     if (match) return match[1];
   }
 
-  // 2. Use senderId directly — the server accepts any consistent string as a label
+  // 2. Try sender ID lookup (many-to-one, cross-channel unification)
+  if (senderId) {
+    const labels = loadChannelLabels(logger);
+    if (labels[senderId]) return labels[senderId];
+  }
+
+  // 3. Raw senderId — works for single-channel installs with no config
   if (senderId) return senderId;
 
   return "unknown";
@@ -729,7 +809,7 @@ export default function register(api: OpenClawPluginApi): void {
       const subcommand = parts[0]?.toLowerCase() ?? "";
 
       // Infer channel label from sender/session context
-      const channelLabel = inferChannelLabel(ctx.senderId, (ctx as any).sessionId);
+      const channelLabel = inferChannelLabel(ctx.senderId, (ctx as any).sessionId, logger);
 
       // ── /tags (no args) — overview ───────────────────────────────
       if (!subcommand) {
