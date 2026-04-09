@@ -87,10 +87,13 @@ export class ContextGraphEngine implements ContextEngine {
     if (sessionId.includes("cron:")) return "cron";
 
     // Pattern: agent:<prefix>-<user>:<rest>
+    // e.g. agent:glados-rich:main → "rich"
     const match = sessionId.match(/^agent:[^-]+-([^:]+):/);
     if (match) return match[1];
 
-    // Fallback: return the full session ID as the label
+    // Fallback: UUID session IDs won't match the pattern.
+    // Return the raw sessionId so callers can decide; user-tag
+    // scoping will silently load no user tags (safe degradation).
     return sessionId;
   }
 

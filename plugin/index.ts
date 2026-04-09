@@ -284,26 +284,46 @@ function splitUserAssistant(messages: AgentMessage[]): {
 // ── Channel label inference ────────────────────────────────────────────────
 
 /**
- * Infer a channel label from a session ID.
+ * Known sender ID → label mappings.
+ * Used as a fallback when session ID pattern doesn't match.
+ * Configure via CONTEXTGRAPH_SENDER_LABELS env var as JSON:
+ *   CONTEXTGRAPH_SENDER_LABELS='{"994902066":"rich","900606288":"dana"}'
+ */
+function getSenderLabels(): Record<string, string> {
+  try {
+    const raw = process.env.CONTEXTGRAPH_SENDER_LABELS;
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore malformed env var
+  }
+  return {};
+}
+
+/**
+ * Infer a channel label from a session ID and/or sender ID.
  * Used to scope user tags to the correct person.
  *
- * Extracts the user segment from session patterns like:
- *   agent:<prefix>-<user>:<channel>  →  <user>
- * Examples:
- *   agent:jarvis-rich:main       →  "rich"
- *   agent:glados-dana:main       →  "dana"
- *   agent:glados-household:cron  →  "household"
- *
- * Falls back to the senderId (or "unknown") if the pattern doesn't match.
+ * Resolution order:
+ *   1. Session ID pattern: agent:<prefix>-<user>:<channel>  →  <user>
+ *      e.g. agent:glados-rich:main → "rich"
+ *   2. CONTEXTGRAPH_SENDER_LABELS env var lookup by senderId
+ *   3. Raw senderId (numeric Telegram ID etc.)
+ *   4. "unknown"
  */
 function inferChannelLabel(senderId?: string, sessionId?: string): string {
-  // Try session ID pattern first: agent:<prefix>-<user>:<rest>
+  // 1. Try session ID pattern: agent:<prefix>-<user>:<rest>
   if (sessionId) {
     const match = sessionId.match(/^agent:[^-]+-([^:]+):/);
     if (match) return match[1];
   }
 
-  // Fallback to senderId if available
+  // 2. Try sender ID → label lookup
+  if (senderId) {
+    const labels = getSenderLabels();
+    if (labels[senderId]) return labels[senderId];
+  }
+
+  // 3. Fallback to raw senderId
   if (senderId) return senderId;
 
   return "unknown";
