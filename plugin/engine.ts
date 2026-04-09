@@ -73,14 +73,25 @@ export class ContextGraphEngine implements ContextEngine {
   /**
    * Infer a channel label from a session ID.
    * Used to scope messages to a specific user for user-tag retrieval.
+   *
+   * Extracts the user segment from session patterns like:
+   *   agent:<prefix>-<user>:<channel>  →  <user>
+   * Examples:
+   *   agent:jarvis-rich:main       →  "rich"
+   *   agent:glados-dana:main       →  "dana"
+   *   agent:glados-household:cron  →  "household"
+   *
+   * Falls back to the full sessionId if the pattern doesn't match.
    */
   private inferChannelLabel(sessionId: string): string {
-    if (sessionId.includes("glados-dana")) return "dana";
-    if (sessionId.includes("glados-terry")) return "terry";
-    if (sessionId.includes("glados-household")) return "household";
     if (sessionId.includes("cron:")) return "cron";
-    // Default: main agent = Rich
-    return "rich";
+
+    // Pattern: agent:<prefix>-<user>:<rest>
+    const match = sessionId.match(/^agent:[^-]+-([^:]+):/);
+    if (match) return match[1];
+
+    // Fallback: return the full session ID as the label
+    return sessionId;
   }
 
   private detectToolChains(messages: AgentMessage[]): { last_turn_had_tools: boolean; pending_chain_ids: string[] } {

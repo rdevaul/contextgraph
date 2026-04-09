@@ -14,14 +14,25 @@ def _env(key: str, default: str) -> str:
     return os.environ.get(key, default)
 
 
+def _resolve_workspace_default() -> str:
+    """Auto-detect workspace root for openclaw or sybilclaw installations."""
+    home = Path.home()
+    for platform_dir in (".openclaw", ".sybilclaw"):
+        candidate = home / platform_dir / "workspace"
+        if candidate.is_dir():
+            return str(candidate)
+    # Fallback — openclaw is the most common
+    return str(home / ".openclaw" / "workspace")
+
+
 # Workspace root — the agent workspace directory
 WORKSPACE = Path(_env(
     "CONTEXTGRAPH_WORKSPACE",
-    str(Path.home() / ".openclaw" / "workspace")
+    _resolve_workspace_default()
 ))
 
 # Agent name — used for launchd service naming and logging
-AGENT_NAME = _env("CONTEXTGRAPH_AGENT_NAME", "glados")
+AGENT_NAME = _env("CONTEXTGRAPH_AGENT_NAME", "agent")
 
 # Database path
 DB_PATH = Path(_env(

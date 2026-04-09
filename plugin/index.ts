@@ -30,7 +30,7 @@ import * as os from "node:os";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const PYTHON_API_BASE = "http://localhost:8300";
+const PYTHON_API_BASE = process.env.CONTEXTGRAPH_API_URL ?? "http://localhost:8300";
 const REQUEST_TIMEOUT_MS = 5000;
 const GRAPH_MODE_FILE = path.join(os.homedir(), ".tag-context", "graph-mode.json");
 const GRAPH_MODE_DIR = path.dirname(GRAPH_MODE_FILE);
@@ -284,16 +284,29 @@ function splitUserAssistant(messages: AgentMessage[]): {
 // ── Channel label inference ────────────────────────────────────────────────
 
 /**
- * Infer a channel label from a sender ID or session context.
+ * Infer a channel label from a session ID.
  * Used to scope user tags to the correct person.
+ *
+ * Extracts the user segment from session patterns like:
+ *   agent:<prefix>-<user>:<channel>  →  <user>
+ * Examples:
+ *   agent:jarvis-rich:main       →  "rich"
+ *   agent:glados-dana:main       →  "dana"
+ *   agent:glados-household:cron  →  "household"
+ *
+ * Falls back to the senderId (or "unknown") if the pattern doesn't match.
  */
-function inferChannelLabel(senderId?: string): string {
-  // Known sender IDs → labels
-  if (senderId === "994902066") return "rich";
-  if (senderId === "900606288") return "dana";
-  if (senderId === "7686402653") return "terry";
-  // Default to "rich" for the main agent
-  return "rich";
+function inferChannelLabel(senderId?: string, sessionId?: string): string {
+  // Try session ID pattern first: agent:<prefix>-<user>:<rest>
+  if (sessionId) {
+    const match = sessionId.match(/^agent:[^-]+-([^:]+):/);
+    if (match) return match[1];
+  }
+
+  // Fallback to senderId if available
+  if (senderId) return senderId;
+
+  return "unknown";
 }
 
 // ── Context Engine implementation ──────────────────────────────────────────
@@ -713,8 +726,8 @@ export default function register(api: OpenClawPluginApi): void {
       const parts = args.split(/\s+/).filter(Boolean);
       const subcommand = parts[0]?.toLowerCase() ?? "";
 
-      // Infer channel label from sender context
-      const channelLabel = inferChannelLabel(ctx.senderId);
+      // Infer channel label from sender/session context
+      const channelLabel = inferChannelLabel(ctx.senderId, (ctx as any).sessionId);
 
       // ── /tags (no args) — overview ───────────────────────────────
       if (!subcommand) {
