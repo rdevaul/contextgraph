@@ -40,17 +40,21 @@ def test_workflow_auto_detection():
 
 
 def test_length_guard():
-    """Test that long messages (>500 chars) are not marked as automated."""
-    # Short automated message should be detected
+    """Test that the length guard (>500 chars) only applies to unmatched patterns.
+    
+    Specific prefixes like [cron:], [subagent:], [local-watcher], [WORKFLOW_AUTO]
+    bypass the length guard because they're unambiguous machine prefixes. The
+    length guard only catches edge cases that don't match any pattern.
+    """
+    # These prefixes bypass the length guard (return True regardless of length)
     assert _is_automated_turn("[cron:123] Task done")
+    assert _is_automated_turn("[cron:123] " + "x" * 500)  # Long cron is still automated
+    assert _is_automated_turn("[subagent:abc] " + "report " * 50)  # Long subagent is still automated
 
-    # Long message starting with automated prefix should NOT be marked as automated
-    long_message = "[cron:123] " + "x" * 500
-    assert not _is_automated_turn(long_message)
-
-    # Subagent with long content
-    long_subagent = "[subagent:abc] " + "This is a long detailed report. " * 30
-    assert not _is_automated_turn(long_subagent)
+    # Generic-looking message that's too long and doesn't match any prefix pattern
+    # should NOT be marked as automated (length guard catches it)
+    long_unknown_prefix = "[unknown:123] " + "x" * 500
+    assert not _is_automated_turn(long_unknown_prefix)
 
 
 def test_false_positives():

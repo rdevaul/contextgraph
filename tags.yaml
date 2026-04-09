@@ -587,3 +587,23 @@ tags:
       - skillregistry
       - skill hub
     confidence: 1.0
+
+  - name: sybilclaw
+    description: SybilClaw — OpenClaw fork with multi-user memory isolation, Discord backup gateway, switchover plan
+    keywords:
+      - sybilclaw
+      - sybil-claw
+      - sybil claw
+      - openclaw-fork
+      - openclaw fork
+      - per-agent-memory
+      - per-agent memory
+      - memoryfile
+      - discord backup
+      - backup gateway
+      - isolated gateway
+      - switchover plan
+      - switch-over
+      - backup openclaw
+      - openclaw-backup
+    confidence: 1.0

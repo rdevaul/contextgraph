@@ -23,12 +23,6 @@ WORKSPACE = Path(_env(
 # Agent name — used for launchd service naming and logging
 AGENT_NAME = _env("CONTEXTGRAPH_AGENT_NAME", "glados")
 
-# MEMORY.md location
-MEMORY_FILE = Path(_env(
-    "CONTEXTGRAPH_MEMORY_FILE",
-    str(WORKSPACE / "MEMORY.md")
-))
-
 # Database path
 DB_PATH = Path(_env(
     "CONTEXTGRAPH_DB_PATH",

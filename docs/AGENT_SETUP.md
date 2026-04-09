@@ -11,12 +11,9 @@ tag-based context retrieval. Every user/assistant turn is stored and tagged.
 When a new message arrives, the plugin queries the graph API to assemble
 topically-relevant context rather than just the most recent N messages.
 
-There are two additional features layered on top:
+Additional features:
 - **Sticky threads** — tool chains (multi-step exec work) are pinned so
   context isn't broken mid-task by compaction.
-- **Dynamic memory injection** — nightly, assembled context is written
-  into a dedicated section of `MEMORY.md` (currently in shadow mode
-  writing to `SHADOWMEMORY.md` for validation).
 
 ## Repository
 
@@ -25,12 +22,10 @@ https://github.com/rdevaul/contextgraph
 Local: ~/Projects/tag-context
 ```
 
-## Current Status (as of 2026-03-19)
+## Current Status (as of 2026-04-08)
 
 - **Phase 3 complete** — native plugin live, `/graph on|off` working
-- **Phase 3.5 in progress** — shadow memory injection running, targeting
-  `MEMORY.md` directly once output quality is confirmed stable
-- **All 145 tests passing** (`python3 -m pytest tests/ -v`)
+- **All tests passing** (`python3 -m pytest tests/ -v`)
 - **v1.1 fixes applied** — envelope stripping, IDF tag filtering, `/quality` endpoint
 
 ---
@@ -43,7 +38,7 @@ OpenClaw (Telegram/Voice/etc.)
         ▼ (every turn)
   plugin/index.ts          ← OpenClaw native plugin
         │
-        ├── POST /tag       ← store turn in SQLite + tag it
+        ├── POST /ingest    ← store turn in SQLite + tag it
         ├── POST /assemble  ← retrieve relevant context for incoming msg
         ├── POST /sticky    ← manage tool-chain pins
         └── GET  /compare   ← graph vs linear stats (comparison logging)
@@ -70,11 +65,9 @@ data/tag_registry.json   ← NOT tracked in git (live runtime file)
 
 ## Services (macOS launchd)
 
-Two services run this system:
-
 ### 1. Context Graph API — `com.glados.tag-context`
 
-The Python FastAPI server. This is the one that actually matters.
+The Python FastAPI server.
 
 ```bash
 # Status (PID present = running; just exit code = crashed)
@@ -160,9 +153,7 @@ openclaw gateway reload   # use reload, not restart — restart kills active ses
 
 ---
 
-## Nightly Scripts
-
-These are not yet in cron — they're run manually or will be scheduled:
+## Maintenance Scripts
 
 ### Harvester (collect new turns from session logs)
 
@@ -181,12 +172,6 @@ Skips cron/hook/group sessions (too noisy). Harvests:
 - `agent:main:main` — primary DM session
 - `agent:main:telegram:*` — Telegram DMs
 - `agent:main:voice*` — Voice PWA sessions
-
-### Memory Injection (Deprecated)
-
-> **Removed 2026-03-31.** The `update_memory_dynamic.py` script and associated
-> launchd services have been removed. Context is now delivered per-turn by the
-> OpenClaw plugin's assembler — no static MEMORY.md injection needed.
 
 ### GP Tagger Evolution (periodic retraining)
 
@@ -226,7 +211,6 @@ evolving a new GP tagger.
 | `scripts/harvester.py` | Collect turns from OpenClaw session logs |
 | `scripts/evolve.py` | Retrain GP tagger |
 | `scripts/replay.py` | Retag full corpus |
-| `scripts/update_memory_dynamic.py` | *(removed — superseded by per-turn plugin retrieval)* |
 | `utils/text.py` | `strip_envelope()` — strips channel metadata before indexing/querying |
 | `scripts/install-service.sh` | launchd service installer |
 | `service/*.plist.template` | launchd plist templates (path-substituted) |
@@ -281,24 +265,18 @@ Key fields:
 - `tag_entropy` — how evenly tags are distributed. <2.0 = over-generic tags, topic layer degraded.
 - `alert` / `alert_reasons` — automated summary.
 
-**`/health` returning `{"status":"ok"}` does NOT mean retrieval is working.** The service
-can be up and indexed while silently returning empty context due to tag pollution or corpus
-issues. Always check `/quality` when diagnosing.
-
 ### Context quality degraded / assembler returning noise
 
 Likely causes:
 1. **Envelope pollution in old data** — if corpus was ingested before v1.1, stored
-   `user_text` may contain OpenClaw channel metadata (Sender, message_id, etc.). This
-   degrades tag inference and retrieval. Re-ingest affected records or run `scripts/replay.py`
-   to retag (stripping is now applied at ingest time automatically in v1.1+).
+   `user_text` may contain OpenClaw channel metadata. Re-ingest affected records or
+   run `scripts/replay.py` to retag (stripping is now applied at ingest time in v1.1+).
 2. **Over-generic tags** — IDF filtering (>30% corpus frequency = skip) is applied
-   automatically in the assembler. If all your tags are high-frequency, the fallback
-   uses the lowest-frequency half. Check `zero_return_rate` via `/quality`.
-3. **New cron/heartbeat turns in DB** — harvester may have ingested noisy
-   sessions. Check `python3 cli.py recent --n 20` for garbage records.
-4. **Oversized records blocking assembler budget** — check if any record
-   has token count > 5000 (`python3 cli.py recent --n 5` and inspect).
+   automatically. If all tags are high-frequency, the fallback uses the lowest-frequency
+   half. Check `zero_return_rate` via `/quality`.
+3. **New cron/heartbeat turns in DB** — harvester may have ingested noisy sessions.
+4. **Oversized records blocking assembler budget** — check if any record has token
+   count > 5000.
 5. **tag_registry diverged** — run `python3 scripts/replay.py` to retag.
 
 ### Comparison log growing too large
@@ -319,7 +297,6 @@ tail -1000 ~/.tag-context/comparison-log.jsonl > /tmp/cl.tmp && mv /tmp/cl.tmp ~
 cd ~/Projects/tag-context
 source venv/bin/activate
 python3 -m pytest tests/ -v
-# All 145 tests should pass
 ```
 
 Key test files:
@@ -335,9 +312,6 @@ Key test files:
 - [x] Phase 1 — Passive collection (corpus: 800+ interactions)
 - [x] Phase 2 — Shadow evaluation (graph beats linear baseline)
 - [x] Phase 3 — Native plugin live (`/graph on|off`, sticky threads)
-- [ ] Phase 3.5 — Shadow memory injection → **in progress**
-  - Shadow mode: writing to `SHADOWMEMORY.md`
-  - Next step: confirm stable output for ~1 day, then switch to `--live`
 - [ ] Phase 4 — Graph-primary (default on, linear as fallback)
 
 ---
@@ -374,7 +348,5 @@ Only use `stop`/`restart` as a last resort when the gateway is already dead.
   `unload`/`load` after changing environment variables or the plist itself.
 - **`data/tag_registry.json` is gitignored** — it's a live runtime file
   that accumulates real conversation tags. Don't try to commit it.
-- **`update_memory_dynamic.py` has been removed** (2026-03-31) — context
-  is now delivered per-turn by the plugin assembler.
 - The `com.glados.tag-context` label is local convention. The template
   installer uses `com.contextgraph.api`. Both are fine — just don't run both.

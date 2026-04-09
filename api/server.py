@@ -160,8 +160,38 @@ ensemble.register('fixed', fixed_tagger_instance.assign, 1.5)  # Higher weight �
 baseline_tagger = lambda features, user_text, assistant_text: assign_tags(features, user_text, assistant_text)
 ensemble.register('baseline', baseline_tagger, 1.0)
 
+LOCK_FILE = Path("/tmp/tag-context.lock")
+
+def _acquire_lock() -> None:
+    """Prevent dual-instance hang: exit if another instance is already running."""
+    if LOCK_FILE.exists():
+        try:
+            existing_pid = int(LOCK_FILE.read_text().strip())
+            import signal as sig
+            os.kill(existing_pid, 0)  # raises OSError if process doesn't exist
+            print(f"[lockfile] Instance {existing_pid} already running on port 8300, exiting")
+            sys.exit(1)
+        except (ValueError, ProcessLookupError, OSError):
+            # Stale lockfile — remove it
+            LOCK_FILE.unlink(missing_ok=True)
+            print("[lockfile] Removed stale lockfile")
+    LOCK_FILE.write_text(str(os.getpid()))
+    print(f"[lockfile] Acquired lock (PID {os.getpid()})")
+
+def _release_lock() -> None:
+    try:
+        if LOCK_FILE.exists() and LOCK_FILE.read_text().strip() == str(os.getpid()):
+            LOCK_FILE.unlink(missing_ok=True)
+            print(f"[lockfile] Released lock (PID {os.getpid()})")
+    except Exception:
+        pass
+
+import atexit
+atexit.register(_release_lock)
+
 @app.on_event("startup")
 async def startup_event():
+    _acquire_lock()
     store.get_all_tags()  # Initialize the store
     # One-time purge of junk candidates with < 2 hits
     registry = get_registry()
@@ -209,8 +239,15 @@ def _seed_registry_from_yaml() -> None:
             continue
         if not entry.get("enabled", True):
             continue  # skip disabled tags
-        if name in active_tags or name in archived_tags:
-            continue  # already known to the registry
+        if name in active_tags:
+            continue  # already active in the registry
+        if name in archived_tags:
+            # Archived but defined in tags.yaml — resurrect to core
+            registry._tags[name].state = "core"
+            registry._tags[name].promoted_at = now
+            registry._tags[name].archived_at = None
+            seeded.append(f"{name} (resurrected)")
+            continue
 
         # New tag in yaml — seed it as core so it's immediately active
         from tag_registry import TagMetadata
