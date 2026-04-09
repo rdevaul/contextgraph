@@ -284,31 +284,19 @@ function splitUserAssistant(messages: AgentMessage[]): {
 // ── Channel label inference ────────────────────────────────────────────────
 
 /**
- * Known sender ID → label mappings.
- * Used as a fallback when session ID pattern doesn't match.
- * Configure via CONTEXTGRAPH_SENDER_LABELS env var as JSON:
- *   CONTEXTGRAPH_SENDER_LABELS='{"994902066":"rich","900606288":"dana"}'
- */
-function getSenderLabels(): Record<string, string> {
-  try {
-    const raw = process.env.CONTEXTGRAPH_SENDER_LABELS;
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore malformed env var
-  }
-  return {};
-}
-
-/**
  * Infer a channel label from a session ID and/or sender ID.
  * Used to scope user tags to the correct person.
  *
+ * The server stores user tags in a file named by this label, so any
+ * consistent string works — it does not need to be a human-readable name.
+ *
  * Resolution order:
  *   1. Session ID pattern: agent:<prefix>-<user>:<channel>  →  <user>
- *      e.g. agent:glados-rich:main → "rich"
- *   2. CONTEXTGRAPH_SENDER_LABELS env var lookup by senderId
- *   3. Raw senderId (numeric Telegram ID etc.)
- *   4. "unknown"
+ *      e.g. agent:glados-rich:main → "rich" (structured deployments)
+ *   2. Raw senderId — e.g. Telegram user ID "994902066"
+ *      Works for all standard OpenClaw/SybilClaw installs since the
+ *      gateway passes the channel sender ID and uses UUID session keys.
+ *   3. "unknown" — safe degradation, no user tags loaded
  */
 function inferChannelLabel(senderId?: string, sessionId?: string): string {
   // 1. Try session ID pattern: agent:<prefix>-<user>:<rest>
@@ -317,13 +305,7 @@ function inferChannelLabel(senderId?: string, sessionId?: string): string {
     if (match) return match[1];
   }
 
-  // 2. Try sender ID → label lookup
-  if (senderId) {
-    const labels = getSenderLabels();
-    if (labels[senderId]) return labels[senderId];
-  }
-
-  // 3. Fallback to raw senderId
+  // 2. Use senderId directly — the server accepts any consistent string as a label
   if (senderId) return senderId;
 
   return "unknown";
