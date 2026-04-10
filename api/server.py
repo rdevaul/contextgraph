@@ -2,7 +2,6 @@ import sys
 import re
 import time
 import threading
-from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -16,13 +15,12 @@ from ensemble import EnsembleTagger
 from assembler import ContextAssembler, _estimate_tokens
 from quality import QualityAgent
 from gp_tagger import GeneticTagger
-from tag_registry import get_registry, get_user_registry, USER_REGISTRY_DIR
+from tag_registry import get_registry
 from sticky import StickyPinManager
 from reframing import detect_reference
 from utils.text import strip_envelope
 from summarizer import summarize_message
 from logger import _is_automated_turn
-import config
 import pickle
 import os
 import json
@@ -48,47 +46,39 @@ def _is_retrieval_turn(entry: dict) -> bool:
 app = FastAPI()
 
 class TagRequest(BaseModel):
-    user_text: str = Field(..., max_length=100_000)
-    assistant_text: str = Field(..., max_length=100_000)
+    user_text: str
+    assistant_text: str
 
 class IngestRequest(BaseModel):
-    id: str = Field(None, nullable=True, max_length=256)
-    session_id: str = Field(..., max_length=256)
-    user_text: str = Field(..., max_length=100_000)
-    assistant_text: str = Field(..., max_length=100_000)
-    timestamp: float = Field(..., ge=0)
-    user_id: str = Field(None, nullable=True, max_length=256)
-    external_id: str = Field(None, nullable=True, max_length=256)  # OpenClaw AgentMessage.id or other external system ID
-    channel_label: str = Field(None, nullable=True, max_length=256)  # Channel label for per-agent memory isolation
+    id: str = Field(None, nullable=True)
+    session_id: str
+    user_text: str
+    assistant_text: str
+    timestamp: float
+    user_id: str = Field(None, nullable=True)
+    external_id: str = Field(None, nullable=True)  # OpenClaw AgentMessage.id or other external system ID
+    channel_label: str = Field(None, nullable=True)  # Channel label for per-agent memory isolation
 
 class ToolState(BaseModel):
     last_turn_had_tools: bool
-    pending_chain_ids: list[str] = Field(default_factory=list, max_length=100)
+    pending_chain_ids: list[str] = Field(default_factory=list)
 
 class AssembleRequest(BaseModel):
-    user_text: str = Field(..., max_length=100_000)
-    tags: list[str] | None = Field(None, max_length=50)
-    token_budget: int = Field(4000, ge=100, le=200_000)
+    user_text: str
+    tags: list[str] | None = None
+    token_budget: int = 4000
     tool_state: ToolState | None = None
-    session_id: str | None = Field(None, max_length=256)
-    channel_label: str | None = Field(None, max_length=256)
-
-class AddUserTagRequest(BaseModel):
-    name: str = Field(..., max_length=100)
-    description: str = Field("", max_length=500)
-    keywords: list[str] | None = Field(None, max_length=100)
-    confidence: float = Field(1.0, ge=0.0, le=1.0)
+    session_id: str | None = None
 
 class PinRequest(BaseModel):
-    message_ids: list[str] = Field(..., max_length=100)
-    reason: str = Field(..., max_length=1000)
-    ttl_turns: int = Field(20, ge=1, le=1000)
+    message_ids: list[str]
+    reason: str
+    ttl_turns: int = 20
 
 class UnpinRequest(BaseModel):
     pin_id: str
 
 class CompareResponse(BaseModel):
-    inferred_tags: list[str] = []
     graph_assembly: dict
     linear_window: dict
 
@@ -113,91 +103,18 @@ def _background_summarize(message_id: str) -> None:
         import logging
         logging.error(f"Background summarization failed for {message_id}: {e}")
 
-# ── GP tagger (optional, experimental) ───────────────────────────────────────
-# The GP tagger is DISABLED by default. To enable it, set:
-#   CONTEXTGRAPH_TAGGER_MODE=hybrid   (fixed + gp)
-#   CONTEXTGRAPH_TAGGER_MODE=gp-only  (gp only, not recommended)
-#
-# ⚠️  VOTING LIMITATION: With the current weighted-vote ensemble
-# (fixed=1.5, baseline=1.0, gp=1.0, total=3.5, threshold=0.4),
-# the GP's normalised weight is 1.0/3.5 ≈ 0.286 — BELOW the threshold.
-# This means the GP can NEVER promote a tag on its own; it can only
-# reinforce tags that fixed or baseline already found. Any unique tags
-# the GP fires are always pruned. Until the voting system is redesigned
-# (e.g. threshold lowered to 0.2, or GP given higher weight), the GP
-# provides no recall improvement over fixed+baseline alone.
-if config.TAGGER_MODE in ("hybrid", "gp-only"):
-    gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
-    if gp_tagger_path.exists():
-        try:
-            with open(gp_tagger_path, 'rb') as f:
-                gp_tagger = pickle.load(f)
-                ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
-            print(f"[contextgraph] GP tagger loaded (experimental mode={config.TAGGER_MODE})")
-        except Exception as e:
-            print(f"[contextgraph] WARNING: GP tagger failed to load, continuing without it: {e}")
-    else:
-        print(f"[contextgraph] GP tagger mode={config.TAGGER_MODE} but no pkl found at {gp_tagger_path}, skipping")
-else:
-    print(f"[contextgraph] Tagger mode={config.TAGGER_MODE} — GP tagger disabled (default)")
-
-from fixed_tagger import FixedTagger, USER_TAGS_DIR
-import re as _re
-
-# Validate channel labels to prevent path traversal attacks.
-# Labels must be alphanumeric with optional hyphens/underscores, 1-64 chars.
-_VALID_LABEL_RE = _re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
-
-def _validate_label(label: str) -> str:
-    """Validate a channel label to prevent path traversal. Raises HTTPException on invalid input."""
-    if not _VALID_LABEL_RE.match(label):
-        raise HTTPException(status_code=400, detail=f"Invalid channel label: '{label}'. Must be lowercase alphanumeric with hyphens/underscores, 1-64 chars.")
-    return label
-
-fixed_tagger_instance = FixedTagger()
-ensemble.register('fixed', fixed_tagger_instance.assign, 1.5)  # Higher weight — authoritative for personal assistant tags
+gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
+if gp_tagger_path.exists():
+    with open(gp_tagger_path, 'rb') as f:
+        gp_tagger = pickle.load(f)
+        ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
 
 baseline_tagger = lambda features, user_text, assistant_text: assign_tags(features, user_text, assistant_text)
 ensemble.register('baseline', baseline_tagger, 1.0)
 
-LOCK_FILE = Path("/tmp/tag-context.lock")
-
-def _acquire_lock() -> None:
-    """Prevent dual-instance hang: exit if another instance is already running."""
-    if LOCK_FILE.exists():
-        try:
-            existing_pid = int(LOCK_FILE.read_text().strip())
-            import signal as sig
-            os.kill(existing_pid, 0)  # raises OSError if process doesn't exist
-            print(f"[lockfile] Instance {existing_pid} already running on port 8300, exiting")
-            sys.exit(1)
-        except (ValueError, ProcessLookupError, OSError):
-            # Stale lockfile — remove it
-            LOCK_FILE.unlink(missing_ok=True)
-            print("[lockfile] Removed stale lockfile")
-    LOCK_FILE.write_text(str(os.getpid()))
-    print(f"[lockfile] Acquired lock (PID {os.getpid()})")
-
-def _release_lock() -> None:
-    try:
-        if LOCK_FILE.exists() and LOCK_FILE.read_text().strip() == str(os.getpid()):
-            LOCK_FILE.unlink(missing_ok=True)
-            print(f"[lockfile] Released lock (PID {os.getpid()})")
-    except Exception:
-        pass
-
-import atexit
-atexit.register(_release_lock)
-
 @app.on_event("startup")
 async def startup_event():
-    _acquire_lock()
     store.get_all_tags()  # Initialize the store
-    # One-time purge of junk candidates with < 2 hits
-    registry = get_registry()
-    purged = registry.purge_junk_candidates(min_hits=2)
-    if purged > 0:
-        print(f"[startup] Purged {purged} junk candidate tags with < 2 hits")
     _seed_registry_from_yaml()
 
 
@@ -239,15 +156,8 @@ def _seed_registry_from_yaml() -> None:
             continue
         if not entry.get("enabled", True):
             continue  # skip disabled tags
-        if name in active_tags:
-            continue  # already active in the registry
-        if name in archived_tags:
-            # Archived but defined in tags.yaml — resurrect to core
-            registry._tags[name].state = "core"
-            registry._tags[name].promoted_at = now
-            registry._tags[name].archived_at = None
-            seeded.append(f"{name} (resurrected)")
-            continue
+        if name in active_tags or name in archived_tags:
+            continue  # already known to the registry
 
         # New tag in yaml — seed it as core so it's immediately active
         from tag_registry import TagMetadata
@@ -263,7 +173,7 @@ def _seed_registry_from_yaml() -> None:
 
     if seeded:
         registry.save()
-        print(f"[startup] Registry seeded {len(seeded)} new tag(s) from tags.yaml: {seeded}")
+        logging.info(f"Registry seeded {len(seeded)} new tag(s) from tags.yaml: {seeded}")
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):
@@ -291,23 +201,6 @@ _INJECTION_PATTERNS = [
 # Strip zero-width characters that bypass pattern matching
 _ZERO_WIDTH = re.compile(r'[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff\u00ad]')
 
-def _is_degenerate_text(text: str, threshold: float = 0.7) -> bool:
-    """Detect garbage/repetitive text that would poison the graph.
-    
-    Returns True if the text is mostly repeated words (e.g. 'word word word...').
-    Threshold is the ratio of most-common-word occurrences to total words.
-    """
-    if not text:
-        return False
-    words = text.lower().split()
-    if len(words) < 10:
-        return False
-    from collections import Counter
-    counts = Counter(words)
-    most_common_count = counts.most_common(1)[0][1]
-    return (most_common_count / len(words)) >= threshold
-
-
 def _sanitize_for_storage(text: str) -> str:
     """Strip prompt injection patterns before storing in the graph."""
     if not text:
@@ -330,25 +223,15 @@ def ingest(request: IngestRequest):
         # HIGH-01 fix: sanitize injection patterns before storage
         clean_user = _sanitize_for_storage(clean_user)
 
-        # Reject degenerate/garbage messages (e.g. "word word word..." repeated)
-        if _is_degenerate_text(clean_user):
-            return {"status": "skipped", "reason": "degenerate text detected"}
-
-        # Reject test/benchmark sessions — these come from pytest runs and
-        # should never be stored in the live graph.
-        if request.session_id and (
-            request.session_id.startswith("test-") or
-            request.session_id.startswith("test_") or
-            request.session_id.startswith("pytest-") or
-            request.session_id == "test"
-        ):
-            return {"status": "skipped", "reason": "test session rejected"}
-
         # Auto-detect automated turns (cron, heartbeat, local-watcher)
         is_automated = _is_automated_turn(request.user_text)
 
-        features = extract_features(clean_user, request.assistant_text)
-        tags = ensemble.assign(features, clean_user, request.assistant_text).tags
+        # Skip tagging for automated messages - they shouldn't be tagged
+        if is_automated:
+            tags = []
+        else:
+            features = extract_features(clean_user, request.assistant_text)
+            tags = ensemble.assign(features, clean_user, request.assistant_text).tags
         token_count = len(clean_user.split()) + len(request.assistant_text.split())
         message = Message(
             id=message_id,
@@ -444,40 +327,15 @@ def assemble(request: AssembleRequest):
 
         # Strip envelope from query text for clean tag inference and similarity matching
         clean_query = strip_envelope(request.user_text)
-
-        # Build channel-aware tagger if channel_label provided
-        channel_label = request.channel_label
-        if channel_label:
-            _validate_label(channel_label)
-            from fixed_tagger import FixedTagger
-            ch_tagger = FixedTagger.for_channel(channel_label)
-        else:
-            ch_tagger = fixed_tagger_instance
-
         features = extract_features(clean_query, "")  # Empty assistant_text for incoming message
         if not request.tags:
-            request.tags = ch_tagger.assign(features, clean_query, "").tags
-
-        # Determine user tags (tags that exist in user tag file)
-        user_tag_names: list[str] = []
-        if channel_label:
-            user_tags_path = USER_TAGS_DIR / f"{channel_label}.yaml"
-            if user_tags_path.exists():
-                from fixed_tagger import FixedTagger as _FT, _parse_tag_specs
-                import yaml as _yaml
-                with user_tags_path.open() as _f:
-                    _ud = _yaml.safe_load(_f)
-                user_tag_names = [s.name for s in _parse_tag_specs(_ud or {})]
+            request.tags = ensemble.assign(features, clean_query, "").tags
 
         # Get pinned message IDs
         pinned_ids = pin_manager.get_pinned_message_ids()
 
         assembler = ContextAssembler(store, token_budget=request.token_budget)
-        result = assembler.assemble(
-            clean_query, request.tags, pinned_message_ids=pinned_ids,
-            channel_label=channel_label,
-            user_tags=user_tag_names if user_tag_names else None,
-        )
+        result = assembler.assemble(clean_query, request.tags, pinned_message_ids=pinned_ids)
 
         return {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
@@ -494,7 +352,7 @@ def assemble(request: AssembleRequest):
 @app.get("/health", response_model=dict)
 def health():
     try:
-        messages_in_store = store.count()  # Exact count via SELECT COUNT(*)
+        messages_in_store = len(store.get_recent(1000))  # Approximate count
         tags = store.get_all_tags()
         return {"status": "ok", "messages_in_store": messages_in_store, "tags": tags, "engine": "contextgraph"}
     except Exception as e:
@@ -636,15 +494,12 @@ def compare(request: TagRequest):
         }
 
         # Simulated Linear Window — pack to 4000 token budget, newest-first
-        # Use the same _estimate_tokens() function as the assembler for an apples-to-apples
-        # comparison. Previously used raw word count (no 1.3x multiplier), which made the
-        # linear window appear ~30% smaller than graph mode at equivalent budgets.
         linear_window_messages = []
         linear_tokens = 0
         budget = 4000
 
         for msg in store.get_recent(100):  # Fetch enough to fill budget
-            msg_tokens = _estimate_tokens(msg)
+            msg_tokens = len(msg.user_text.split()) + len(msg.assistant_text.split())
             if linear_tokens + msg_tokens > budget:
                 break
             linear_window_messages.append(msg)
@@ -661,7 +516,7 @@ def compare(request: TagRequest):
             "tags_used": list(set(tag for msg in linear_window_messages for tag in msg.tags))
         }
 
-        return CompareResponse(inferred_tags=inferred_tags, graph_assembly=graph_assembly, linear_window=linear_window)
+        return CompareResponse(graph_assembly=graph_assembly, linear_window=linear_window)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -692,34 +547,10 @@ def get_comparison_log(limit: Optional[int] = Query(None, description="Maximum n
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/comparison-stats", response_model=dict)
-def get_comparison_stats(since: Optional[str] = Query(None, description="ISO timestamp or hours suffix e.g. '24h', '7d' to filter entries")):
-    """Compute aggregate statistics from the comparison log.
-    
-    Optional ?since= param filters entries to a time window:
-      - ISO 8601 string: since=2026-03-23T00:00:00Z
-      - Hours suffix:    since=24h
-      - Days suffix:     since=7d
-    """
+def get_comparison_stats():
+    """Compute aggregate statistics from the comparison log."""
     try:
-        from datetime import timezone
         log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
-        
-        # Parse since param into a cutoff datetime
-        cutoff_dt = None
-        if since:
-            import re as _re
-            m = _re.match(r'^(\d+(?:\.\d+)?)(h|d)$', since.strip().lower())
-            if m:
-                amount, unit = float(m.group(1)), m.group(2)
-                hours = amount if unit == 'h' else amount * 24
-                cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=hours)
-            else:
-                try:
-                    cutoff_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-                    if cutoff_dt.tzinfo is None:
-                        cutoff_dt = cutoff_dt.replace(tzinfo=timezone.utc)
-                except ValueError:
-                    pass  # Ignore unparseable since values
         if not log_path.exists():
             return {
                 "total_turns": 0,
@@ -739,22 +570,6 @@ def get_comparison_stats(since: Optional[str] = Query(None, description="ISO tim
             for line in f:
                 if line.strip():
                     entries.append(json.loads(line))
-
-        # Apply time window filter if cutoff_dt was parsed
-        if cutoff_dt is not None:
-            from datetime import timezone as _tz
-            def _entry_ts(e):
-                ts = e.get("timestamp", "")
-                if not ts:
-                    return None
-                try:
-                    dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=_tz.utc)
-                    return dt
-                except ValueError:
-                    return None
-            entries = [e for e in entries if (ts := _entry_ts(e)) is not None and ts >= cutoff_dt]
 
         if not entries:
             return {
@@ -808,11 +623,9 @@ def get_comparison_stats(since: Optional[str] = Query(None, description="ISO tim
             efficiency_ratio = 0
             token_savings_pct = 0
 
-        # Time series data: if a window filter is active, show all filtered entries (already scoped);
-        # for all-time, cap at 500 to avoid sending huge payloads.
+        # Time series data (most recent 50 entries, chronological order)
         time_series = []
-        max_points = 500 if cutoff_dt is None else len(entries)
-        recent_entries = entries[-max_points:] if len(entries) > max_points else entries
+        recent_entries = entries[-50:] if len(entries) > 50 else entries
         for i, entry in enumerate(recent_entries):
             time_series.append({
                 "index": i,
@@ -841,285 +654,6 @@ def get_comparison_stats(since: Optional[str] = Query(None, description="ISO tim
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ── User Tag Endpoints ─────────────────────────────────────────────────────────
-
-@app.get("/tags", response_model=dict)
-def get_tags(channel_label: Optional[str] = Query(None, description="Channel label for user tags")):
-    """
-    Return combined system + user tags with registry metadata.
-
-    If channel_label is provided, also returns user tags for that channel.
-    """
-    try:
-        import yaml as _yaml
-
-        registry = get_registry()
-        tag_counts_map = store.tag_counts()
-
-        def _build_tag_list(tags_dict, scope: str) -> list:
-            result = []
-            for name, meta in tags_dict.items():
-                result.append({
-                    "name": name,
-                    "state": meta.state,
-                    "hits": meta.hits,
-                    "scope": scope,
-                })
-            return sorted(result, key=lambda x: x["hits"], reverse=True)
-
-        all_sys = registry._tags
-        system_tags = _build_tag_list(all_sys, "system")
-
-        user_tags_list = []
-        if channel_label:
-            _validate_label(channel_label)
-            user_reg = get_user_registry(channel_label)
-            if user_reg:
-                user_tags_list = _build_tag_list(user_reg._tags, "user")
-
-        return {"system_tags": system_tags, "user_tags": user_tags_list}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/tags/system", response_model=dict)
-def get_system_tags():
-    """Return system tags only."""
-    try:
-        registry = get_registry()
-        result = []
-        for name, meta in registry._tags.items():
-            result.append({
-                "name": name,
-                "state": meta.state,
-                "hits": meta.hits,
-                "scope": "system",
-            })
-        return {"system_tags": sorted(result, key=lambda x: x["hits"], reverse=True)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/tags/user/{label}", response_model=dict)
-def get_user_tags(label: str):
-    """Return user tags for a specific channel label."""
-    try:
-        _validate_label(label)
-        user_reg = get_user_registry(label)
-        result = []
-        if user_reg:
-            for name, meta in user_reg._tags.items():
-                result.append({
-                    "name": name,
-                    "state": meta.state,
-                    "hits": meta.hits,
-                    "scope": "user",
-                })
-        return {"user_tags": sorted(result, key=lambda x: x["hits"], reverse=True), "channel_label": label}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/tags/user/{label}/add", response_model=dict)
-def add_user_tag(label: str, request: AddUserTagRequest):
-    """
-    Add a new user tag for a channel label.
-
-    Writes to ~/.tag-context/tags.user/<label>.yaml (hot-reloaded by tagger).
-    Also seeds the user registry with a candidate entry.
-    """
-    try:
-        _validate_label(label)
-        import yaml as _yaml
-
-        user_tags_path = USER_TAGS_DIR / f"{label}.yaml"
-        USER_TAGS_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Load existing or start fresh
-        if user_tags_path.exists():
-            with user_tags_path.open() as f:
-                data = _yaml.safe_load(f) or {}
-        else:
-            data = {"version": 1, "tags": []}
-
-        tags_list = data.get("tags", [])
-
-        # Check for duplicate
-        existing_names = [t["name"] for t in tags_list]
-        if request.name in existing_names:
-            raise HTTPException(status_code=409, detail=f"Tag '{request.name}' already exists for user '{label}'")
-
-        # Infer keywords from name if not provided
-        keywords = request.keywords
-        if not keywords:
-            # Generate keyword suggestions from tag name (replace hyphens/underscores with spaces)
-            keywords = [request.name.replace("-", " ").replace("_", " ")]
-
-        new_tag = {
-            "name": request.name,
-            "description": request.description,
-            "keywords": keywords,
-            "confidence": request.confidence,
-        }
-        tags_list.append(new_tag)
-        data["tags"] = tags_list
-
-        with user_tags_path.open("w") as f:
-            _yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-
-        # Seed registry candidate
-        import time as _time
-        user_reg = get_user_registry(label)
-        if user_reg and request.name not in user_reg._tags:
-            from tag_registry import TagMetadata
-            now = _time.time()
-            user_reg._tags[request.name] = TagMetadata(
-                name=request.name,
-                state="core",  # new user tags are immediately core
-                first_seen=now,
-                last_seen=now,
-                hits=0,
-                promoted_at=now,
-            )
-            user_reg.save()
-
-        return {
-            "success": True,
-            "tag": new_tag,
-            "inferred_keywords": keywords if not request.keywords else None,
-            "message": f"Tag '{request.name}' added for user '{label}'"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/tags/user/{label}/{tag_name}", response_model=dict)
-def archive_user_tag(label: str, tag_name: str):
-    """
-    Archive a user tag (move to archived state; do not delete from YAML).
-
-    Updates the user registry to mark the tag as archived.
-    """
-    try:
-        _validate_label(label)
-        user_reg = get_user_registry(label)
-        if user_reg is None:
-            raise HTTPException(status_code=404, detail=f"No registry for user '{label}'")
-
-        if tag_name not in user_reg._tags:
-            raise HTTPException(status_code=404, detail=f"Tag '{tag_name}' not found for user '{label}'")
-
-        import time as _time
-        tag = user_reg._tags[tag_name]
-        tag.state = "archived"
-        tag.archived_at = _time.time()
-        user_reg.save()
-
-        return {"success": True, "message": f"Tag '{tag_name}' archived for user '{label}'"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/tags/user/{label}/retag", response_model=dict)
-def retag_user_corpus(label: str):
-    """
-    Retag the user's corpus with current user tags.
-
-    Only touches messages with matching channel_label. This re-runs tag
-    inference on the user's messages and updates their tags in the store.
-    """
-    try:
-        _validate_label(label)
-        from fixed_tagger import FixedTagger
-        from features import extract_features as _extract_features
-
-        ch_tagger = FixedTagger.for_channel(label)
-        messages = store.get_recent(10000, channel_label=label)
-
-        updated = 0
-        for msg in messages:
-            features = _extract_features(msg.user_text, msg.assistant_text)
-            new_tags = ch_tagger.assign(features, msg.user_text, msg.assistant_text).tags
-            if set(new_tags) != set(msg.tags):
-                # Clear old tags and re-add
-                with store._lock:
-                    conn = store._conn()
-                    conn.execute("DELETE FROM tags WHERE message_id = ?", (msg.id,))
-                    for tag in new_tags:
-                        conn.execute(
-                            "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
-                            (msg.id, tag),
-                        )
-                    conn.commit()
-                updated += 1
-
-        return {
-            "success": True,
-            "channel_label": label,
-            "messages_processed": len(messages),
-            "messages_updated": updated,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── Admin: Global Retag ────────────────────────────────────────────────────────
-
-@app.post("/admin/retag", response_model=dict)
-def retag_all(batch_size: int = Query(500, ge=50, le=5000)):
-    """
-    Re-tag the entire corpus with current system tagger rules.
-
-    This re-runs the ensemble tagger on every stored message and updates tags.
-    Use after changing tagger rules to backfill the new logic.
-    Safe to run multiple times. Returns count of updated messages.
-    """
-    try:
-        messages = store.get_recent(100_000)  # All messages
-        updated = 0
-        total = len(messages)
-        for msg in messages:
-            features = extract_features(msg.user_text, msg.assistant_text)
-            new_tags = ensemble.assign(features, msg.user_text, msg.assistant_text).tags
-            if set(new_tags) != set(msg.tags):
-                with store._lock:
-                    conn = store._conn()
-                    conn.execute("DELETE FROM tags WHERE message_id = ?", (msg.id,))
-                    for tag in new_tags:
-                        conn.execute(
-                            "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
-                            (msg.id, tag),
-                        )
-                    conn.commit()
-                updated += 1
-        return {
-            "success": True,
-            "messages_processed": total,
-            "messages_updated": updated,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── Backfill Endpoint ──────────────────────────────────────────────────────────
-
-@app.post("/admin/backfill-channel-labels", response_model=dict)
-def backfill_channel_labels():
-    """
-    One-time migration: set channel_label on existing messages based on session_id patterns.
-    Safe to run multiple times (only updates NULL rows).
-    """
-    try:
-        counts = store.backfill_channel_labels()
-        return {"success": True, "updated": counts}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # ── Dashboard Endpoint ─────────────────────────────────────────────────────────
 
@@ -1224,7 +758,14 @@ def create_pin(request: PinRequest):
 
 @app.post("/unpin", response_model=dict)
 def remove_pin(request: UnpinRequest):
-    """Remove a pin by ID."""
+    """Remove a pin by ID.
+
+    What this does: Deletes a pin from the in-memory StickyPinManager.
+    The underlying message remains in the database; only the "keep in
+    context" flag is removed.
+
+    What it does NOT do: Does NOT delete messages, does NOT change tags.
+    """
     try:
         success = pin_manager.remove_pin(request.pin_id)
         if success:
@@ -1267,6 +808,212 @@ def get_pins():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ── Admin Endpoints ───────────────────────────────────────────────────────────
+
+class MergeLabelsRequest(BaseModel):
+    source_labels: list[str]
+    target_label: str
+    dry_run: bool = True
+
+
+@app.post("/admin/merge-channel-labels", response_model=dict)
+def admin_merge_channel_labels(req: MergeLabelsRequest):
+    """Merge source channel_label values into a single target label.
+
+    PURPOSE: Before channel_labels.yaml, each sender ID was stored as its own
+    label (e.g. "994902066" for Telegram, "510637988242522133" for Discord).
+    This endpoint retroactively consolidates them into canonical usernames.
+
+    DRY RUN (default): Set dry_run=true to preview changes. No data modified.
+
+    LIVE: Set dry_run=false. A timestamped DB backup is created first.
+
+    WARNING: Always dry-run first. This permanently modifies channel_label
+    values in the message store.
+    """
+    if not req.source_labels:
+        raise HTTPException(status_code=400, detail="source_labels must be non-empty")
+    if not req.target_label:
+        raise HTTPException(status_code=400, detail="target_label must be non-empty")
+
+    if req.dry_run:
+        stats = store.get_channel_label_stats()
+        affected = {}
+        for src in req.source_labels:
+            display_src = src or "(null)"
+            affected[display_src] = stats.get(display_src, {"count": 0, "sessions": 0})
+        total = sum(a["count"] for a in affected.values())
+        return {
+            "dry_run": True,
+            "action": "merge_channel_labels",
+            "source_labels": req.source_labels,
+            "target_label": req.target_label,
+            "affected": affected,
+            "total_rows_affected": total,
+            "note": "Set dry_run=false in the request body to execute.",
+        }
+
+    backup_path = _create_backup_db()
+    if not backup_path:
+        raise HTTPException(status_code=500, detail="Failed to create backup before merge")
+
+    result = store.merge_channel_labels(req.source_labels, req.target_label)
+    return {
+        "dry_run": False,
+        "action": "merge_channel_labels",
+        "source_labels": req.source_labels,
+        "target_label": req.target_label,
+        "rows_updated": result["rows_updated"],
+        "affected_id_count": len(result["affected_ids"]),
+        "backup_path": str(backup_path),
+        "note": "Run POST /admin/retag to rebuild tags on merged messages.",
+    }
+
+
+@app.post("/admin/merge-all-channel-labels", response_model=dict)
+def admin_merge_all_channel_labels(req: MergeLabelsRequest):
+    """Merge ALL non-null, non-target labels into target.
+
+    PURPOSE: Nuclear option — consolidates every fragmented label (numeric
+    IDs, unknowns, etc.) into one canonical label (e.g. "rich").
+
+    DRY RUN: Shows every label that would be merged with counts.
+    LIVE: Creates backup, then merges.
+
+    Skips target_label and NULL labels. NULL labels (pre-channel_label
+    column messages) are NOT touched.
+    """
+    stats = store.get_channel_label_stats()
+    to_merge = {
+        label: data
+        for label, data in stats.items()
+        if label != "(null)" and label != req.target_label
+    }
+    total = sum(d["count"] for d in to_merge.values())
+
+    if req.dry_run or not to_merge:
+        return {
+            "dry_run": True,
+            "target_label": req.target_label,
+            "labels_to_merge": to_merge,
+            "total_rows_affected": total,
+            "note": "Set dry_run=false to execute.",
+        }
+
+    backup_path = _create_backup_db()
+    if not backup_path:
+        raise HTTPException(status_code=500, detail="Failed to create backup")
+
+    source_labels = list(to_merge.keys())
+    result = store.merge_channel_labels(source_labels, req.target_label)
+    return {
+        "dry_run": False,
+        "labels_merged": source_labels,
+        "rows_updated": result["rows_updated"],
+        "backup_path": str(backup_path),
+        "note": "Run POST /admin/retag to rebuild tags.",
+    }
+
+
+class RetagRequest(BaseModel):
+    message_ids: Optional[list[str]] = None
+    limit: int = 100
+
+
+@app.post("/admin/retag", response_model=dict)
+def admin_retag(req: RetagRequest):
+    """Re-run tagging on existing messages.
+
+    PURPOSE: After merging labels or updating tags.yaml, rebuild tags on
+    existing messages so retrieval quality is restored.
+
+    If message_ids provided: only those messages are retagged.
+    If not provided: the N most recent non-automated messages are retagged.
+
+    WARNING: CPU-intensive at scale. Use during low-traffic periods.
+    Each message requires a full ensemble tagger evaluation.
+    """
+    if req.message_ids:
+        messages = []
+        for mid in req.message_ids:
+            msg = store.get_by_id(mid)
+            if msg:
+                messages.append(msg)
+        if not messages:
+            raise HTTPException(status_code=400, detail="No valid message_ids found")
+    else:
+        messages = store.get_non_automated(limit=req.limit)
+
+    retagged = 0
+    for msg in messages:
+        clean_user = strip_envelope(msg.user_text)
+        features = extract_features(clean_user, msg.assistant_text)
+        new_tags = ensemble.assign(features, clean_user, msg.assistant_text).tags
+        if set(new_tags) != set(msg.tags):
+            with store._lock:
+                conn = store._conn()
+                conn.execute("DELETE FROM tags WHERE message_id = ?", (msg.id,))
+                for tag in new_tags:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
+                        (msg.id, tag),
+                    )
+                conn.commit()
+            retagged += 1
+
+    return {
+        "retagged": retagged,
+        "total_processed": len(messages),
+        "unchanged": len(messages) - retagged,
+    }
+
+
+@app.get("/admin/channel-labels", response_model=dict)
+def admin_channel_labels():
+    """List all channel labels with counts and session counts.
+
+    PURPOSE: Verify label distribution after deploying channel_labels.yaml
+    or after a merge. Non-destructive, safe to call anytime.
+
+    Returns: {label: {count, sessions}} for every distinct channel_label.
+    """
+    stats = store.get_channel_label_stats()
+    return {
+        "channel_labels": stats,
+        "total_labels": len(stats),
+        "total_messages": sum(d["count"] for d in stats.values()),
+    }
+
+
+def _create_backup_db() -> Optional[Path]:
+    """Create a timestamped backup of the store database before destructive ops.
+
+    Returns the backup path, or None on failure.
+    """
+    try:
+        from datetime import datetime
+        import shutil
+
+        db_path = Path(store._db_path)
+        if not db_path.exists():
+            return None
+
+        backup_dir = db_path.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = backup_dir / f"store_{ts}.db"
+
+        shutil.copy2(str(db_path), str(backup_path))
+
+        if backup_path.exists() and backup_path.stat().st_size == db_path.stat().st_size:
+            return backup_path
+        return None
+    except Exception:
+        import logging
+        logging.exception("Failed to create database backup")
+        return None
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8350)
+    uvicorn.run(app, host="127.0.0.1", port=8300)

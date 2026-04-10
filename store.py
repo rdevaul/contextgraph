@@ -1,5 +1,8 @@
 """
 store.py — SQLite-backed message store and tag index for the tag-context system.
+
+Schema: messages (id, channel_label), tags (message_id, tag), pins
+Admin operations: get_channel_label_stats(), merge_channel_labels()
 """
 
 import json
@@ -268,8 +271,7 @@ class MessageStore:
         tags = self._fetch_tags_for(conn, message_id)
         return self._row_to_message(row, tags)
 
-    def get_recent(self, n: int, include_automated: bool = False,
-                   channel_label: Optional[str] = None) -> List[Message]:
+    def get_recent(self, n: int, include_automated: bool = False) -> List[Message]:
         """Return the N most recent messages, newest first.
 
         Parameters
@@ -278,27 +280,15 @@ class MessageStore:
             Number of messages to return
         include_automated : bool
             If False (default), exclude automated turns (cron/heartbeat/etc)
-        channel_label : Optional[str]
-            If set, only return messages with this channel_label.
-            If None, return messages from all channels.
         """
         conn = self._conn()
 
-        conditions = []
-        params: list = []
+        if include_automated:
+            query = "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?"
+        else:
+            query = "SELECT * FROM messages WHERE is_automated = 0 ORDER BY timestamp DESC LIMIT ?"
 
-        if not include_automated:
-            conditions.append("is_automated = 0")
-
-        if channel_label is not None:
-            conditions.append("channel_label = ?")
-            params.append(channel_label)
-
-        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        query = f"SELECT * FROM messages {where_clause} ORDER BY timestamp DESC LIMIT ?"
-        params.append(n)
-
-        rows = conn.execute(query, params).fetchall()
+        rows = conn.execute(query, (n,)).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -314,8 +304,7 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
-    def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False,
-                   channel_label: Optional[str] = None) -> List[Message]:
+    def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False) -> List[Message]:
         """Return messages carrying `tag`, newest first.
 
         Parameters
@@ -326,31 +315,23 @@ class MessageStore:
             Maximum number of messages to return
         include_automated : bool
             If False (default), exclude automated turns (cron/heartbeat/etc)
-        channel_label : Optional[str]
-            If set, only return messages with this channel_label (user-scoped retrieval).
-            If None, return messages from all channels (system tag behaviour).
         """
         conn = self._conn()
 
-        conditions = ["t.tag = ?"]
-        params: list = [tag]
+        if include_automated:
+            query = """SELECT m.* FROM messages m
+                       INNER JOIN tags t ON m.id = t.message_id
+                       WHERE t.tag = ?
+                       ORDER BY m.timestamp DESC
+                       LIMIT ?"""
+        else:
+            query = """SELECT m.* FROM messages m
+                       INNER JOIN tags t ON m.id = t.message_id
+                       WHERE t.tag = ? AND m.is_automated = 0
+                       ORDER BY m.timestamp DESC
+                       LIMIT ?"""
 
-        if not include_automated:
-            conditions.append("m.is_automated = 0")
-
-        if channel_label is not None:
-            conditions.append("m.channel_label = ?")
-            params.append(channel_label)
-
-        where_clause = " AND ".join(conditions)
-        query = f"""SELECT m.* FROM messages m
-                   INNER JOIN tags t ON m.id = t.message_id
-                   WHERE {where_clause}
-                   ORDER BY m.timestamp DESC
-                   LIMIT ?"""
-        params.append(limit)
-
-        rows = conn.execute(query, params).fetchall()
+        rows = conn.execute(query, (tag, limit)).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -363,30 +344,12 @@ class MessageStore:
         ).fetchall()
         return [r["tag"] for r in rows]
 
-    def tag_counts(self, include_automated: bool = False) -> dict:
-        """Return {tag: message_count} for all tags.
-
-        Parameters
-        ----------
-        include_automated : bool
-            If False (default), exclude automated turns (cron/heartbeat/etc)
-            from tag frequency counts. This prevents automated messages from
-            inflating tag frequencies in the dashboard/quality metrics.
-        """
+    def tag_counts(self) -> dict:
+        """Return {tag: message_count} for all tags."""
         conn = self._conn()
-        if include_automated:
-            rows = conn.execute(
-                "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """SELECT t.tag, COUNT(*) as cnt
-                   FROM tags t
-                   JOIN messages m ON t.message_id = m.id
-                   WHERE m.is_automated = 0
-                   GROUP BY t.tag
-                   ORDER BY cnt DESC"""
-            ).fetchall()
+        rows = conn.execute(
+            "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
+        ).fetchall()
         return {r["tag"]: r["cnt"] for r in rows}
 
     def get_by_external_id(self, external_id: str) -> Optional[Message]:
@@ -416,11 +379,6 @@ class MessageStore:
         msg_by_ext_id = {r["external_id"]: self._row_to_message(r, tags_map[r["id"]]) for r in rows}
         # Return in the same order as input, skipping missing
         return [msg_by_ext_id[eid] for eid in external_ids if eid in msg_by_ext_id]
-
-    def count(self) -> int:
-        """Return exact total number of messages in the store."""
-        conn = self._conn()
-        return conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
     def get_non_automated(self, limit: int = 1000) -> List[Message]:
         """Return non-automated messages (excluding cron/heartbeat turns), newest first."""
@@ -457,36 +415,80 @@ class MessageStore:
         )
         conn.commit()
 
-    # ── backfill ──────────────────────────────────────────────────────────────
+    # ── admin: channel label merge ──────────────────────────────────────────
 
-    def backfill_channel_labels(self) -> dict:
-        """
-        One-time migration: set channel_label on existing messages based on session_id patterns.
+    def get_channel_label_stats(self) -> dict:
+        """Return {channel_label: {count, sessions}} for every label in the DB.
 
-        Returns a dict of {label: count} showing how many rows were updated per label.
+        Used by the merge dry-run to show what will be merged before touching data.
         """
-        mappings = [
-            ("glados-dana", "dana"),
-            ("glados-terry", "terry"),
-            ("glados-household", "household"),
-            ("cron:", "cron"),
-        ]
-        counts: dict = {}
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT channel_label, COUNT(*) as cnt, COUNT(DISTINCT session_id) as sessions "
+            "FROM messages GROUP BY channel_label ORDER BY cnt DESC"
+        ).fetchall()
+        return {
+            (r["channel_label"] or "(null)"): {
+                "count": r["cnt"],
+                "sessions": r["sessions"],
+            }
+            for r in rows
+        }
+
+    def merge_channel_labels(
+        self,
+        source_labels: list[str],
+        target_label: str,
+    ) -> dict:
+        """Merge one or more source channel_label values into a target label.
+
+        This is the migration tool for consolidating split user profiles that
+        arose before the sender ID → username mapping was deployed.
+
+        Steps:
+        1. UPDATE messages SET channel_label = target WHERE channel_label IN (…)
+        2. If re_tag=True, return the list of affected message IDs so the caller
+           can re-run tagging on those messages (via the /admin/retag endpoint).
+
+        Returns {"rows_updated": int, "affected_ids": [str, …]}
+        """
+        if not source_labels:
+            raise ValueError("source_labels must be non-empty")
+
         with self._lock:
             conn = self._conn()
-            for pattern, label in mappings:
-                result = conn.execute(
-                    "UPDATE messages SET channel_label = ? "
-                    "WHERE session_id LIKE ? AND channel_label IS NULL",
-                    (label, f"%{pattern}%"),
-                )
-                counts[label] = result.rowcount
 
-            # Default: main agent sessions → 'rich'
-            result = conn.execute(
-                "UPDATE messages SET channel_label = 'rich' "
-                "WHERE channel_label IS NULL"
+            # Handle NULL channel_label: empty string in source_labels matches IS NULL
+            has_null = "" in source_labels or None in source_labels
+            non_null_labels = [l for l in source_labels if l != "" and l is not None]
+
+            # Build WHERE clause
+            conditions = []
+            params = []
+            if non_null_labels:
+                placeholders = ",".join("?" * len(non_null_labels))
+                conditions.append(f"channel_label IN ({placeholders})")
+                params.extend(non_null_labels)
+            if has_null:
+                conditions.append("channel_label IS NULL")
+
+            where = " OR ".join(f"({c})" if " OR " in c else c for c in conditions)
+
+            # Collect affected IDs before the update
+            rows = conn.execute(
+                f"SELECT id FROM messages WHERE {where}",
+                params,
+            ).fetchall()
+            affected_ids = [r["id"] for r in rows]
+
+            # Perform the merge
+            cursor = conn.execute(
+                f"UPDATE messages SET channel_label = ? WHERE {where}",
+                [target_label] + params,
             )
-            counts["rich"] = result.rowcount
             conn.commit()
-        return counts
+
+        return {
+            "rows_updated": cursor.rowcount,
+            "affected_ids": affected_ids,
+        }

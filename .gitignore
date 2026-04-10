@@ -20,3 +20,6 @@ service/*.plist
 
 # Live runtime state — grows with usage, contains emergent tags from real conversations
 data/tag_registry.json
+
+data/store.db-shm
+data/store.db-wal
