@@ -435,6 +435,26 @@ class MessageStore:
             for r in rows
         }
 
+    def count(self, include_automated: bool = False, channel_label: Optional[str] = None) -> int:
+        """Return message count, optionally filtered by channel_label.
+
+        Parameters
+        ----------
+        include_automated : bool
+            If False (default), exclude automated turns (cron/heartbeat/etc)
+        channel_label : str, optional
+            If provided, count only messages with this channel_label
+        """
+        query = "SELECT COUNT(*) FROM messages WHERE 1=1"
+        params = []
+        if not include_automated:
+            query += " AND is_automated = 0"
+        if channel_label:
+            query += " AND channel_label = ?"
+            params.append(channel_label)
+        conn = self._conn()
+        return conn.execute(query, params).fetchone()[0]
+
     def merge_channel_labels(
         self,
         source_labels: list[str],

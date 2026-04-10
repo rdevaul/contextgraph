@@ -43,22 +43,87 @@ function ensureGraphModeDir(): void {
   }
 }
 
-function readGraphMode(): boolean {
+/**
+ * Migrate old flat graph-mode.json format to per-user format.
+ * Old: {"enabled": true}
+ * New: {"enabled": {"user_label": true, ...}}
+ */
+function migrateGraphModeIfNeeded(): void {
   try {
+    if (!fs.existsSync(GRAPH_MODE_FILE)) {
+      return;
+    }
+    const raw = fs.readFileSync(GRAPH_MODE_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+
+    // Check if it's the old flat format (enabled is a boolean)
+    if (typeof parsed?.enabled === "boolean") {
+      const wasEnabled = parsed.enabled as boolean;
+      // Migrate: preserve the global setting as __default__ so existing users keep it
+      const newFormat: Record<string, unknown> = { enabled: {}, __default__: wasEnabled };
+      ensureGraphModeDir();
+      fs.writeFileSync(GRAPH_MODE_FILE, JSON.stringify(newFormat, null, 2), "utf8");
+    }
+  } catch {
+    // Migration failure is non-fatal - will default to false
+  }
+}
+
+function readGraphMode(userLabel: string): boolean {
+  try {
+    migrateGraphModeIfNeeded();
+
     if (!fs.existsSync(GRAPH_MODE_FILE)) {
       return false; // safe default
     }
     const raw = fs.readFileSync(GRAPH_MODE_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return Boolean(parsed?.enabled);
+
+    // New format: {"enabled": {"user_label": true, ...}}
+    if (parsed?.enabled && typeof parsed.enabled === "object") {
+      // Per-user override takes precedence
+      if (userLabel in parsed.enabled) {
+        return Boolean(parsed.enabled[userLabel]);
+      }
+      // Fall back to migration default (preserves old global setting under __default__)
+      if (parsed.__default__ !== undefined) {
+        return Boolean(parsed.__default__);
+      }
+      return false;
+    }
+
+    return false;
   } catch {
     return false;
   }
 }
 
-function writeGraphMode(enabled: boolean): void {
+function writeGraphMode(userLabel: string, enabled: boolean): void {
   ensureGraphModeDir();
-  fs.writeFileSync(GRAPH_MODE_FILE, JSON.stringify({ enabled }, null, 2), "utf8");
+
+  try {
+    migrateGraphModeIfNeeded();
+
+    let config = { enabled: {} as Record<string, boolean> };
+
+    // Read existing config if it exists
+    if (fs.existsSync(GRAPH_MODE_FILE)) {
+      const raw = fs.readFileSync(GRAPH_MODE_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (parsed?.enabled && typeof parsed.enabled === "object") {
+        config = parsed;
+      }
+    }
+
+    // Update the specific user's setting
+    config.enabled[userLabel] = enabled;
+
+    fs.writeFileSync(GRAPH_MODE_FILE, JSON.stringify(config, null, 2), "utf8");
+  } catch (err) {
+    // Fallback: create new config with just this user
+    const config = { enabled: { [userLabel]: enabled } };
+    fs.writeFileSync(GRAPH_MODE_FILE, JSON.stringify(config, null, 2), "utf8");
+  }
 }
 
 // ── HTTP helper ────────────────────────────────────────────────────────────
@@ -408,7 +473,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     info,
 
     async bootstrap({ sessionId, sessionFile }): Promise<BootstrapResult> {
-      if (!readGraphMode()) {
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) {
         return { bootstrapped: false, reason: "graph-mode-off" };
       }
 
@@ -450,6 +518,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
               user_text: userText,
               assistant_text: assistantText,
               timestamp: now,
+              channel_label: userLabel,
             },
             logger
           );
@@ -462,7 +531,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     },
 
     async ingest({ sessionId, message }): Promise<IngestResult> {
-      if (!readGraphMode()) {
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) {
         return { ingested: false };
       }
 
@@ -482,6 +554,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           user_text: text,
           assistant_text: "",
           timestamp: Date.now() / 1000,
+          channel_label: userLabel,
         },
         logger
       );
@@ -490,7 +563,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     },
 
     async ingestBatch({ sessionId, messages }): Promise<IngestBatchResult> {
-      if (!readGraphMode()) {
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) {
         return { ingestedCount: 0 };
       }
 
@@ -507,6 +583,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           user_text: userParts.join("\n"),
           assistant_text: assistantParts.join("\n"),
           timestamp: Date.now() / 1000,
+          channel_label: userLabel,
         },
         logger
       );
@@ -515,7 +592,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     },
 
     async assemble({ sessionId, messages, tokenBudget }): Promise<AssembleResult> {
-      if (!readGraphMode()) {
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) {
         // Pass-through: still sanitize tool pairs before returning.
         const safe = removeOrphanedToolPairs(messages, logger);
         return {
@@ -640,7 +720,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     },
 
     async compact({ sessionId }): Promise<CompactResult> {
-      if (!readGraphMode()) {
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) {
         return { ok: true, compacted: false, reason: "graph-off-defer-to-legacy" };
       }
       // Graph engine uses semantic retrieval — no compaction needed
@@ -648,7 +731,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     },
 
     async afterTurn({ sessionId, messages, prePromptMessageCount }): Promise<void> {
-      if (!readGraphMode()) return;
+      // Infer user label from session ID for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+
+      if (!readGraphMode(userLabel)) return;
 
       // Only ingest messages from THIS turn — not the full session history.
       // prePromptMessageCount tells us how many messages existed before the prompt
@@ -702,6 +788,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           user_text: userText || "",
           assistant_text: assistantText,
           timestamp: Date.now() / 1000,
+          channel_label: userLabel,
         },
         logger
       );
@@ -756,23 +843,26 @@ export default function register(api: OpenClawPluginApi): void {
   // Register /graph command
   api.registerCommand({
     name: "graph",
-    description: "Toggle or check the context graph engine mode",
+    description: "Toggle or check the context graph engine mode (per-user)",
     acceptsArgs: true,
     handler: async (ctx) => {
+      // Infer user label from sender/session context
+      const userLabel = inferChannelLabel(ctx.senderId, (ctx as any).sessionId, logger);
+
       const arg = (ctx.args ?? "").trim().toLowerCase();
 
       if (arg === "on") {
-        writeGraphMode(true);
-        return { text: "🔀 Context graph engine activated. Using DAG-based context assembly." };
+        writeGraphMode(userLabel, true);
+        return { text: `🔀 Context graph engine activated for **${userLabel}**. Using DAG-based context assembly.` };
       }
 
       if (arg === "off") {
-        writeGraphMode(false);
-        return { text: "🔀 Switched back to linear context window." };
+        writeGraphMode(userLabel, false);
+        return { text: `🔀 Switched back to linear context window for **${userLabel}**.` };
       }
 
       // Status check
-      const enabled = readGraphMode();
+      const enabled = readGraphMode(userLabel);
 
       // Optionally ping the API to check health
       let apiStatus = "unknown";
@@ -793,7 +883,7 @@ export default function register(api: OpenClawPluginApi): void {
 
       const modeLabel = enabled ? "🟢 ON" : "⚪ OFF";
       return {
-        text: `**Context Graph Engine**\nMode: ${modeLabel}\nPython API: ${apiStatus}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
+        text: `**Context Graph Engine** (\`${userLabel}\`)\nMode: ${modeLabel}\nPython API: ${apiStatus}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
       };
     },
   });
