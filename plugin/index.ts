@@ -2,7 +2,7 @@
  * contextgraph — OpenClaw ContextEngine Plugin
  *
  * Bridges OpenClaw's ContextEngine interface to the contextgraph Python
- * FastAPI server running at http://localhost:8300.
+ * FastAPI server running at http://localhost:8302.
  *
  * When graph mode is OFF (default): transparent pass-through — behaves
  * identically to the legacy linear context window.
@@ -30,7 +30,7 @@ import * as os from "node:os";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const PYTHON_API_BASE = process.env.CONTEXTGRAPH_API_URL ?? "http://localhost:8300";
+const PYTHON_API_BASE = process.env.CONTEXTGRAPH_API_URL ?? "http://localhost:8302";
 const REQUEST_TIMEOUT_MS = 5000;
 const GRAPH_MODE_FILE = path.join(os.homedir(), ".tag-context", "graph-mode.json");
 const GRAPH_MODE_DIR = path.dirname(GRAPH_MODE_FILE);

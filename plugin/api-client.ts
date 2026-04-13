@@ -63,7 +63,7 @@ export class ContextGraphAPIClient {
   private baseURL: string;
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL ?? process.env.CONTEXTGRAPH_API_URL ?? "http://127.0.0.1:8300";
+    this.baseURL = baseURL ?? process.env.CONTEXTGRAPH_API_URL ?? "http://127.0.0.1:8302";
   }
 
   async tag(userText: string, assistantText: string): Promise<TagResponse> {
