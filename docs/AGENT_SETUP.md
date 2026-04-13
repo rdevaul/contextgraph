@@ -1,3 +1,4 @@
+<!-- HISTORICAL: This document is preserved from an earlier era. Many details are stale (references to ensemble.py, old component counts). See README.md and docs/SPEC.md for current system documentation. Retained for reference only. Not actively maintained. -->
 # AGENT_SETUP.md — Operational Guide for OpenClaw Agents
 
 This document describes the current deployment of the Context Graph system

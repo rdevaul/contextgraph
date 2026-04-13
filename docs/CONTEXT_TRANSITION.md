@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Feb 2026 design doc describing the problem statement and transition phases. All phases complete. Retained for reference only. Not actively maintained. -->
 # From Linear Window to Context Graph: A Transition Design Doc
 
 *Written: 2026-02-27*

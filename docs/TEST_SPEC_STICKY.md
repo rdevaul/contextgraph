@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 test specification for sticky thread system. Test spec completed. Retained for reference only. Not actively maintained. -->
 # Sticky Thread Test Specification
 
 *Written: 2026-03-18*

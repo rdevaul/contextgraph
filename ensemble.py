@@ -1,11 +1,13 @@
 """
-ensemble.py — Mixture model tagger combining multiple tagging strategies.
+ensemble.py — Thin wrapper around FixedTagger for the tag-context system.
 
-The ensemble runs multiple taggers on each message, combines their outputs
-with quality-agent-derived weights, and applies a pruning step to maintain
-precision while gaining recall from diversity.
+Originally designed as a mixture model combining multiple tagging strategies
+(Fixed + GP tagger), but the GP tagger requires the DEAP library which
+was never successfully integrated. This module now serves as a compatibility
+wrapper around FixedTagger.
 
-This is the "tagger family" from the design doc.
+The "hybrid" and "gp-only" modes are deprecated — they will raise ImportError
+if DEAP is not installed. Use TAGGER_MODE="fixed" (the default).
 """
 
 from dataclasses import dataclass, field
@@ -38,12 +40,16 @@ class EnsembleResult:
 
 class EnsembleTagger:
     """
-    Weighted mixture model over multiple taggers.
+    FixedTagger-compatible wrapper (formerly a multi-tagger ensemble).
+
+    Originally designed to run multiple taggers with weighted voting, but
+    since the GP tagger (DEAP-based) never worked, this now effectively
+    wraps a single FixedTagger. The ensemble infrastructure (weight updates,
+    per-tagger attribution, vote thresholds) is preserved for future use
+    if additional taggers are added.
 
     Tags are included if their weighted vote exceeds the threshold.
     Weights come from the quality agent's historical fitness scores.
-
-    This is the core "tagger family" from the tag-context design doc.
     """
 
     def __init__(
@@ -148,12 +154,12 @@ def build_ensemble(
     vote_threshold: float = 0.4,
 ) -> EnsembleTagger:
     """
-    Build an ensemble tagger based on the specified mode.
+    Build a tagger based on the specified mode.
 
     Modes:
-    - "fixed": FixedTagger only (no GP, DEAP not required)
-    - "hybrid": FixedTagger + GP tagger (default)
-    - "gp-only": GP tagger only (legacy mode)
+    - "fixed": FixedTagger only (default — recommended, no extra deps)
+    - "hybrid": DEPRECATED — FixedTagger + GP tagger (requires DEAP)
+    - "gp-only": DEPRECATED — GP tagger only (requires DEAP)
 
     If mode is None, uses config.TAGGER_MODE (defaults to "fixed").
     """

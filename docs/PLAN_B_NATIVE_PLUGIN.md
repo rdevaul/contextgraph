@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 implementation plan for completed Phase 3. Retained for reference only. Not actively maintained. -->
 # Plan B: Native OpenClaw Context Engine Plugin
 
 *Written: 2026-03-12*

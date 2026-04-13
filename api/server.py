@@ -81,6 +81,7 @@ class UnpinRequest(BaseModel):
 class CompareResponse(BaseModel):
     graph_assembly: dict
     linear_window: dict
+    inferred_tags: list = []
 
 store = MessageStore()
 quality_agent = QualityAgent()
@@ -115,65 +116,19 @@ ensemble.register('baseline', baseline_tagger, 1.0)
 @app.on_event("startup")
 async def startup_event():
     store.get_all_tags()  # Initialize the store
-    _seed_registry_from_yaml()
+    # System tags loaded from data/system_tags.json in TagRegistry.__init__
+    # No seeding from YAML — explicit config file is the source of truth.
 
 
+# Legacy seeding function — no longer used (system_tags.json is the source of truth)
+# Kept here as reference for historical understanding
 def _seed_registry_from_yaml() -> None:
     """
-    Auto-seed the tag registry with any enabled tags in tags.yaml that
-    aren't already registered. This means adding a tag to tags.yaml is
-    all that's needed — no manual registry surgery required.
+    DEPRECATED: Auto-seeded from tags.yaml.
+    Replaced by explicit data/system_tags.json config.
+    See docs/TAG_SYSTEM_DESIGN.md
     """
-    import logging
-    try:
-        import yaml
-    except ImportError:
-        logging.warning("pyyaml not installed; skipping tags.yaml registry seed")
-        return
-
-    tags_yaml_path = Path(__file__).parent.parent / "tags.yaml"
-    if not tags_yaml_path.exists():
-        return
-
-    try:
-        with tags_yaml_path.open() as f:
-            data = yaml.safe_load(f)
-    except Exception as e:
-        logging.warning(f"Failed to load tags.yaml for registry seeding: {e}")
-        return
-
-    registry = get_registry()
-    active_tags = registry.get_active_tags()  # core + candidate
-    archived_tags = set(registry.get_archived().keys())
-
-    import time
-    now = time.time()
-    seeded = []
-
-    for entry in data.get("tags", []):
-        name = entry.get("name")
-        if not name:
-            continue
-        if not entry.get("enabled", True):
-            continue  # skip disabled tags
-        if name in active_tags or name in archived_tags:
-            continue  # already known to the registry
-
-        # New tag in yaml — seed it as core so it's immediately active
-        from tag_registry import TagMetadata
-        registry._tags[name] = TagMetadata(
-            name=name,
-            state="core",
-            first_seen=now,
-            last_seen=now,
-            hits=0,
-            promoted_at=now,
-        )
-        seeded.append(name)
-
-    if seeded:
-        registry.save()
-        logging.info(f"Registry seeded {len(seeded)} new tag(s) from tags.yaml: {seeded}")
+    pass
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):
@@ -473,6 +428,67 @@ def metrics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/tags", response_model=dict)
+def get_tags():
+    """Return system and user tags with metadata for /tags command in plugins."""
+    try:
+        registry = get_registry()
+
+        # System tags: all tags from the registry with state, hits, corpus_pct
+        corpus_size = store.count()
+        system_tags = []
+        for tag_name, meta in registry._tags.items():
+            corpus_pct = (meta.hits / corpus_size) if corpus_size > 0 else 0.0
+            system_tags.append({
+                "name": tag_name,
+                "state": meta.state,
+                "hits": meta.hits,
+                "corpus_pct": round(corpus_pct, 4),
+            })
+
+        # User tags: aggregate from per-user registries, deduplicating by
+        # (name, channel). Only include tags with user-specific data
+        # (hits > 0 or candidate/archived state) to avoid echoing
+        # every system tag for every user.
+        from tag_registry import get_user_registry, USER_REGISTRY_DIR
+        user_tags_map = {}  # (name, channel) -> tag dict
+        if USER_REGISTRY_DIR.exists():
+            for reg_file in sorted(USER_REGISTRY_DIR.glob("*.json")):
+                channel_label = reg_file.stem
+                try:
+                    user_reg = get_user_registry(channel_label)
+                    if user_reg:
+                        for tag_name, meta in user_reg._tags.items():
+                            key = (tag_name, channel_label)
+                            # Aggregate hits from registries that share the same
+                            # channel label (e.g. multiple users on one channel)
+                            if key in user_tags_map:
+                                user_tags_map[key]["hits"] += meta.hits
+                            else:
+                                user_tags_map[key] = {
+                                    "name": tag_name,
+                                    "state": meta.state,
+                                    "hits": meta.hits,
+                                    "channel": channel_label,
+                                }
+                except Exception:
+                    pass
+
+        # Filter: only show tags with actual user activity
+        user_tags = [
+            t for t in user_tags_map.values()
+            if t["hits"] > 0 or t["state"] != "core"
+        ]
+        # Sort by hits descending
+        user_tags.sort(key=lambda t: (-t["hits"], t["name"]))
+
+        return {
+            "system_tags": system_tags,
+            "user_tags": user_tags,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/compare", response_model=CompareResponse)
 def compare(request: TagRequest):
     try:
@@ -516,7 +532,7 @@ def compare(request: TagRequest):
             "tags_used": list(set(tag for msg in linear_window_messages for tag in msg.tags))
         }
 
-        return CompareResponse(graph_assembly=graph_assembly, linear_window=linear_window)
+        return CompareResponse(graph_assembly=graph_assembly, linear_window=linear_window, inferred_tags=graph_assembly.get("tags_used", []))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -709,20 +725,16 @@ def force_demote_tag(tag_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Registry tick removed — no promotion/demotion in explicit-only system.
 @app.post("/registry/tick", response_model=dict)
 def registry_tick():
-    """Run promotion and demotion cycle on tag registry."""
-    try:
-        registry = get_registry()
-        promoted = registry.promote_candidates()
-        demoted = registry.demote_stale()
-        return {
-            "promoted": promoted,
-            "demoted": demoted,
-            "message": f"Promoted {len(promoted)} candidates, archived {len(demoted)} stale tags"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """DEPRECATED: No longer performs promotion/demotion.
+    System tags are explicit-only (see docs/TAG_SYSTEM_DESIGN.md)."""
+    return {
+        "promoted": [],
+        "demoted": [],
+        "message": "Tick no longer runs — explicit-only tag system. See docs/TAG_SYSTEM_DESIGN.md.",
+    }
 
 # ── Sticky Pin Endpoints ──────────────────────────────────────────────────
 

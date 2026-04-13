@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 architecture doc for sticky threads. Design is implemented; some details may be stale. Retained for reference only. Not actively maintained. -->
 # Sticky Threads — Context Assembly Enhancement
 
 *Written: 2026-03-15*

@@ -3,7 +3,7 @@
 Directed acyclic context graph for LLM context management — tag-based
 retrieval replacing linear sliding windows.
 
-**Status:** v1.0-rc2 — Context Graph is production-ready. Memory integration is live, writing to MEMORY.md every 4 hours via launchd. Dashboard at `/dashboard` provides real-time quality and efficiency metrics. Token efficiency: ~11.8% savings vs linear retrieval, 99%+ cache hit rate on context assembly.
+**Status:** Dashboard at `/dashboard` provides real-time quality and efficiency metrics. Token efficiency: ~11.8% savings vs linear retrieval, 99%+ cache hit rate on context assembly.
 
 ## Problem
 
@@ -31,11 +31,12 @@ discarded.
 Incoming message
        │
        ▼
-  FeatureExtractor ──► EnsembleTagger ──► inferred tags
-                        ├── v0 baseline       │
-                        └── GP-evolved        │
+  FeatureExtractor ──► FixedTagger ──► inferred tags
+                    (system + user tags)
+                                              │
                                               ▼
                                     ContextAssembler
+                                    ├── StickyLayer (pinned / tool-chain messages)
                                     ├── RecencyLayer (most recent N)
                                     └── TopicLayer  (by tag, deduped, IDF-filtered)
                                               │
@@ -55,9 +56,14 @@ Incoming message
 
 The **sticky layer** ensures that explicitly pinned turns remain in context regardless of recency or topic score. This is useful for preserving critical context (requirements docs, architecture decisions, reference material) throughout a long conversation thread.
 
-**When it activates:** A message is sticky if it has `is_sticky=True` in the store. This can be set via the `/pin` command in OpenClaw or through the API. When longer tool-focused turns are detected, the `is_sticky=True` is autmatically activated to prevent the agent from loosing the thread during complex, multi-turn activities.
+**How pins are created:**
 
-**Config:** The `STICKY_BUDGET_FRACTION` environment variable controls how much token budget is reserved for sticky turns (default: `0.20` — up to 20% of total token budget).
+1. **Manual pin** — Users send the `/pin` command in OpenClaw to pin a specific message.
+2. **Automatic tool-chain detection** — The server checks `pending_chain_ids` on each `/assemble` call. When tool-use chains are active, it automatically creates/extends pins via `pin_manager.update_or_create_tool_chain_pin()`. This works even when the plugin loses track of pending chains (e.g. after a gateway restart), because the server falls back to inspecting recent messages.
+
+**Data model:** Pins are stored in a separate `pins` table managed by the `pin_manager` module — there is no `is_sticky` column on the messages table.
+
+**Config:** The `STICKY_BUDGET_FRACTION` environment variable controls how much of the token budget is reserved for pinned/sticky messages (default: `0.3` — 30% of total budget).
 
 **Example use case:** In a "rocket design workflow" conversation, you might pin the initial requirements document turn so it persists through all subsequent back-and-forth, even as the conversation shifts through different subsystems and implementation details.
 
@@ -65,38 +71,36 @@ The **sticky layer** ensures that explicitly pinned turns remain in context rega
 
 Context Graph supports **user-specific tag definitions** alongside the global tag taxonomy. This allows individual users to customize tag ontology without affecting the shared baseline.
 
-**Directory structure:**
+**Data files:**
 ```
-tags.main/          # Global tag ontology (shared across all users)
-  ├── base.yaml
-  ├── code.yaml
-  ├── personal-assistant.yaml
-  └── ...
-tags.user/          # User-specific tag definitions
-  ├── alice.yaml
-  ├── bob.yaml
-  └── ...
+data/system_tags.json                           # Global/system tag definitions
+~/.tag-context/tags.user.registry/
+  ├── <channel_label>.json                      # User-scoped tag registries
+  ├── 994902066.json                            # (example: Rich's Telegram user ID)
+  └── 510637988242522133.json                   # (example: Discord user ID)
 ```
 
 **How it works:**
-- The system loads tags from both `tags.main/` (global) and `tags.user/` (user-specific) directories
-- User tags can override or extend global tags with domain-specific keywords
-- Each user's tags are isolated to their namespace to prevent conflicts
+- System tags are loaded from `data/system_tags.json`
+- User-scoped tags are stored as per-channel JSON files in `~/.tag-context/tags.user.registry/`
+- User tags extend (not replace) the system tag set — both are used during tagging
+- Each user/channel's tags are isolated to their own file to prevent conflicts
 
 **API endpoints:**
 ```bash
-# List all tags for user 'alice'
-GET /tags/user/alice
+# List all tag definitions for user (channel label)
+curl http://localhost:8300/tags/user/glados-rich
 
-# Add a new tag definition for user 'alice'
-POST /tags/user/alice/add
-Body: {"tag": "rocket-design", "keywords": ["propulsion", "nozzle", "thrust"]}
+# Add a new tag definition for a user
+curl -X POST http://localhost:8300/tags/user/glados-rich/add \
+  -H 'Content-Type: application/json' \
+  -d '{"tag": "rocket-design", "keywords": ["propulsion", "nozzle", "thrust"]}'
 
-# Delete a tag definition for user 'alice'
-DELETE /tags/user/alice/delete?tag=rocket-design
+# Delete a tag definition for a user
+curl -X DELETE http://localhost:8300/tags/user/glados-rich/rocket-design
 ```
 
-**Path traversal protection:** The API validates all user names to prevent directory traversal attacks (e.g., `../../../etc/passwd` is rejected).
+**Path traversal protection:** The API validates all user/channel label names to prevent directory traversal attacks (e.g., `../../../etc/passwd` is rejected).
 
 **Use cases:**
 - Personal assistant interactions with user-specific vocabulary (task management, reminders, scheduling, health tracking)
@@ -203,22 +207,6 @@ Production metrics across **580+ retrieval turns**, 4000-token budget:
   not a deficiency. The density metric can be adjusted by tuning the recency/topic
   budget split if needed.
 
-### Dynamic MEMORY.md modifications
-
-In addition to assembling context for each turn, the contextgraph system can
-update MEMORY.md with a summary of recent salient topics and information. This compliments
-the query-specific assembly for the current prompt, though there can be overlap.  In multi-agent
-systems with a single agent identity serving multiple users, the system-wide memory lives in MEMORY.md, with
-user-specific MEMORY.md files for each user agent. The contexgragph system can be configured to support this
-by updating only the per-user MEMORY.md file.
-
-### Shadow Mode
-
-In shadow mode, a non-operational copy of the modified MEMORY.md file is created so that the performance
-of the context graph system's updates can be evaluated before MEMORY.md is touched.
-
-Shadow evaluation can be run in two modes, each testing different aspects of the system:
-
 #### 1. Infinite budget mode (`--budget 999999`)
 
 This tests **retrieval quality** — what the system retrieves, independent of budget pressure:
@@ -258,36 +246,20 @@ remain meaningful at any budget:
 | Novel msgs delivered | ✅ Always |
 | Context density | ❌ Budget-dependent — ignore with large budgets |
 
-### GP Tagger Fitness (20 tags)
-
-Top-performing tags (fitness ≥ 0.90):
-`code`, `infrastructure`, `networking`, `question`, `shopping-list`, `llm`,
-`openclaw`, `voice-pwa`, `research`, `ai`, `deployment`, `devops`, `security`
-
-Mid-range (0.70–0.90): `planning`, `context-management`, `rl`
-
-Low-data tags (0.495): `api`, `debugging`, `personal`, `yapCAD`
-
 ## Components
 
 | File | Purpose |
 |---|---|
-| `store.py` | SQLite MessageStore + tag index |
+| `store.py` | SQLite MessageStore + tag index + `pin_manager` (sticky/pin layer) |
 | `features.py` | Feature extraction (NLP + structural) |
-| `tagger.py` | Rule-based baseline tagger (v0) |
-| `gp_tagger.py` | Genetically-evolved tagger (DEAP) |
-| `ensemble.py` | Weighted mixture model over tagger family |
-| `assembler.py` | Context assembly (recency + topic layers) |
+| `tagger.py` | `FixedTagger` — loads tags from `data/system_tags.json` + user registries |
+| `assembler.py` | Context assembly (sticky + recency + topic layers) |
 | `quality.py` | Quality agent (density + reframing scoring) |
 | `reframing.py` | Reframing signal detection |
 | `logger.py` | Interaction logging |
 | `cli.py` | CLI for manual testing |
-| `scripts/harvester.py` | Nightly interaction collection |
-| `scripts/evolve.py` | GP tagger retraining |
-| `scripts/replay.py` | Ensemble retagging of full corpus |
 | `scripts/shadow.py` | Phase 2 shadow mode evaluation |
 | `utils/text.py` | Shared text utilities: `strip_envelope()` strips channel metadata before indexing |
-| `scripts/update_memory_dynamic.py` | *(removed — superseded by per-turn plugin retrieval)* |
 
 ## Operations
 
@@ -374,7 +346,6 @@ Ingest a user/assistant message pair into the graph.
   "user_text": "How do I fix the gateway?",
   "assistant_text": "To fix the gateway, you need to...",
   "channel_label": "telegram:rocket-team",  // optional
-  "is_sticky": false,  // optional
   "skip_automated_detection": false  // optional
 }
 ```
@@ -485,12 +456,12 @@ Add or update a tag definition for a user.
 }
 ```
 
-#### DELETE `/tags/user/<name>/delete?tag=<tag_name>`
+#### DELETE `/tags/user/<name>/<tag_name>`
 Delete a tag definition for a user.
 
 **Example:**
 ```bash
-curl -X DELETE http://localhost:8300/tags/user/alice/delete?tag=rocket-design
+curl -X DELETE http://localhost:8300/tags/user/alice/rocket-design
 ```
 
 **Response:**
@@ -694,10 +665,8 @@ python3 -m pytest tests/ -v
   writes `~/.tag-context/comparison-log.jsonl` every turn. Dashboard at `/dashboard`
   provides real-time quality and efficiency metrics. See [`docs/PLAN_B_NATIVE_PLUGIN.md`](docs/PLAN_B_NATIVE_PLUGIN.md)
   for the full implementation plan.
-- [x] **Phase 4 — Memory Integration (v1.0-rc1, then deprecated).**
-  Originally used `update_memory_dynamic.py` to inject context into MEMORY.md every
-  4 hours. Removed 2026-03-31 — superseded by per-turn plugin retrieval which provides
-  fresher, more relevant context without bloating MEMORY.md.
+- [x] **Phase 4 — Memory Integration (deprecated).**
+  Superseded by per-turn plugin retrieval. Removed 2026-03-31.
 - [ ] **Phase 5 — Graph-Primary.** After extended validation, graph becomes the default
   context engine. Linear window available as fallback via `/graph off`.
 
@@ -717,9 +686,9 @@ vim my-domain-tags.yaml
 # The API server will detect changes and reload automatically
 ```
 
-### Filtered Memory Updates
+### Filtered Context Retrieval
 
-When running the memory updater script, you can filter retrieval by specific topics using the `--tags` flag:
+You can retrieve context filtered by specific tags directly via the API:
 
 ```bash
 # Only retrieve messages tagged with 'rocket-design'
@@ -729,7 +698,9 @@ curl -s 'http://localhost:8300/assemble?tags=rocket-design&budget=2000'
 curl -s 'http://localhost:8300/assemble?tags=rocket-design,propulsion&budget=2000'
 ```
 
-This is useful for querying domain-specific context via the API directly.
+This is useful for querying domain-specific context. _(The old `update_memory_dynamic.py`
+script that used this for MEMORY.md injection was removed on 2026-03-31 — context is now
+delivered per-turn by the plugin.)_
 
 ### Multi-Agent Deployments
 
@@ -763,13 +734,9 @@ This creates distinct service files (e.g., `com.glados.tag-context-glados-rich.p
 
 ## Documentation
 
-- [`docs/MEMORY_INTEGRATION.md`](docs/MEMORY_INTEGRATION.md) — **How Context Graph
-  works with the existing MEMORY.md / daily log paradigm.** Start here if you're
-  integrating Context Graph into an existing deployment without replacing the old
-  memory system. Includes ghost mode validation checklist and Phase 3.5 upgrade path.
 - [`docs/AGENT_SETUP.md`](docs/AGENT_SETUP.md) — **Operational guide for agents:**
-  full setup, service management, nightly scripts, diagnostics, and transition
-  status. Start here if you're taking over maintenance.
+  full setup, service management, diagnostics, and transition status.
+  Start here if you're taking over maintenance.
 - [`docs/CONTEXT_TRANSITION.md`](docs/CONTEXT_TRANSITION.md) — Design doc:
   the problem with linear context, the DAG vision, transition phases.
 - [`docs/PLAN_B_NATIVE_PLUGIN.md`](docs/PLAN_B_NATIVE_PLUGIN.md) — Implementation

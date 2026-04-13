@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 code review of user-scoped tags. Retained for reference only. Not actively maintained. -->
 # Code Review: User-Scoped Tags v1
 
 **Reviewer:** Opus (automated code review)  

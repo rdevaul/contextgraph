@@ -1,3 +1,5 @@
+<!-- CURRENT: Actively maintained documentation. Last reviewed 2026-04-12. -->
+
 # Channel Labels — Cross-Channel User Identity
 
 By default, the contextgraph plugin scopes user tags to the `senderId` provided

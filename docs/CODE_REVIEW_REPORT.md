@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 automated code review report for sticky thread fixes. Retained for reference only. Not actively maintained. -->
 # Code Review Report: Sticky Thread System Fixes
 
 **Reviewer:** Claude (Sonnet 4.5)

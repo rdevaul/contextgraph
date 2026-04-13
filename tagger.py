@@ -382,12 +382,21 @@ class TagAssignment:
     rules_fired: List[str]     # names of rules that matched
 
 
+# DEPRECATED: Superseded by FixedTagger.
+# This is the v0 hand-written rule-based tagger, retained for reference
+# and backwards compatibility. It is NOT used by default (TAGGER_MODE="fixed"
+# uses FixedTagger instead).
 class StructuredProgramTagger:
     """
-    v0 tagger: applies a fixed set of structured rules over MessageFeatures.
+    DEPRECATED — v0 rule-based tagger: applies fixed structured rules over
+    MessageFeatures.
 
-    This is the baseline "genome" — future GP-evolved taggers implement
-    the same `assign()` interface.
+    Superseded by FixedTagger, which provides a cleaner, config-driven
+    tagging approach. This class is retained for backwards compatibility
+    and reference purposes only.
+
+    This was the original "genome" prototype — the GP-evolved taggers that
+    were meant to evolve from this interface were never integrated.
     """
 
     def __init__(self, rules: Optional[List[TagRule]] = None,
@@ -425,9 +434,8 @@ class StructuredProgramTagger:
         # Canonicalize: only emit tags in active_tags
         canonical = [t for t in sorted(fired_tags) if t in active_tags]
 
-        # Track dropped tags and discover new candidates
-        dropped = [t for t in fired_tags if t not in active_tags]
-        registry.discover(canonical, dropped, features.entities)
+        # Tag discovery disabled — explicit-only system.
+        # See docs/TAG_SYSTEM_DESIGN.md
 
         return TagAssignment(
             tags=canonical,

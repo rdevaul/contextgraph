@@ -1,3 +1,4 @@
+<!-- HISTORICAL: Mar 2026 spec for user-scoped tags v1 (superseded by actual implementation). Retained for reference only. Not actively maintained. -->
 # User-Scoped Tags — Design Spec v1
 
 **Author:** GLaDOS (spec) + Rich (architecture direction)  

@@ -9,6 +9,7 @@ words for topic retrieval (they carry no discriminating signal). This threshold
 is configurable via TOPIC_TAG_MAX_CORPUS_FREQ.
 """
 
+import os
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -24,6 +25,10 @@ TOPIC_TAG_MAX_CORPUS_FREQ = 0.30
 # total token budget — prevents one giant turn from consuming the entire window.
 # The "always include first" safety valve is also capped at this size.
 MAX_SINGLE_MSG_BUDGET_FRACTION = 0.35
+
+# Fraction of token budget reserved for pinned/sticky messages.
+# Set STICKY_BUDGET_FRACTION env var to override (default 0.3 = 30%).
+DEFAULT_STICKY_BUDGET_FRACTION = float(os.environ.get("STICKY_BUDGET_FRACTION", "0.3"))
 
 
 def _estimate_tokens(msg: Message) -> int:
@@ -63,9 +68,11 @@ class ContextAssembler:
     retrieve from all channels. Pass user_tags to specify which tags are user-scoped.
     """
 
-    def __init__(self, store: MessageStore, token_budget: int = 4000) -> None:
+    def __init__(self, store: MessageStore, token_budget: int = 4000,
+                 sticky_budget_fraction: float = DEFAULT_STICKY_BUDGET_FRACTION) -> None:
         self.store = store
         self.token_budget = token_budget
+        self.sticky_budget_fraction = sticky_budget_fraction
 
     def assemble(self, incoming_text: str,
                  inferred_tags: List[str],
@@ -96,7 +103,7 @@ class ContextAssembler:
         sticky_tokens = 0
 
         if pinned_message_ids:
-            sticky_budget = int(self.token_budget * 0.3)
+            sticky_budget = int(self.token_budget * self.sticky_budget_fraction)
             # Try to fetch by external_id first (for OpenClaw IDs), fall back to internal ID
             for msg_id in pinned_message_ids:
                 msg = self.store.get_by_external_id(msg_id)
@@ -211,12 +218,10 @@ class ContextAssembler:
         tag_hit_count: dict = {}
 
         for tag in useful_tags:
-            # Apply channel_label filter only for user-scoped tags
-            tag_channel = channel_label if (channel_label and tag in user_tag_set) else None
-            # Fetch a larger pool (50) so we have real diversity to score against.
-            # Previously fetching only 20 meant the same fixed set of newest messages
-            # was returned every turn when a dominant tag (e.g. yapCAD) had >20 messages.
-            for msg in self.store.get_by_tag(tag, limit=50, channel_label=tag_channel):
+            # Channel label merge completed 2026-04-09: all messages now use unified
+            # channel labels. No need to pass channel_label to get_by_tag() anymore.
+            # User-scoped tags are filtered via user_tag_set, not channel_label.
+            for msg in self.store.get_by_tag(tag, limit=50):
                 if msg.id not in seen_ids:
                     topic_candidates.append(msg)
                     seen_ids.add(msg.id)
