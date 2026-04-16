@@ -39,6 +39,8 @@ tags:
       - bug fix
       - test suite
       - unit test
+      - pip install
+      - pip3 install
     patterns:
       - "```[\\s\\S]*?```"   # code block
       - "^    \\S"            # 4-space indent
@@ -69,6 +71,11 @@ tags:
       - permission denied
       - privilege escalation
       - injection attack
+      - security token
+      - api key
+      - vulnerability
+      - secret key
+      - access token
     confidence: 1.0
 
   - name: ai
@@ -82,6 +89,12 @@ tags:
       - fine-tuning
       - transformer
       - neural network
+      - anthropic
+      - openai
+      - benchmark
+      - gpt
+      - claude
+      - sonnet
     confidence: 1.0
 
   - name: llm
@@ -102,6 +115,7 @@ tags:
       - compaction
       - tag-context
       - context management
+      - context-management
       - quality agent
       - context graph
       - context budget
@@ -119,6 +133,14 @@ tags:
       - systemctl
       - daemon reload
       - ci/cd
+      - docker-compose
+      - kubectl
+      - kubernetes
+      - k8s
+      - helm
+    patterns:
+      - "docker-compose\\s+\\w+"
+      - "kubectl\\s+\\w+"
     confidence: 1.0
 
   - name: research
@@ -178,6 +200,7 @@ tags:
       - spawn agent
       - sessions_spawn
       - isolated session
+      - agent
     confidence: 1.0
 
   - name: trading
@@ -194,6 +217,24 @@ tags:
       - portfolio
       - earnings
       - volatility
+      - stock analysis
+      - AAPL
+      - TSLA
+      - SPY
+    confidence: 1.0
+
+  - name: finance
+    description: General finance topics, financial markets, economics
+    keywords:
+      - finance
+      - financial
+      - economy
+      - economics
+      - market
+      - stock market
+      - bond
+      - investment
+      - investor
     confidence: 1.0
 
   - name: hardware
@@ -205,6 +246,8 @@ tags:
       - framework
       - gpu memory
       - vram
+      - nvidia
+      - gpu
     confidence: 1.0
 
   - name: local-compute
@@ -233,6 +276,7 @@ tags:
       - contextgraph
       - store.db
       - interaction log
+      - compaction
     confidence: 1.0
 
   # ── Personal assistant tags ─────────────────────────────────────────────
@@ -382,6 +426,7 @@ tags:
   - name: finance-personal
     description: Personal finance, bills, banking, budget, retirement, investment planning
     keywords:
+      - finance
       - bank account
       - credit card
       - bill
@@ -606,4 +651,286 @@ tags:
       - switch-over
       - backup openclaw
       - openclaw-backup
+    confidence: 1.0
+
+  - name: voice-pwa
+    description: Voice PWA — speech-to-text (Voxtral STT), text-to-speech, voice UI
+    keywords:
+      - voice pwa
+      - tts
+      - stt
+      - speech to text
+      - speech-to-text
+      - text to speech
+      - text-to-speech
+      - transcription
+      - voice interface
+    patterns:
+      - "tts"
+      - "stt"
+    confidence: 1.0
+
+  - name: infrastructure
+    description: Server infrastructure, databases, containers, YAML configs, YAML manifests
+    keywords:
+      - infrastructure
+      - server
+      - database
+      - postgresql
+      - docker container
+      - container
+      - nginx
+      - apache
+      - load balancer
+      - microservice
+      - yaml config
+    confidence: 1.0
+
+  - name: openclaw
+    description: OpenClaw — the base project this runs on
+    keywords:
+      - openclaw
+      - open-claw
+      - clawd
+      - heartbea
+      - webhook
+      - gateway bot
+      - sybilclaw
+    confidence: 1.0
+
+  # ── Additional system tags ─────────────────────────────────────────────────
+
+  - name: api
+    description: API design, endpoints, authentication, REST/GraphQL
+    keywords:
+      - api key
+      - api endpoint
+      - api design
+      - rest api
+      - graphql
+    confidence: 1.0
+
+  - name: contextgraph
+    description: Context graph system, tag assembly, quality metrics
+    keywords:
+      - context graph
+      - contextgraph
+      - graph assembly
+      - graph mode
+      - zero return rate
+      - tag entropy
+    confidence: 1.0
+
+  - name: cron
+    description: Cron jobs, scheduled tasks, launchd
+    keywords:
+      - cron job
+      - scheduled task
+      - launchd
+    confidence: 1.0
+
+  - name: dark-matter-lab
+    description: Relativity Space / DML / moonshot engineering
+    keywords:
+      - dark matter lab
+      - dml
+      - relativity
+      - relativity space
+      - moonshot
+    confidence: 1.0
+
+  - name: data
+    description: Data pipelines, ETL, data analysis
+    keywords:
+      - data pipeline
+      - etl
+      - data analysis
+      - data processing
+    confidence: 1.0
+
+  - name: debugging
+    description: Debugging, troubleshooting, root cause analysis
+    keywords:
+      - debugging
+      - troubleshoot
+      - root cause
+      - stack trace
+    confidence: 1.0
+
+  - name: deployment
+    description: Deploying services, releases, production
+    keywords:
+      - deploy
+      - release
+      - production
+    confidence: 1.0
+
+  - name: documentation
+    description: Writing docs, README, spec files
+    keywords:
+      - documentation
+      - readme
+      - spec
+      - spec file
+      - docs
+    confidence: 1.0
+
+  - name: framework1
+    description: Framework1 — internal system
+    keywords:
+      - framework1
+      - framework-1
+    confidence: 1.0
+
+  - name: home-automation
+    description: Home automation, smart home devices
+    keywords:
+      - home automation
+      - smart home
+      - homekit
+      - home assistant
+    confidence: 1.0
+
+  - name: litellm
+    description: LiteLLM — LLM proxy/gateway
+    keywords:
+      - litellm
+      - lite llm
+    confidence: 1.0
+
+  - name: maxrisk
+    description: maxrisk — risk management system
+    keywords:
+      - maxrisk
+    confidence: 1.0
+
+  - name: media
+    description: Media files, images, audio, video
+    keywords:
+      - media file
+      - image
+      - audio file
+      - video
+    confidence: 1.0
+
+  - name: ollama
+    description: Ollama — local model serving
+    keywords:
+      - ollama
+      - ollama pull
+      - ollama run
+      - ollama model
+    confidence: 1.0
+
+  - name: options
+    description: Options trading
+    keywords:
+      - options
+      - call spread
+      - put spread
+      - iron condor
+    confidence: 1.0
+
+  - name: performance
+    description: Performance optimization, profiling
+    keywords:
+      - performance
+      - profiling
+      - optimization
+      - slow
+    confidence: 1.0
+
+  - name: plugins
+    description: OpenClaw plugins
+    keywords:
+      - plugin
+      - plugins
+    confidence: 1.0
+
+  - name: privacy
+    description: Privacy, data protection
+    keywords:
+      - privacy
+      - data protection
+      - personal data
+    confidence: 1.0
+
+  - name: shopping-list
+    description: Shopping list system
+    keywords:
+      - shopping list
+      - shopping
+      - grocery
+    confidence: 1.0
+
+  - name: space-launch
+    description: Space launch, rocketry
+    keywords:
+      - space launch
+      - rocket
+      - launch vehicle
+      - orbital
+    confidence: 1.0
+
+  - name: storage
+    description: Storage systems, NAS, drives
+    keywords:
+      - storage
+      - nas
+      - drive
+      - disk
+    confidence: 1.0
+
+  - name: telecom
+    description: Telecommunications, phone systems
+    keywords:
+      - telecom
+      - telephone
+      - phone system
+    confidence: 1.0
+
+  - name: testing
+    description: Testing, unit tests, integration tests
+    keywords:
+      - testing
+      - unit test
+      - integration test
+      - pytest
+    confidence: 1.0
+
+  - name: vehicle
+    description: Vehicles, cars, driving
+    keywords:
+      - vehicle
+      - car
+    confidence: 1.0
+
+  - name: wireless-power
+    description: Wireless power transfer (WiPoW)
+    keywords:
+      - wireless power
+      - wipow
+      - resonant power
+    confidence: 1.0
+
+  - name: xr-vision
+    description: XR/vision systems
+    keywords:
+      - xr
+      - vision
+      - mixed reality
+    confidence: 1.0
+
+  - name: yapCAD
+    description: yapCAD — agentic CAD/CAM tool
+    keywords:
+      - yapcad
+      - yap-cad
+    confidence: 1.0
+
+  - name: zheng-consulting
+    description: Zheng consulting
+    keywords:
+      - zheng
+      - consulting
     confidence: 1.0

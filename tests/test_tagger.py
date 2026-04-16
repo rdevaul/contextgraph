@@ -1,6 +1,6 @@
 """Tests for tagger.py"""
 from features import extract_features
-from tagger import assign_tags, StructuredProgramTagger, RULES
+from tagger import assign_tags, _assign_tags_full, RULES
 
 
 def test_code_tag():
@@ -48,12 +48,10 @@ def test_no_spurious_tags_on_plain_text():
 
 
 def test_tagger_interface():
-    """StructuredProgramTagger.assign returns TagAssignment with correct fields."""
-    from tagger import StructuredProgramTagger
+    """_assign_tags_full returns TagAssignment with correct fields."""
     from features import extract_features
-    tagger = StructuredProgramTagger()
     f = extract_features("deploy to vercel", "pushed to main branch")
-    result = tagger.assign(f, "deploy to vercel", "pushed to main branch")
+    result = _assign_tags_full(f, "deploy to vercel", "pushed to main branch")
     assert isinstance(result.tags, list)
     assert isinstance(result.confidence, float)
     assert isinstance(result.rules_fired, list)

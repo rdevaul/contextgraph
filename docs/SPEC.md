@@ -19,13 +19,14 @@ deployment, and operational details.
 6. [Context Assembly](#6-context-assembly)
 7. [Sticky / Pin Layer](#7-sticky--pin-layer)
 8. [API Reference](#8-api-reference)
-9. [Quality Monitoring](#9-quality-monitoring)
-10. [Channel Labels](#10-channel-labels)
-11. [Configuration](#11-configuration)
-12. [Deployment](#12-deployment)
-13. [OpenClaw Plugin Integration](#13-openclaw-plugin-integration)
-14. [Text Processing Utilities](#14-text-processing-utilities)
-15. [Testing](#15-testing)
+9. [Per-Channel Endpoints](#9-per-channel-endpoints)
+10. [Quality Monitoring](#10-quality-monitoring)
+11. [Channel Labels](#11-channel-labels)
+12. [Configuration](#12-configuration)
+13. [Deployment](#13-deployment)
+14. [OpenClaw Plugin Integration](#14-openclaw-plugin-integration)
+15. [Text Processing Utilities](#15-text-processing-utilities)
+16. [Testing](#16-testing)
 
 ---
 
@@ -173,7 +174,7 @@ class Message:
 | `add_message` | `(msg: Message) -> None` | Persist message + tags |
 | `add_tags` | `(message_id, tags) -> None` | Add tags idempotently |
 | `get_by_id` | `(message_id) -> Optional[Message]` | Fetch single message |
-| `get_recent` | `(n, include_automated=False) -> List[Message]` | N newest messages |
+| `get_recent` | `(n, include_automated=False, channel_label=None) -> List[Message]` | N newest messages (optionally scoped) |
 | `get_recent_by_session` | `(n, session_id) -> List[Message]` | Session-scoped recency |
 | `get_by_tag` | `(tag, limit=20, include_automated=False) -> List[Message]` | Tag-filtered retrieval |
 | `get_all_tags` | `() -> List[str]` | All distinct tags |
@@ -184,6 +185,8 @@ class Message:
 | `count` | `(include_automated=False, channel_label=None) -> int` | Filtered count |
 | `get_summary` / `set_summary` | | Lazy summarization storage |
 | `get_channel_label_stats` | `() -> Dict[str, Dict]` | Stats per channel label |
+| `channel_tag_counts` | `(channel_label=None) -> Dict[str, int]` | Tag frequencies scoped to channel |
+| `channel_tag_count` | `(tag, channel_label=None) -> int` | Count of a single tag scoped to channel |
 | `merge_channel_labels` | `(source_labels, target_label) -> Dict` | Merge operation + backup |
 
 #### Threading Model
@@ -803,8 +806,12 @@ messages.
 (small corpus), the system sorts tags by ascending frequency and keeps the
 bottom half.
 
-Corpus size is approximated as `max(tag_counts.values())` — the most frequent
-tag's count upper-bounds the actual unique message count.
+Corpus size uses `store.count()` (actual non-automated message count), not
+`max(tag_counts.values())`. The max-tag-count proxy was replaced because in
+multi-channel stores the most-frequent system tag (`openclaw`) was on only
+a subset of messages, artificially shrinking the denominator and causing
+legitimate tags to be filtered as stop words (e.g. `voice-pwa` showed 34.7%
+with max-tag denominator but should have been 12.0%).
 
 ### 6.4 Oversized Message Handling
 
@@ -1174,7 +1181,64 @@ List all channel labels with counts and session counts. Non-destructive, safe to
 
 ---
 
-## 9. Channel Labels — Cross-Channel User Identity
+### 8.5 Per-Channel Endpoints (Dashboard Support)
+
+These endpoints expose per-channel data so the dashboard can scope statistics
+and assembly previews to a specific user.
+
+#### GET `/channels`
+
+List all channel labels with message counts, session counts, and tag counts.
+Drives the channel selector dropdown in the dashboard.
+
+**Method:** `GET`
+**Auth:** none (internal API)
+
+**Response:**
+```json
+{
+  "channels": {
+    "glados-rich": {"message_count": 2160, "session_count": 487, "tag_count": 45},
+    "glados-dana": {"message_count": 412, "session_count": 98, "tag_count": 28},
+    "glados-terry": {"message_count": 308, "session_count": 87, "tag_count": 25}
+  }
+}
+```
+
+Channels with `null` label are omitted (these are pre-channel_label legacy data).
+
+#### GET `/quality/channel/{channel_label}`
+
+Quality metrics scoped to a specific channel.
+
+**Method:** `GET`
+
+**Returns:** Same shape as `/quality` but computed from that channel's
+recent messages only (`zero_return_rate`, `avg_topic_messages`,
+`tag_entropy`, and per-channel `top_tags`).
+
+#### GET `/tags/channel/{channel_label}`
+
+Tag frequency distribution scoped to a specific channel.
+
+**Method:** `GET`
+
+**Returns:** `{"channel": <label>, "total_messages_tagged": int, "tags": [{"name": str, "count": int, "pct": float}]}`
+
+#### POST `/compare/channel/{channel_label}`
+
+Run the comparison endpoint graph-assemble vs linear-window with scope
+limited to a specific channel's data.
+
+**Method:** `POST`
+**Body:** Same as `/compare` request.
+
+**Returns:** Same as `/compare`, but topic retrieval only uses messages
+matching the given `channel_label`.
+
+---
+
+## 10. Channel Labels — Cross-Channel User Identity
 
 ### 9.1 Problem
 

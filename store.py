@@ -304,6 +304,41 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
+    def channel_tag_counts(self, channel_label: Optional[str] = None) -> dict:
+        """Return {tag: count} for messages in a given channel."""
+        conn = self._conn()
+        if channel_label:
+            rows = conn.execute(
+                "SELECT t.tag, COUNT(*) as cnt FROM tags t "
+                "JOIN messages m ON t.message_id = m.id "
+                "WHERE m.channel_label = ? "
+                "GROUP BY t.tag ORDER BY cnt DESC",
+                (channel_label,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT tag, COUNT(*) as cnt FROM tags "
+                "GROUP BY tag ORDER BY cnt DESC"
+            ).fetchall()
+        return {r["tag"]: r["cnt"] for r in rows}
+
+    def channel_tag_count(self, tag: str, channel_label: Optional[str] = None) -> int:
+        """Return count of messages with a given tag, optionally scoped to a channel."""
+        conn = self._conn()
+        if channel_label:
+            row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM tags t "
+                "JOIN messages m ON t.message_id = m.id "
+                "WHERE t.tag = ? AND m.channel_label = ?",
+                (tag, channel_label)
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM tags WHERE tag = ?",
+                (tag,)
+            ).fetchone()
+        return row[0] if row else 0
+
     def get_by_tag(self, tag: str, limit: int = 20, include_automated: bool = False) -> List[Message]:
         """Return messages carrying `tag`, newest first.
 
@@ -344,13 +379,78 @@ class MessageStore:
         ).fetchall()
         return [r["tag"] for r in rows]
 
-    def tag_counts(self) -> dict:
-        """Return {tag: message_count} for all tags."""
+    def tag_counts(self, since: Optional[int] = None) -> dict:
+        """Return {tag: message_count} for all tags.
+        
+        If since is provided (Unix timestamp), only count tags on
+        messages with timestamp >= since.
+        """
         conn = self._conn()
-        rows = conn.execute(
-            "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
-        ).fetchall()
+        if since:
+            rows = conn.execute(
+                "SELECT tag, COUNT(*) as cnt FROM tags "
+                "JOIN messages ON tags.message_id = messages.id "
+                "WHERE messages.timestamp >= ? "
+                "GROUP BY tag ORDER BY cnt DESC",
+                (since,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT tag, COUNT(*) as cnt FROM tags GROUP BY tag ORDER BY cnt DESC"
+            ).fetchall()
         return {r["tag"]: r["cnt"] for r in rows}
+
+    def per_message_tags(self, since: Optional[int] = None) -> list:
+        """Return [(message_id, [tag1, tag2, ...]), ...] for all messages with tags.
+        Used for computing tag discrimination/salience scores.
+        
+        If since is provided (Unix timestamp), only include messages
+        with timestamp >= since.
+        """
+        conn = self._conn()
+        if since:
+            rows = conn.execute(
+                "SELECT DISTINCT tags.message_id, tag FROM tags "
+                "JOIN messages ON tags.message_id = messages.id "
+                "WHERE messages.timestamp >= ? "
+                "ORDER BY tags.message_id",
+                (since,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT message_id, tag FROM tags ORDER BY message_id"
+            ).fetchall()
+        # Group by message_id
+        from collections import defaultdict
+        groups: dict = defaultdict(list)
+        for row in rows:
+            groups[row["message_id"]].append(row["tag"])
+        return list(groups.items())
+
+    def tag_salience(self, since: Optional[int] = None) -> dict:
+        """Return {tag: salience_score} for all tags.
+        Salience = discrimination: of messages where this tag fires,
+        what fraction fire WITHOUT any other tag? High salience means
+        the tag uniquely identifies a topic area.
+        
+        If since is provided, compute only from messages >= that timestamp.
+        """
+        per_msg = self.per_message_tags(since=since)
+        tag_msg_count: dict = {}
+        tag_coo_count: dict = {}  # co-occurrence: tag fires alongside other tags
+        for msg_id, msg_tags in per_msg:
+            tag_set = set(msg_tags)
+            for t in tag_set:
+                tag_msg_count[t] = tag_msg_count.get(t, 0) + 1
+            if len(tag_set) > 1:
+                for t in tag_set:
+                    tag_coo_count[t] = tag_coo_count.get(t, 0) + 1
+        result = {}
+        for tag, msgs in tag_msg_count.items():
+            coo = tag_coo_count.get(tag, 0)
+            unique = msgs - coo if coo <= msgs else 0
+            result[tag] = unique / msgs if msgs > 0 else 0.0
+        return result
 
     def get_by_external_id(self, external_id: str) -> Optional[Message]:
         """Fetch a single message by external_id, or None if not found."""

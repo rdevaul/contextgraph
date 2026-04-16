@@ -25,6 +25,10 @@ class TagMetadata:
     hits: int
     promoted_at: Optional[float] = None
     archived_at: Optional[float] = None
+    # Extended fields from per-user registries (may not be present in older data)
+    frequency: float = 0.0
+    recency_weight: float = 0.0
+    distinctiveness: float = 0.0
 
 
 # Directory for per-user tag registries

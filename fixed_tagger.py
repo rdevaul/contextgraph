@@ -1,11 +1,11 @@
 """
-fixed_tagger.py — User-configurable fixed-tag tagger.
+fixed_tagger.py — User-configurable keyword/pattern-based tagger.
 
 Reads tags.yaml (or a path given at construction). Hot-reloads on change.
 Optionally loads per-user tags from a user tag file and merges them with
 system tags (user tags override system tags on name collision).
 
-Compatible with StructuredProgramTagger.assign() interface.
+Returns TagAssignment objects compatible with the ensemble tagger interface.
 """
 
 import re
@@ -73,7 +73,7 @@ class FixedTagger:
     when a channel_label is provided. User tags are merged with system tags;
     user tags take precedence on name collision.
 
-    Interface-compatible with StructuredProgramTagger.
+    Production tagger for the tag-context system.
     """
 
     def __init__(self, config_path: Optional[Path] = None,
@@ -194,7 +194,16 @@ class FixedTagger:
         hits = []
         # Keyword matching (word-boundary)
         for kw in spec.keywords:
-            pattern = r"\b" + re.escape(kw) + r"\b"
+            # For multi-word keywords, we need word boundaries at the start and end only,
+            # not between words. Split on spaces and build a pattern that allows
+            # spaces between the words.
+            if ' ' in kw:
+                # Multi-word keyword: match with flexible whitespace
+                words = kw.split()
+                pattern = r"\b" + r"\s+".join(re.escape(w) for w in words) + r"\b"
+            else:
+                # Single-word keyword: simple word boundary match
+                pattern = r"\b" + re.escape(kw) + r"\b"
             if re.search(pattern, combined):
                 hits.append(True)
                 if not spec.requires_all:

@@ -194,13 +194,10 @@ class ContextAssembler:
         # Tags in >30% of corpus are stop words — they retrieve nearly everything,
         # blowing the token budget on low-relevance messages.
         #
-        # Use tag_counts sum as corpus size proxy — avoids fetching all rows.
-        # tag_counts() returns {tag: count} where count = messages with that tag.
-        # Total unique messages ≈ max tag count (most frequent tag upper-bounds corpus).
+        # IDF filtering: skip tags that appear too frequently to be discriminating.
+        # Use actual message count as corpus denominator.
         tag_counts = self.store.tag_counts()
-        total_messages = max(tag_counts.values()) if tag_counts else 1
-        if total_messages == 0:
-            total_messages = 1  # avoid div-by-zero
+        total_messages = self.store.count() if self.store.count() > 0 else 1
         useful_tags = [
             t for t in inferred_tags
             if tag_counts.get(t, 0) / total_messages <= TOPIC_TAG_MAX_CORPUS_FREQ

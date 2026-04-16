@@ -85,6 +85,11 @@
             border-left: 4px solid #6e7681;
         }
 
+        .tag-card.user {
+            border-left: 4px solid #a371f7;
+            border: 1px solid #a371f780;
+        }
+
         .tag-name {
             font-weight: 600;
             font-size: 1.1em;
@@ -111,6 +116,7 @@
         .tag-state.core { background: #1a472a; color: #3fb950; }
         .tag-state.candidate { background: #3d2c00; color: #d29922; }
         .tag-state.archived { background: #21262d; color: #6e7681; }
+        .tag-state.user { background: #2d1b4e; color: #a371f7; }
 
         .progress-bar {
             background: #21262d;
@@ -292,6 +298,11 @@
             font-size: 0.75em;
         }
 
+        .message-tag.user {
+            background: #a371f7;
+            border: 1px solid #bc93ff;
+        }
+
         .comparison {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -344,28 +355,49 @@
 <body>
     <div class="container">
         <header>
-            <h1>Context Graph Dashboard</h1>
-            <p>Hybrid tag lifecycle system + context graph efficacy monitoring</p>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <h1>Context Graph Dashboard</h1>
+                    <p>Hybrid tag lifecycle system + context graph efficacy monitoring</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="color:#8b949e; font-size:13px; white-space:nowrap;">Channel:</label>
+                        <select id="channel-select" onchange="onChannelChange()" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">
+                            <option value="">All Channels</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="color:#8b949e; font-size:13px; white-space:nowrap;">Window:</label>
+                        <select id="stats-window" onchange="onWindowChange()" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">
+                            <option value="all">All Time</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="1d" selected>Last 24 Hours</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <!-- Section 1: Overhead Analysis (MOST VALUABLE - MOVED TO TOP) -->
         <div class="section">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
                 <h2 style="margin:0;">Token Overhead Analysis</h2>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <label style="color:#8b949e; font-size:13px;">Window:</label>
-                    <select id="stats-window" onchange="onWindowChange()" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">
-                        <option value="all">All Time</option>
-                        <option value="7d">Last 7 Days</option>
-                        <option value="1d" selected>Last 24 Hours</option>
-                    </select>
-                </div>
             </div>
             <div id="overhead-stats" class="stats-grid" style="margin-top:12px;"></div>
 
             <div class="chart-container">
                 <canvas id="tokens-timeseries-chart"></canvas>
             </div>
+        </div>
+
+        <!-- Section 1.5: User Tags (NEW) -->
+        <div class="section" id="user-tags-section" style="display:none;">
+            <h2>👤 User-Scope Tags</h2>
+            <p style="color:#8b949e; font-size:0.9em; margin-bottom:15px;">
+                Tags learned from specific channels, separate from system tags.
+            </p>
+            <div id="user-tags-container"></div>
         </div>
 
         <!-- Section 2: Tag Performance Scatter Plot -->
@@ -415,6 +447,7 @@
         let healthData = null;
         let comparisonStats = null;
         let currentWindow = '1d';  // default to last 24h
+        let currentChannel = '';   // default to all channels
         let pinsData = null;
         let qualityData = null;
         let tagsData = null;
@@ -424,6 +457,31 @@
         async function init() {
             await refreshData();
             setInterval(refreshData, 30000); // Auto-refresh every 30 seconds
+            await loadChannels();
+        }
+
+        // ── Channel selector ────────────────────────────────────────────
+        async function loadChannels() {
+            try {
+                const resp = await fetch('/channels');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const sel = document.getElementById('channel-select');
+                const channels = data.channels || {};
+                const sorted = Object.entries(channels).sort((a,b) => b[1].message_count - a[1].message_count);
+                for (const [label, info] of sorted) {
+                    if (label === '(null)') continue;
+                    const opt = document.createElement('option');
+                    opt.value = label;
+                    opt.textContent = `${label} (${info.message_count} msgs)`;
+                    sel.appendChild(opt);
+                }
+            } catch (e) { /* endpoint not available yet */ }
+        }
+
+        async function onChannelChange() {
+            currentChannel = document.getElementById('channel-select').value;
+            await refreshData();
         }
 
         async function refreshData() {
@@ -444,8 +502,16 @@
         }
 
         async function fetchRegistry() {
-            const response = await fetch('/registry');
-            registryData = await response.json();
+            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const response = await fetch(`/tags${qs}`);
+            const data = await response.json();
+            // Transform /tags response to match expected registryData format
+            registryData = {
+                core: data.system_tags.filter(t => t.state === 'core'),
+                candidate: data.system_tags.filter(t => t.state === 'candidate'),
+                archived: data.system_tags.filter(t => t.state === 'archived'),
+                user: data.user_tags || []
+            };
         }
 
         async function fetchMetrics() {
@@ -466,9 +532,8 @@
 
         async function onWindowChange() {
             currentWindow = document.getElementById('stats-window').value;
-            await fetchComparisonStats();
-            renderOverhead();        // renders stats cards + time series chart
-            renderTagFrequencyChart();
+            // Re-fetch time-dependent data and re-render ALL dashboard sections
+            await refreshData();
         }
 
         async function fetchPins() {
@@ -477,48 +542,68 @@
         }
 
         async function fetchTagsData() {
-            const response = await fetch('/tags');
+            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const response = await fetch(`/tags${qs}`);
             tagsData = await response.json();
         }
 
         async function fetchQuality() {
-            const response = await fetch('/quality');
+            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const response = await fetch(`/quality${qs}`);
             qualityData = await response.json();
         }
 
         function renderDashboard() {
+            renderUserTags();
             renderTagRegistry();
             renderPins();
             renderEfficacy();
             renderOverhead();
+            renderTagFrequencyChart();
         }
 
         function renderTagRegistry() {
             if (!registryData) return;
 
-            // Stats
+            // Stats — no candidate state anymore (removed in favor of user tags)
             const statsHtml = `
                 <div class="stat-card">
                     <div class="stat-value">${registryData.core.length}</div>
-                    <div class="stat-label">Core Tags</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${registryData.candidate.length}</div>
-                    <div class="stat-label">Candidates</div>
+                    <div class="stat-label">System Tags</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${registryData.archived.length}</div>
                     <div class="stat-label">Archived</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${registryData.core.length + registryData.candidate.length + registryData.archived.length}</div>
+                    <div class="stat-value" style="color: #a371f7">${registryData.user.length}</div>
+                    <div class="stat-label">User Tags</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${registryData.core.length + registryData.archived.length + registryData.user.length}</div>
                     <div class="stat-label">Total Tags</div>
                 </div>
             `;
             document.getElementById('tag-registry-stats').innerHTML = statsHtml;
 
-            // Render scatter plot instead of tag cards
+            // Render scatter plot
             renderTagScatterPlot();
+        }
+
+        function getVisibleUserTags() {
+            // If a specific channel is selected, only show tags for that channel
+            if (currentChannel) {
+                return registryData.user.filter(t => t.channel === currentChannel);
+            }
+            // Otherwise show all user tags
+            return registryData.user || [];
+        }
+
+        // Tiny pseudo-random jitter for overlapping points (deterministic from tag name)
+        function jitter(label) {
+            let h = 0;
+            for (let i = 0; i < label.length; i++) h = ((h << 5) - h + label.charCodeAt(i)) | 0;
+            return (Math.abs(h) % 10 - 5) / 50; // -0.1 to +0.1
         }
 
         function renderTagScatterPlot() {
@@ -527,88 +612,89 @@
             const ctx = document.getElementById('tag-scatter-chart');
             if (!ctx) return;
 
-            // Combine all tags with their state
-            const allTags = [
-                ...registryData.core.map(tag => ({ ...tag, state: 'core' })),
-                ...registryData.candidate.map(tag => ({ ...tag, state: 'candidate' })),
-                ...registryData.archived.map(tag => ({ ...tag, state: 'archived' }))
-            ];
-
-            // Prepare datasets by state
-            const coreData = allTags.filter(t => t.state === 'core').map(t => ({
-                x: t.hits,
-                y: t.salience,
+            // System core tags only (no archived, no candidate)
+            const coreData = registryData.core.map(t => ({
+                x: (t.hits || 0) + jitter(t.name),
+                y: ((t.salience || 0) + jitter(t.name + '__y')),
                 label: t.name
             }));
 
-            const candidateData = allTags.filter(t => t.state === 'candidate').map(t => ({
-                x: t.hits,
-                y: t.salience,
-                label: t.name
+            // User tags — filtered by selected channel if any
+            const visibleUserTags = getVisibleUserTags();
+            const userData = visibleUserTags.map(t => ({
+                x: (t.hits || 0) + jitter(t.name),
+                y: ((t.salience || 0) + jitter(t.name + '__y')),
+                label: t.name,
+                channel: t.channel
             }));
 
-            const archivedData = allTags.filter(t => t.state === 'archived').map(t => ({
-                x: t.hits,
-                y: t.salience,
-                label: t.name
-            }));
+            // User tags grouped by channel for distinct visuals
+            const channels = {};
+            userData.forEach(pt => {
+                if (!channels[pt.channel]) channels[pt.channel] = [];
+                channels[pt.channel].push(pt);
+            });
+            const channelColors = ['#a371f7', '#7ee787', '#ffa657', '#79c0ff', '#f778ba', '#d29922'];
+            let colorIdx = 0;
 
             // Destroy existing chart if it exists
             if (charts['tag-scatter-chart']) {
                 charts['tag-scatter-chart'].destroy();
             }
 
+            const datasets = [
+                {
+                    label: 'Core Tags',
+                    data: coreData,
+                    backgroundColor: '#3fb950',
+                    borderColor: '#3fb950',
+                    pointRadius: 7,
+                    pointHoverRadius: 10,
+                    pointStyle: 'circle'
+                }
+            ];
+
+            // Add user tag datasets per channel — visually distinct (star shape, bright color, larger)
+            for (const [channel, pts] of Object.entries(channels)) {
+                const color = channelColors[colorIdx % channelColors.length];
+                colorIdx++;
+                datasets.push({
+                    label: `User: ${channel}`,
+                    data: pts,
+                    backgroundColor: color,
+                    borderColor: '#fff',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 12,
+                    pointStyle: 'star'
+                });
+            }
+
             charts['tag-scatter-chart'] = new Chart(ctx, {
                 type: 'scatter',
-                data: {
-                    datasets: [
-                        {
-                            label: 'Core Tags',
-                            data: coreData,
-                            backgroundColor: '#3fb950',
-                            borderColor: '#3fb950',
-                            pointRadius: 6,
-                            pointHoverRadius: 8
-                        },
-                        {
-                            label: 'Candidate Tags',
-                            data: candidateData,
-                            backgroundColor: '#d29922',
-                            borderColor: '#d29922',
-                            pointRadius: 6,
-                            pointHoverRadius: 8
-                        },
-                        {
-                            label: 'Archived Tags',
-                            data: archivedData,
-                            backgroundColor: '#6e7681',
-                            borderColor: '#6e7681',
-                            pointRadius: 6,
-                            pointHoverRadius: 8
-                        }
-                    ]
-                },
+                data: { datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            labels: { color: '#c9d1d9' }
+                            labels: { color: '#c9d1d9', usePointStyle: true }
                         },
                         title: {
                             display: true,
-                            text: 'Tag Performance: Retrieval Hits vs Salience',
+                            text: 'Tag Performance: Retrieval Hits vs Discrimination Score',
                             color: '#c9d1d9'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const point = context.raw;
+                                    const channel = point.channel ? ` | Channel: ${point.channel}` : '';
                                     return [
                                         `Tag: ${point.label}`,
-                                        `Hits: ${point.x}`,
-                                        `Salience: ${(point.y * 100).toFixed(1)}%`
-                                    ];
+                                        `Hits: ${Math.round(point.x)}`,
+                                        `Discrimination: ${(point.y * 100).toFixed(1)}%`,
+                                    ].filter(Boolean);
                                 }
                             }
                         }
@@ -635,13 +721,64 @@
                             },
                             title: {
                                 display: true,
-                                text: 'Salience Score',
+                                text: 'Discrimination Score (% of matches where this tag is unique)',
                                 color: '#c9d1d9'
                             }
                         }
                     }
                 }
             });
+        }
+
+        function renderUserTags() {
+            const container = document.getElementById('user-tags-container');
+            const section = document.getElementById('user-tags-section');
+            if (!container || !section) return;
+
+            const userTags = registryData?.user || [];
+            if (userTags.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+
+            // Group by channel
+            const byChannel = {};
+            userTags.forEach(t => {
+                const ch = t.channel || 'unknown';
+                if (!byChannel[ch]) byChannel[ch] = [];
+                byChannel[ch].push(t);
+            });
+
+            let html = '';
+            for (const [channel, tags] of Object.entries(byChannel)) {
+                html += `<div class="pin-card">
+                    <div class="pin-header">
+                        <strong>Channel: ${channel}</strong>
+                        <span style="color:#8b949e; font-size:0.85em;">${tags.length} tags</span>
+                    </div>
+                    <div class="message-list">
+                        ${tags.map(t => {
+                            const saliencePct = ((t.salience || 0) * 100).toFixed(1);
+                            const salienceBar = Math.min(100, (t.salience || 0) * 100);
+                            const salienceColor = t.salience > 0.5 ? '#3fb950' : t.salience > 0.2 ? '#d29922' : '#8b949e';
+                            return `<div class="message-item">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <strong>${t.name}</strong>
+                                    <span style="color:#8b949e; font-size:0.85em;">Hits: ${t.hits}</span>
+                                </div>
+                                <div style="margin-top:6px; font-size:0.85em; color:#8b949e;">
+                                    Discrimination: <span style="color:${salienceColor}">${saliencePct}%</span>
+                                    <div class="progress-bar" style="margin-top:4px;">
+                                        <div class="progress-fill" style="width:${salienceBar}%; background:${salienceColor};"></div>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            }
+            container.innerHTML = html;
         }
 
         function renderPins() {
@@ -894,34 +1031,43 @@
         }
 
         function renderTagFrequencyChart() {
-            const ctx = document.getElementById('tag-frequency-chart');
-            if (!ctx) return;
+            const canvas = document.getElementById('tag-frequency-chart');
+            if (!canvas) { console.log('[debug] No tag-frequency-chart canvas'); return; }
 
             // Prefer live registry hits from /tags; fall back to comparison-stats
             let tags, frequencies;
-            if (tagsData && tagsData.system_tags && tagsData.system_tags.length > 0) {
+            if (tagsData && tagsData.system_tags) {
                 const sorted = [...tagsData.system_tags]
                     .filter(t => t.hits > 0)
                     .sort((a, b) => b.hits - a.hits)
                     .slice(0, 20);
                 tags = sorted.map(t => t.name);
                 frequencies = sorted.map(t => t.hits);
-            } else if (comparisonStats && comparisonStats.tag_frequency) {
+                console.log('[debug] registry path: ' + tags.length + ' tags with hits>0');
+            }
+            // Fall back to comparison-stats if registry has no hits
+            if ((!tags || tags.length === 0) && comparisonStats && comparisonStats.tag_frequency) {
                 const tagFreq = comparisonStats.tag_frequency;
                 tags = Object.keys(tagFreq);
                 frequencies = Object.values(tagFreq);
-            } else {
+                console.log('[debug] comparison-stats fallback: ' + tags.length + ' tags');
+            }
+            if (!tags || tags.length === 0) {
+                console.log('[debug] No tags data available');
                 return;
             }
+            console.log('[debug] Rendering chart with', tags.length, 'tags');
 
             if (tags.length === 0) return;
 
-            // Destroy existing chart if it exists
-            if (charts['tag-frequency-chart']) {
-                charts['tag-frequency-chart'].destroy();
+            // Destroy existing chart using Chart.js built-in lookup (covers cases where
+            // our cache missed due to refresh timing or module scoping)
+            const existing = Chart.getChart(canvas);
+            if (existing) {
+                existing.destroy();
             }
 
-            charts['tag-frequency-chart'] = new Chart(ctx, {
+            charts['tag-frequency-chart'] = new Chart(canvas, {
                 type: 'bar',
                 data: {
                     labels: tags,

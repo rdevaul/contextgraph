@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tagger import RULES, StructuredProgramTagger, assign_tags
+from tagger import RULES, assign_tags
 from features import extract_features
 from tag_registry import get_registry
 

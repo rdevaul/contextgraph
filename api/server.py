@@ -10,11 +10,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from store import MessageStore, Message
 from features import extract_features
-from tagger import assign_tags
-from ensemble import EnsembleTagger
+from tagger import _assign_tags_full
+from ensemble import build_ensemble
 from assembler import ContextAssembler, _estimate_tokens
 from quality import QualityAgent
-from gp_tagger import GeneticTagger
 from tag_registry import get_registry
 from sticky import StickyPinManager
 from reframing import detect_reference
@@ -26,6 +25,26 @@ import os
 import json
 from typing import Optional
 from collections import Counter
+from datetime import datetime, timedelta
+
+
+def _parse_since(since: Optional[str]) -> Optional[float]:
+    """Convert a window string (e.g. '1d', '7d', '24h') to a Unix timestamp.
+    Returns None for 'all' or unparsable values (meaning: no time filter)."""
+    if not since or since == 'all':
+        return None
+    m = re.match(r'^(\d+)([dhm])$', since)
+    if not m:
+        return None
+    value, unit = int(m.group(1)), m.group(2)
+    if unit == 'd':
+        delta = timedelta(days=value)
+    elif unit == 'h':
+        delta = timedelta(hours=value)
+    else:
+        delta = timedelta(minutes=value)
+    return (datetime.utcnow() - delta).timestamp()
+
 
 def _is_retrieval_turn(entry: dict) -> bool:
     """Return True if this turn represents a genuine retrieval attempt."""
@@ -85,7 +104,8 @@ class CompareResponse(BaseModel):
 
 store = MessageStore()
 quality_agent = QualityAgent()
-ensemble = EnsembleTagger(quality_agent=quality_agent)
+# Build ensemble with FixedTagger + baseline in "fixed" mode (production mode)
+ensemble = build_ensemble(mode="fixed", quality_agent=quality_agent)
 pin_manager = StickyPinManager()
 
 # Summarization configuration
@@ -104,13 +124,8 @@ def _background_summarize(message_id: str) -> None:
         import logging
         logging.error(f"Background summarization failed for {message_id}: {e}")
 
-gp_tagger_path = Path(__file__).parent.parent / 'data' / 'gp-tagger.pkl'
-if gp_tagger_path.exists():
-    with open(gp_tagger_path, 'rb') as f:
-        gp_tagger = pickle.load(f)
-        ensemble.register(gp_tagger.tagger_id, gp_tagger.assign, 1.0)
-
-baseline_tagger = lambda features, user_text, assistant_text: assign_tags(features, user_text, assistant_text)
+# Register baseline tagger for fallback/ensemble voting
+baseline_tagger = lambda features, user_text, assistant_text: _assign_tags_full(features, user_text, assistant_text)
 ensemble.register('baseline', baseline_tagger, 1.0)
 
 @app.on_event("startup")
@@ -187,6 +202,10 @@ def ingest(request: IngestRequest):
         else:
             features = extract_features(clean_user, request.assistant_text)
             tags = ensemble.assign(features, clean_user, request.assistant_text).tags
+            # Record hit for each tag assigned
+            registry = get_registry()
+            for tag in tags:
+                registry.record_hit(tag)
         token_count = len(clean_user.split()) + len(request.assistant_text.split())
         message = Message(
             id=message_id,
@@ -429,21 +448,36 @@ def metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tags", response_model=dict)
-def get_tags():
-    """Return system and user tags with metadata for /tags command in plugins."""
+def get_tags(since: Optional[str] = Query(None)):
+    """Return system and user tags with metadata for /tags command in plugins.
+
+    Since parameter: "1d" (last 24h), "7d" (last 7 days), None (all time).
+    """
     try:
         registry = get_registry()
 
-        # System tags: all tags from the registry with state, hits, corpus_pct
+        # Calculate cutoff timestamp if a window is specified
+        cutoff = _parse_since(since)
+
+        # System tags: all tags from the registry with state, hits, and salience.
         corpus_size = store.count()
+        if cutoff:
+            tag_counts = store.tag_counts(since=cutoff)
+            salience_scores = store.tag_salience(since=cutoff)
+        else:
+            tag_counts = store.tag_counts()
+            salience_scores = store.tag_salience()
+
         system_tags = []
         for tag_name, meta in registry._tags.items():
-            corpus_pct = (meta.hits / corpus_size) if corpus_size > 0 else 0.0
+            hits = tag_counts.get(tag_name, 0)
+            corpus_pct = (hits / corpus_size) if corpus_size > 0 else 0.0
             system_tags.append({
                 "name": tag_name,
                 "state": meta.state,
-                "hits": meta.hits,
+                "hits": hits,
                 "corpus_pct": round(corpus_pct, 4),
+                "salience": round(salience_scores.get(tag_name, 0.0), 4),
             })
 
         # User tags: aggregate from per-user registries, deduplicating by
@@ -465,11 +499,13 @@ def get_tags():
                             if key in user_tags_map:
                                 user_tags_map[key]["hits"] += meta.hits
                             else:
+                                salience = salience_scores.get(tag_name, 0.0)
                                 user_tags_map[key] = {
                                     "name": tag_name,
                                     "state": meta.state,
                                     "hits": meta.hits,
                                     "channel": channel_label,
+                                    "salience": round(salience, 4),
                                 }
                 except Exception:
                     pass
@@ -563,8 +599,11 @@ def get_comparison_log(limit: Optional[int] = Query(None, description="Maximum n
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/comparison-stats", response_model=dict)
-def get_comparison_stats():
-    """Compute aggregate statistics from the comparison log."""
+def get_comparison_stats(since: Optional[str] = Query(None)):
+    """Compute aggregate statistics from the comparison log.
+
+    Since parameter: "1d" (last 24h), "7d" (last 7 days), None (all time).
+    """
     try:
         log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
         if not log_path.exists():
@@ -586,6 +625,36 @@ def get_comparison_stats():
             for line in f:
                 if line.strip():
                     entries.append(json.loads(line))
+
+        # Filter by time window if specified
+        if since:
+            from datetime import datetime, timedelta, timezone as tz
+            now = datetime.now(tz.utc)
+            if since == "1d":
+                cutoff = now - timedelta(days=1)
+            elif since == "7d":
+                cutoff = now - timedelta(days=7)
+            elif since == "30d":
+                cutoff = now - timedelta(days=30)
+            else:
+                cutoff = None
+
+            if cutoff:
+                def _parse_ts(e):
+                    """Handle both ISO strings and Unix timestamps."""
+                    ts_val = e.get("timestamp", 0)
+                    if isinstance(ts_val, (int, float)):
+                        return datetime.fromtimestamp(ts_val, tz=tz.utc)
+                    # ISO string: "2026-03-14T04:42:48.148Z"
+                    if isinstance(ts_val, str):
+                        ts_val = ts_val.replace("Z", "+00:00")
+                        try:
+                            return datetime.fromisoformat(ts_val)
+                        except ValueError:
+                            return datetime.min.replace(tzinfo=tz.utc)
+                    return datetime.min.replace(tzinfo=tz.utc)
+
+                entries = [e for e in entries if _parse_ts(e) >= cutoff]
 
         if not entries:
             return {
@@ -978,6 +1047,140 @@ def admin_retag(req: RetagRequest):
         "total_processed": len(messages),
         "unchanged": len(messages) - retagged,
     }
+
+
+# ── Per-Channel Endpoints ─────────────────────────────────────────────────────
+
+@app.get("/channels", response_model=dict)
+def list_channels():
+    """List all channel labels with message counts and tag counts.
+
+    PURPOSE: Drive the channel selector dropdown in the dashboard.
+    Non-destructive, safe to call anytime.
+
+    Returns: {label: {message_count, session_count, tag_count}} for every
+    distinct channel_label.
+    """
+    stats = store.get_channel_label_stats()
+    result = {}
+    for label, data in stats.items():
+        display = label or "(null)"
+        # Count tags for messages in this channel
+        tag_count = store.channel_tag_count(label)
+        result[display] = {
+            "message_count": data["count"],
+            "session_count": data["sessions"],
+            "tag_count": tag_count,
+        }
+    # Sort by message count descending
+    return {"channels": dict(sorted(result.items(), key=lambda x: -x[1]["message_count"]))}
+
+
+@app.get("/quality/channel/{channel_label}", response_model=dict)
+def channel_quality(channel_label: str):
+    """Compute quality metrics scoped to a specific channel label."""
+    try:
+        # Fetch messages for this channel
+        messages = store.get_recent(50, channel_label=channel_label)
+        if not messages:
+            return {
+                "channel": channel_label,
+                "turns_evaluated": 0,
+                "zero_return_rate": None,
+                "avg_topic_messages": None,
+                "tag_entropy": None,
+            }
+
+        # Compute tag entropy for this channel's recent messages
+        all_tags: dict[str, int] = {}
+        for msg in messages:
+            for tag in msg.tags:
+                all_tags[tag] = all_tags.get(tag, 0) + 1
+
+        total_tag_hits = sum(all_tags.values())
+        if total_tag_hits == 0:
+            entropy = 0.0
+        else:
+            import math
+            entropy = 0.0
+            for count in all_tags.values():
+                p = count / total_tag_hits
+                if p > 0:
+                    entropy -= p * math.log2(p)
+
+        return {
+            "channel": channel_label,
+            "turns_evaluated": len(messages),
+            "unique_tags": len(all_tags),
+            "avg_tags_per_message": total_tag_hits / len(messages),
+            "tag_entropy": round(entropy, 3),
+            "top_tags": sorted(all_tags.items(), key=lambda x: -x[1])[:15],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/tags/channel/{channel_label}", response_model=dict)
+def channel_tags(channel_label: str):
+    """Get tag distribution for a specific channel label."""
+    try:
+        tag_counts = store.channel_tag_counts(channel_label)
+        total = sum(tag_counts.values()) if tag_counts else 0
+        result = []
+        for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1]):
+            result.append({"name": tag, "count": count, "pct": round(count / total * 100, 1) if total > 0 else 0})
+        return {"channel": channel_label, "total_messages_tagged": total, "tags": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/compare/channel/{channel_label}", response_model=CompareResponse)
+def compare_channel(channel_label: str, request: TagRequest):
+    """Run a comparison (graph vs linear) scoped to a specific channel."""
+    try:
+        features = extract_features(request.user_text, request.assistant_text)
+        inferred_tags = ensemble.assign(features, request.user_text, request.assistant_text).tags
+
+        pinned_ids = pin_manager.get_pinned_message_ids()
+
+        assembler = ContextAssembler(store, token_budget=4000)
+        graph_assembly_result = assembler.assemble(
+            request.user_text, inferred_tags,
+            pinned_message_ids=pinned_ids,
+            channel_label=channel_label
+        )
+        graph_assembly = {
+            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in graph_assembly_result.messages],
+            "total_tokens": graph_assembly_result.total_tokens,
+            "sticky_count": graph_assembly_result.sticky_count,
+            "recency_count": graph_assembly_result.recency_count,
+            "topic_count": graph_assembly_result.topic_count,
+            "tags_used": graph_assembly_result.tags_used,
+        }
+
+        # Linear window: just recent messages from this channel
+        linear_window_messages = []
+        linear_tokens = 0
+        budget = 4000
+        for msg in store.get_recent(100, channel_label=channel_label):
+            msg_tokens = len(msg.user_text.split()) + len(msg.assistant_text.split())
+            if linear_tokens + msg_tokens > budget:
+                break
+            linear_window_messages.append(msg)
+            linear_tokens += msg_tokens
+        linear_window_messages.reverse()
+
+        linear_window = {
+            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in linear_window_messages],
+            "total_tokens": linear_tokens,
+            "recency_count": len(linear_window_messages),
+            "topic_count": len(set(tag for msg in linear_window_messages for tag in msg.tags)),
+            "tags_used": list(set(tag for msg in linear_window_messages for tag in msg.tags)),
+        }
+
+        return CompareResponse(graph_assembly=graph_assembly, linear_window=linear_window, inferred_tags=graph_assembly.get("tags_used", []))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/admin/channel-labels", response_model=dict)

@@ -15,9 +15,17 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tagger import RULES, StructuredProgramTagger, assign_tags
+from tagger import RULES, assign_tags
 from features import extract_features
 from tag_registry import get_registry
+from ensemble import build_ensemble
+
+_TEST_ENSEMBLE = None
+def _get_ensemble():
+    global _TEST_ENSEMBLE
+    if _TEST_ENSEMBLE is None:
+        _TEST_ENSEMBLE = build_ensemble(mode="fixed")
+    return _TEST_ENSEMBLE
 
 
 # ── System tag completeness ──────────────────────────────────────────────────
@@ -56,7 +64,8 @@ class TestTaggerStability:
 
     def _tag(self, user_text, assistant_text=""):
         features = extract_features(user_text, assistant_text)
-        return assign_tags(features, user_text, assistant_text)
+        # Use the ensemble (FixedTagger + baseline) — this is what production uses.
+        return _get_ensemble().assign(features, user_text, assistant_text).tags
 
     # ─── Code / Development ─────────────────────────────────────────
 
@@ -247,7 +256,8 @@ class TestNoFalsePositives:
 
     def _tag(self, user_text, assistant_text=""):
         features = extract_features(user_text, assistant_text)
-        return assign_tags(features, user_text, assistant_text)
+        # Use the ensemble — what production actually uses.
+        return set(_get_ensemble().assign(features, user_text, assistant_text).tags)
 
     def test_hello(self):
         tags = self._tag("hello")

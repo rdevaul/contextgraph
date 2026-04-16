@@ -1,6 +1,6 @@
 """Tests for ensemble.py"""
 from features import extract_features, MessageFeatures
-from tagger import TagAssignment, assign_tags, StructuredProgramTagger
+from tagger import TagAssignment, assign_tags
 from ensemble import EnsembleTagger, EnsembleResult
 
 

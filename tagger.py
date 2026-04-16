@@ -1,9 +1,8 @@
 """
-tagger.py — v0 structured-program tagger for the tag-context system.
+tagger.py — Baseline rule-based tagger for the tag-context system.
 
-This is the hand-written baseline tagger. Each rule is an explicit
-structured program over MessageFeatures. This is the "genome" prototype —
-future GP-evolved taggers will follow the same interface.
+This is the hand-written baseline tagger used by the ensemble. Each rule
+is an explicit structured program over MessageFeatures.
 """
 
 import re
@@ -382,76 +381,54 @@ class TagAssignment:
     rules_fired: List[str]     # names of rules that matched
 
 
-# DEPRECATED: Superseded by FixedTagger.
-# This is the v0 hand-written rule-based tagger, retained for reference
-# and backwards compatibility. It is NOT used by default (TAGGER_MODE="fixed"
-# uses FixedTagger instead).
-class StructuredProgramTagger:
+def _assign_tags_full(features: MessageFeatures,
+                      user_text: str, assistant_text: str) -> TagAssignment:
     """
-    DEPRECATED — v0 rule-based tagger: applies fixed structured rules over
-    MessageFeatures.
+    Internal baseline rule-based tagger — applies structured rules over MessageFeatures.
 
-    Superseded by FixedTagger, which provides a cleaner, config-driven
-    tagging approach. This class is retained for backwards compatibility
-    and reference purposes only.
-
-    This was the original "genome" prototype — the GP-evolved taggers that
-    were meant to evolve from this interface were never integrated.
+    Returns a full TagAssignment with tags, confidence, and rules_fired.
     """
+    user_text = _strip_metadata(user_text)
+    assistant_text = _strip_metadata(assistant_text)
 
-    def __init__(self, rules: Optional[List[TagRule]] = None,
-                 min_confidence: float = 0.5) -> None:
-        self._rules = rules if rules is not None else RULES
-        self._min_confidence = min_confidence
+    fired_tags: Set[str] = set()
+    fired_rules: List[str] = []
+    confidences: List[float] = []
+    min_confidence = 0.5
 
-    def assign(self, features: MessageFeatures,
-               user_text: str, assistant_text: str) -> TagAssignment:
-        """
-        Run all rules against the features and texts.
-        Returns deduplicated tags with aggregate confidence.
-        """
-        fired_tags: Set[str] = set()
-        fired_rules: List[str] = []
-        confidences: List[float] = []
+    for rule in RULES:
+        if rule.confidence < min_confidence:
+            continue
+        try:
+            if rule.predicate(features, user_text, assistant_text):
+                fired_tags.update(rule.tags)
+                fired_rules.append(rule.name)
+                confidences.append(rule.confidence)
+        except Exception:
+            pass  # individual rule failures are non-fatal
 
-        for rule in self._rules:
-            if rule.confidence < self._min_confidence:
-                continue
-            try:
-                if rule.predicate(features, user_text, assistant_text):
-                    fired_tags.update(rule.tags)
-                    fired_rules.append(rule.name)
-                    confidences.append(rule.confidence)
-            except Exception:
-                pass  # individual rule failures are non-fatal
+    avg_confidence = (sum(confidences) / len(confidences)) if confidences else 0.0
 
-        avg_confidence = (sum(confidences) / len(confidences)) if confidences else 0.0
+    # Get active tags from registry (core + candidate)
+    registry = get_registry()
+    active_tags = registry.get_active_tags()
 
-        # Get active tags from registry (core + candidate)
-        registry = get_registry()
-        active_tags = registry.get_active_tags()
+    # Canonicalize: only emit tags in active_tags
+    canonical = [t for t in sorted(fired_tags) if t in active_tags]
 
-        # Canonicalize: only emit tags in active_tags
-        canonical = [t for t in sorted(fired_tags) if t in active_tags]
-
-        # Tag discovery disabled — explicit-only system.
-        # See docs/TAG_SYSTEM_DESIGN.md
-
-        return TagAssignment(
-            tags=canonical,
-            confidence=avg_confidence,
-            rules_fired=fired_rules,
-        )
-
-
-# ── Default instance ──────────────────────────────────────────────────────────
-
-default_tagger = StructuredProgramTagger()
+    return TagAssignment(
+        tags=canonical,
+        confidence=avg_confidence,
+        rules_fired=fired_rules,
+    )
 
 
 def assign_tags(features: MessageFeatures,
                 user_text: str, assistant_text: str) -> List[str]:
-    """Convenience function using the default tagger."""
-    user_text = _strip_metadata(user_text)
-    assistant_text = _strip_metadata(assistant_text)
-    return default_tagger.assign(features, user_text, assistant_text).tags
+    """
+    Baseline rule-based tagger — convenience function returning just the tag list.
+
+    This is the public API used by CLI and scripts. For the full TagAssignment
+    result (with confidence and rules_fired), use _assign_tags_full().
+    """
+    return _assign_tags_full(features, user_text, assistant_text).tags

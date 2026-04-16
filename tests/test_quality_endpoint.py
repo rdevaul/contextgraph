@@ -35,14 +35,14 @@ def tmp_store(tmp_path):
 @pytest.fixture
 def quality_agent(tmp_store):
     """QualityAgent pointing at a temp store."""
-    return QualityAgent(db_path=str(tmp_store.db_path))
+    return QualityAgent(db_path=str(tmp_store._db_path))
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def insert_msg(store, tags, graph_count=0, offset_sec=0):
     """Convenience: insert a message with given tags and graph_count."""
-    conn = sqlite3.connect(store.db_path)
+    conn = sqlite3.connect(store._db_path)
     conn.execute(
         """INSERT INTO messages (
             user_text, assistant_text, timestamp,
@@ -176,7 +176,7 @@ class TestQualityEdgeCases:
         assert r["alert"] is False
 
     def test_empty_tags(self, quality_agent):
-        conn = sqlite3.connect(quality_agent.store.db_path)
+        conn = sqlite3.connect(quality_agent.store._db_path)
         conn.execute(
             """INSERT INTO messages (
                 user_text, assistant_text, timestamp,
@@ -193,7 +193,7 @@ class TestQualityEdgeCases:
 
     def test_corrupted_tags_gracefully_handled(self, quality_agent):
         """Tags stored as non-JSON should not crash."""
-        conn = sqlite3.connect(quality_agent.store.db_path)
+        conn = sqlite3.connect(quality_agent.store._db_path)
         conn.execute(
             """INSERT INTO messages (
                 user_text, assistant_text, timestamp,

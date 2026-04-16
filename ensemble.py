@@ -1,13 +1,8 @@
 """
-ensemble.py — Thin wrapper around FixedTagger for the tag-context system.
+ensemble.py — Ensemble tagger wrapper for the tag-context system.
 
-Originally designed as a mixture model combining multiple tagging strategies
-(Fixed + GP tagger), but the GP tagger requires the DEAP library which
-was never successfully integrated. This module now serves as a compatibility
-wrapper around FixedTagger.
-
-The "hybrid" and "gp-only" modes are deprecated — they will raise ImportError
-if DEAP is not installed. Use TAGGER_MODE="fixed" (the default).
+Supports weighted voting across multiple tagging strategies. Production uses
+"fixed" mode only with FixedTagger for keyword/pattern matching.
 """
 
 from dataclasses import dataclass, field
@@ -154,53 +149,21 @@ def build_ensemble(
     vote_threshold: float = 0.4,
 ) -> EnsembleTagger:
     """
-    Build a tagger based on the specified mode.
+    Build a tagger in fixed mode (FixedTagger + baseline).
 
-    Modes:
-    - "fixed": FixedTagger only (default — recommended, no extra deps)
-    - "hybrid": DEPRECATED — FixedTagger + GP tagger (requires DEAP)
-    - "gp-only": DEPRECATED — GP tagger only (requires DEAP)
-
-    If mode is None, uses config.TAGGER_MODE (defaults to "fixed").
+    Production uses "fixed" mode only — keyword/pattern matching from tags.yaml.
     """
     mode = mode or config.TAGGER_MODE
+    if mode != "fixed":
+        raise ValueError(f"Only 'fixed' mode is supported. Got: {mode}")
+
     ensemble = EnsembleTagger(
         quality_agent=quality_agent,
         vote_threshold=vote_threshold,
     )
 
-    if mode == "fixed":
-        # Fixed tagger only — no DEAP dependency required
-        fixed = FixedTagger(config.TAGS_CONFIG)
-        ensemble.register("fixed", fixed.assign, initial_weight=1.0)
-
-    elif mode == "hybrid":
-        # Fixed + GP tagger
-        fixed = FixedTagger(config.TAGS_CONFIG)
-        ensemble.register("fixed", fixed.assign, initial_weight=1.0)
-
-        # Import GP tagger only when needed
-        try:
-            from gp_tagger import StructuredProgramTagger
-            gp_tagger = StructuredProgramTagger()
-            ensemble.register("gp", gp_tagger.assign, initial_weight=1.0)
-        except ImportError as e:
-            raise ImportError(
-                f"GP tagger requires DEAP: pip install deap (error: {e})"
-            )
-
-    elif mode == "gp-only":
-        # Legacy mode: GP tagger only
-        try:
-            from gp_tagger import StructuredProgramTagger
-            gp_tagger = StructuredProgramTagger()
-            ensemble.register("gp", gp_tagger.assign, initial_weight=1.0)
-        except ImportError as e:
-            raise ImportError(
-                f"GP tagger requires DEAP: pip install deap (error: {e})"
-            )
-
-    else:
-        raise ValueError(f"Unknown tagger mode: {mode}. Use 'fixed', 'hybrid', or 'gp-only'.")
+    # Fixed tagger only — no DEAP dependency required
+    fixed = FixedTagger(config.TAGS_CONFIG)
+    ensemble.register("fixed", fixed.assign, initial_weight=1.0)
 
     return ensemble
