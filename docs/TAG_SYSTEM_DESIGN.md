@@ -12,7 +12,7 @@ _2026-04-11 — Rich DeVaul / GLaDOS_
 
 ## System Tags
 
-- Stored in `data/system_tags.json` (relative to tag-context root)
+- Stored in `data/tags.yaml` (relative to tag-context root)
 - Loaded at service startup — deterministic, persisted across Gateway sessions
 - Format: list of tag names with optional metadata
 
@@ -53,7 +53,7 @@ Until these challenges are solved, the system stays explicit.
 
 - The tagger matches incoming messages against the union of system tags
 - Per-user tag context is filtered via user_registry tags during assembly
-- Matching is deterministic — what you see in system_tags.json is what you get
+- Matching is deterministic — what you see in tags.yaml is what you get
 
 ## Commands
 

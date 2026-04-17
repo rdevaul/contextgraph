@@ -25,7 +25,7 @@ CORE_TAGS = {
     # Project-specific (extend as needed)
     "voice-pwa", "shopping-list", "openclaw", "yapCAD",
     # General
-    "planning", "research", "question", "has-url",
+    "planning", "research",  # question/has-url removed (archived in tags.yaml)
     # Memory / context system
     "memory-system", "contextgraph",
     # Trading / finance (only seeded if actually used)
@@ -233,22 +233,6 @@ RULES: List[TagRule] = [
                    "release", "staging", "rollback", "blue-green", "canary deploy"]
         ),
         tags=["deployment"],
-    ),
-
-    # URL present
-    TagRule(
-        name="contains-url",
-        predicate=lambda f, u, a: f.contains_url,
-        tags=["has-url"],
-        confidence=0.5,
-    ),
-
-    # Question — user is asking for something
-    TagRule(
-        name="is-question",
-        predicate=lambda f, u, a: f.is_question,
-        tags=["question"],
-        confidence=0.7,
     ),
 
     # Research / planning

@@ -73,7 +73,7 @@ Context Graph supports **user-specific tag definitions** alongside the global ta
 
 **Data files:**
 ```
-data/system_tags.json                           # Global/system tag definitions
+data/tags.yaml                           # Global/system tag definitions
 ~/.tag-context/tags.user.registry/
   ├── <channel_label>.json                      # User-scoped tag registries
   ├── 994902066.json                            # (example: Rich's Telegram user ID)
@@ -81,7 +81,7 @@ data/system_tags.json                           # Global/system tag definitions
 ```
 
 **How it works:**
-- System tags are loaded from `data/system_tags.json`
+- System tags are loaded from `data/tags.yaml`
 - User-scoped tags are stored as per-channel JSON files in `~/.tag-context/tags.user.registry/`
 - User tags extend (not replace) the system tag set — both are used during tagging
 - Each user/channel's tags are isolated to their own file to prevent conflicts
@@ -252,7 +252,7 @@ remain meaningful at any budget:
 |---|---|
 | `store.py` | SQLite MessageStore + tag index + `pin_manager` (sticky/pin layer) |
 | `features.py` | Feature extraction (NLP + structural) |
-| `tagger.py` | `FixedTagger` — loads tags from `data/system_tags.json` + user registries |
+| `tagger.py` | `FixedTagger` — loads tags from `data/tags.yaml` + user registries |
 | `assembler.py` | Context assembly (sticky + recency + topic layers) |
 | `quality.py` | Quality agent (density + reframing scoring) |
 | `reframing.py` | Reframing signal detection |

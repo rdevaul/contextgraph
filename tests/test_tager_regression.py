@@ -1,7 +1,7 @@
 """
 test_tager_regression.py — Tagger regression test suite.
 
-Ensures every rule's tags exist in system_tags.json and that key message
+Ensures every rule's tags exist in tags.yaml and that key message
 patterns always produce the expected tags. This prevents rule changes from
 silently breaking tag assignments.
 
@@ -26,7 +26,7 @@ class TestTagRegistryCompleteness:
     """Every tag referenced by a rule must exist in the system registry."""
 
     def test_all_rule_tags_exist_in_system_tags(self):
-        """No rule should reference a tag that doesn't exist in system_tags.json."""
+        """No rule should reference a tag that doesn't exist in tags.yaml."""
         registry = get_registry()
         active = registry.get_active_tags()
         
@@ -37,9 +37,9 @@ class TestTagRegistryCompleteness:
                     missing.add(f"{rule.name} → {tag}")
         
         assert not missing, (
-            f"Rules reference tags that don't exist in system_tags.json:\n"
+            f"Rules reference tags that don't exist in tags.yaml:\n"
             + "\n".join(sorted(missing))
-            + "\n\nEither add these tags to system_tags.json or remove them from the rules."
+            + "\n\nEither add these tags to tags.yaml or remove them from the rules."
         )
 
     def test_no_duplicate_rule_tags(self):

@@ -135,19 +135,7 @@ ensemble.register('baseline', baseline_tagger, 1.0)
 @app.on_event("startup")
 async def startup_event():
     store.get_all_tags()  # Initialize the store
-    # System tags loaded from data/system_tags.json in TagRegistry.__init__
-    # No seeding from YAML — explicit config file is the source of truth.
-
-
-# Legacy seeding function — no longer used (system_tags.json is the source of truth)
-# Kept here as reference for historical understanding
-def _seed_registry_from_yaml() -> None:
-    """
-    DEPRECATED: Auto-seeded from tags.yaml.
-    Replaced by explicit data/system_tags.json config.
-    See docs/TAG_SYSTEM_DESIGN.md
-    """
-    pass
+    # System tags loaded from tags.yaml via TagRegistry — single source of truth.
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):

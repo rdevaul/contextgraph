@@ -1,309 +1,321 @@
 """
-tag_registry.py — Explicit-only tag system.
+tag_registry.py — Tag definitions from YAML files. Single source of truth.
 
-System tags are loaded from data/system_tags.json on startup.
-User tags are only added via explicit /tags command.
-No auto-discovery, no auto-promotion, no auto-demotion.
+SYSTEM TAGS: loaded from tags.yaml (package root)
+USER TAGS: one YAML file per user in ~/.tag-context/tags.user.registry/
 
-Design doc: docs/TAG_SYSTEM_DESIGN.md
+NO system_tags.json. NO JSON tag config. YAML only.
+tag_registry.json is purely a runtime statistics overlay (hits, timestamps,
+and any runtime-added tags not yet migrated to user YAML).
 """
 
 import json
 import time
+import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Set, Optional
+from typing import Dict, Set, Optional
+
+
+SYSTEM_TAGS_YAML = Path(__file__).parent / "tags.yaml"
+USER_REGISTRY_DIR = Path(__file__).parent.parent / ".tag-context" / "tags.user.registry"
 
 
 @dataclass
-class TagMetadata:
-    """Metadata for a single tag in the registry."""
+class TagConfig:
+    """A tag's configuration — YAML is always authoritative."""
     name: str
-    state: str  # "core", "archived"
-    first_seen: float
-    last_seen: float
-    hits: int
+    description: str = ""
+    keywords: list = field(default_factory=list)
+    patterns: list = field(default_factory=list)
+    requires_all: bool = False
+    confidence: float = 1.0
+    enabled: bool = True
+    state: str = "core"
+
+
+@dataclass
+class TagRuntime:
+    """Runtime metadata (hits, timestamps). Never overrides YAML config."""
+    name: str
+    state: str = "core"
+    first_seen: float = 0.0
+    last_seen: float = 0.0
+    hits: int = 0
     promoted_at: Optional[float] = None
     archived_at: Optional[float] = None
-    # Extended fields from per-user registries (may not be present in older data)
-    frequency: float = 0.0
-    recency_weight: float = 0.0
-    distinctiveness: float = 0.0
 
 
-# Directory for per-user tag registries
-USER_REGISTRY_DIR = Path.home() / ".tag-context" / "tags.user.registry"
+def _load_yaml(path: Path) -> Dict[str, TagConfig]:
+    """Load tag configs from a YAML file."""
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    tags = {}
+    for entry in data.get("tags", []):
+        name = entry["name"]
+        enabled = entry.get("enabled", True)
+        state = entry.get("state", "archived" if not enabled else "core")
+        tags[name] = TagConfig(
+            name=name,
+            description=entry.get("description", ""),
+            keywords=entry.get("keywords", []),
+            patterns=entry.get("patterns", []),
+            requires_all=entry.get("requires_all", False),
+            confidence=entry.get("confidence", 1.0),
+            enabled=enabled,
+            state=state,
+        )
+    return tags
+
+
+def _save_yaml_tags(path: Path, tags: Dict[str, TagConfig]) -> None:
+    """Save tag configs to a YAML file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entries = []
+    for tag in sorted(tags.values(), key=lambda t: t.name):
+        entry = {"name": tag.name}
+        if tag.description:
+            entry["description"] = tag.description
+        if tag.keywords:
+            entry["keywords"] = tag.keywords
+        if tag.patterns:
+            entry["patterns"] = tag.patterns
+        if tag.requires_all:
+            entry["requires_all"] = True
+        if tag.confidence != 1.0:
+            entry["confidence"] = tag.confidence
+        if not tag.enabled:
+            entry["enabled"] = False
+        if tag.state != "core":
+            entry["state"] = tag.state
+        entries.append(entry)
+    with open(path, "w") as f:
+        yaml.dump({"tags": entries}, f, default_flow_style=False, sort_keys=False)
 
 
 class TagRegistry:
     """
-    Explicit-only tag registry.
-
-    System tags are loaded from a static config file (system_tags.json).
-    User registries track per-user tag state, modified only by
-    explicit /tags commands.
-
-    No auto-discovery, no auto-promotion, no auto-demotion.
+    System mode (_is_system=True):
+      - Loads tag configs from system YAML (tags.yaml)
+      - Loads runtime stats from JSON overlay
+      - Runtime-added user tags also loaded from JSON (fallback until migrated)
+    
+    User mode (_is_system=False):
+      - Loads tag configs from user YAML file
+      - Loads runtime stats from matching JSON overlay
+    
+    When user tags are added/removed at runtime, they're saved to the
+    user's YAML file so they persist across restarts.
     """
-
     def __init__(self, data_dir: Path = None, registry_file: str = None,
-                 system_config_path: Path = None):
-        """
-        Args:
-            data_dir: Base directory for tag data files.
-            registry_file: Filename for this registry (system or user).
-            system_config_path: Path to system_tags.json (system registries only).
-                If None, defaults to data_dir/system_tags.json when
-                registry_file is "tag_registry.json" (i.e. system mode).
-        """
+                 yaml_path: Path = None, is_system: bool = None):
         if data_dir is None:
             data_dir = Path(__file__).parent / "data"
         self.data_dir = data_dir
         self.registry_file = registry_file or "tag_registry.json"
-        self.system_config_path = system_config_path or (data_dir / "system_tags.json")
+        self.yaml_path = yaml_path or SYSTEM_TAGS_YAML
 
-        self._tags: Dict[str, TagMetadata] = {}
-        self._message_count: int = 0
-        # System registry is identified by file name AND explicit config path.
-        # User registries have their own file and do NOT load system config.
-        # Only the canonical system file name + presence of config = system mode.
-        self._is_system = (
-            self.registry_file == "tag_registry.json"
-            and self.system_config_path.exists()
-        )
+        if is_system is not None:
+            self._is_system = is_system
+        else:
+            self._is_system = (self.registry_file == "tag_registry.json"
+                               and self.yaml_path == SYSTEM_TAGS_YAML)
+
+        self._configs: Dict[str, TagConfig] = {}
+        self._runtime: Dict[str, TagRuntime] = {}
+        self.message_count: int = 0
         self.load()
 
     def load(self) -> None:
-        """Load tag registry from disk.
-
-        For the system registry: load from system_tags.json config file.
-        For user registries: load from the user-specific JSON file.
-        """
-        if self._is_system:
-            # Load system tags from explicit config file
-            if self.system_config_path.exists():
-                try:
-                    with open(self.system_config_path, 'r') as f:
-                        data = json.load(f)
-                        for tag_entry in data.get('tags', []):
-                            name = tag_entry['name']
-                            state = tag_entry.get('state', 'core')
-                            self._tags[name] = TagMetadata(
-                                name=name,
-                                state=state,
-                                first_seen=time.time(),
-                                last_seen=time.time(),
-                                hits=0,
-                                promoted_at=time.time() if state == "core" else None,
-                            )
-                except Exception as e:
-                    print(f"Error loading system tags from {self.system_config_path}: {e}")
-        else:
-            # Load user registry from its JSON file
-            path = self.data_dir / self.registry_file
-            if path.exists():
-                try:
-                    with open(path, 'r') as f:
-                        data = json.load(f)
-                        self._message_count = data.get('message_count', 0)
-                        for tag_data in data.get('tags', []):
-                            tag = TagMetadata(**tag_data)
-                            self._tags[tag.name] = tag
-                except Exception as e:
-                    print(f"Error loading user registry {path}: {e}")
+        """Load YAML configs + runtime metadata overlay."""
+        self._configs = _load_yaml(self.yaml_path)
+        state_path = self.data_dir / self.registry_file
+        if state_path.exists():
+            try:
+                with open(state_path) as f:
+                    data = json.load(f)
+                self.message_count = data.get('message_count', 0)
+                for item in data.get('tags', []):
+                    name = item['name']
+                    if name in self._configs:
+                        # Update runtime stats for known tag
+                        self._runtime[name] = TagRuntime(
+                            name=name,
+                            state=self._configs[name].state,
+                            first_seen=item.get('first_seen', time.time()),
+                            last_seen=item.get('last_seen', time.time()),
+                            hits=item.get('hits', 0),
+                            promoted_at=item.get('promoted_at'),
+                            archived_at=item.get('archived_at'),
+                        )
+                    elif not self._is_system:
+                        # Non-system: load runtime-added tags from JSON
+                        self._configs[name] = TagConfig(
+                            name=name,
+                            state=item.get('state', 'core'),
+                        )
+                        self._runtime[name] = TagRuntime(
+                            name=name,
+                            state=item.get('state', 'core'),
+                            first_seen=item.get('first_seen', time.time()),
+                            last_seen=item.get('last_seen', time.time()),
+                            hits=item.get('hits', 0),
+                            promoted_at=item.get('promoted_at'),
+                            archived_at=item.get('archived_at'),
+                        )
+            except Exception as e:
+                print(f"Error loading runtime state: {e}")
 
     def save(self) -> None:
-        """Save tag registry to JSON file."""
+        """Persist runtime metadata to JSON and configs to YAML."""
         path = self.data_dir / self.registry_file
         path.parent.mkdir(parents=True, exist_ok=True)
-
+        all_tags = {}
+        for name, cfg in self._configs.items():
+            if name in self._runtime:
+                all_tags[name] = self._runtime[name]
+            else:
+                all_tags[name] = TagRuntime(
+                    name=name, state=cfg.state,
+                    first_seen=time.time(),
+                    last_seen=time.time(), hits=0,
+                )
         data = {
-            'message_count': self._message_count,
+            'message_count': self.message_count,
             'tags': [
-                {
-                    'name': tag.name,
-                    'state': tag.state,
-                    'first_seen': tag.first_seen,
-                    'last_seen': tag.last_seen,
-                    'hits': tag.hits,
-                    'promoted_at': tag.promoted_at,
-                    'archived_at': tag.archived_at,
-                }
-                for tag in self._tags.values()
+                {'name': t.name, 'state': t.state,
+                 'first_seen': t.first_seen, 'last_seen': t.last_seen,
+                 'hits': t.hits, 'promoted_at': t.promoted_at,
+                 'archived_at': t.archived_at}
+                for t in all_tags.values()
             ]
         }
-
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
 
-    # ---- System tag management (explicit only) ----
+        # Non-system registries also persist configs to user YAML
+        if not self._is_system:
+            _save_yaml_tags(self.yaml_path, self._configs)
+
+    def get_active_tags(self) -> Set[str]:
+        """Enabled, non-archived tags from YAML configs."""
+        return {n for n, c in self._configs.items()
+                if c.enabled and c.state != "archived"}
+
+    def get_core_tags(self) -> Set[str]:
+        return self.get_active_tags()
+
+    def get_active_tags_for_channel(self, channel_label: Optional[str]) -> Set[str]:
+        system_active = get_registry().get_active_tags()
+        if not channel_label:
+            return system_active
+        user_reg = get_user_registry(channel_label)
+        return system_active | (user_reg.get_active_tags() if user_reg else set())
+
+    def get_all_tags(self) -> Dict[str, list]:
+        result = {'core': [], 'archived': []}
+        for name, cfg in self._configs.items():
+            rt = self._runtime.get(name)
+            tag_dict = {
+                'name': name, 'state': cfg.state, 'enabled': cfg.enabled,
+                'description': cfg.description, 'keywords': cfg.keywords,
+                'hits': rt.hits if rt else 0,
+                'last_seen': rt.last_seen if rt else 0,
+                'first_seen': rt.first_seen if rt else 0,
+            }
+            result.setdefault(cfg.state, []).append(tag_dict)
+        for s in result:
+            result[s].sort(key=lambda x: -x['hits'])
+        return result
+
+    def record_hit(self, tag_name: str) -> None:
+        if tag_name in self._configs:
+            if tag_name not in self._runtime:
+                self._runtime[tag_name] = TagRuntime(
+                    name=tag_name,
+                    state=self._configs[tag_name].state,
+                    first_seen=time.time(),
+                    last_seen=time.time(), hits=0,
+                )
+            self._runtime[tag_name].hits += 1
+            self._runtime[tag_name].last_seen = time.time()
+            if not self._is_system:
+                self.save()
 
     def add_system_tag(self, name: str, state: str = "core") -> bool:
-        """Add a system tag. Returns True if it was new, False if already exists."""
-        if name in self._tags:
+        if name in self._configs:
             return False
-        now = time.time()
-        self._tags[name] = TagMetadata(
-            name=name,
-            state=state,
-            first_seen=now,
-            last_seen=now,
-            hits=0,
-        )
+        self._configs[name] = TagConfig(name=name, state=state)
         return True
 
     def remove_system_tag(self, name: str) -> bool:
-        """Remove a system tag. Returns True if it existed."""
-        if name not in self._tags:
+        if name not in self._configs:
             return False
-        del self._tags[name]
+        del self._configs[name]
+        self._runtime.pop(name, None)
         return True
 
-    # ---- User tag management (explicit only) ----
-
     def add_user_tag(self, name: str, state: str = "core") -> bool:
-        """Add a user tag. Returns True if it was new, False if already exists."""
-        if name in self._tags:
+        if name in self._configs:
             return False
-        now = time.time()
-        self._tags[name] = TagMetadata(
-            name=name,
-            state=state,
-            first_seen=now,
-            last_seen=now,
-            hits=0,
+        self._configs[name] = TagConfig(name=name, state=state)
+        self._runtime[name] = TagRuntime(
+            name=name, state=state,
+            first_seen=time.time(),
+            last_seen=time.time(), hits=0,
         )
         self.save()
         return True
 
     def remove_user_tag(self, name: str) -> bool:
-        """Remove a user tag. Returns True if it existed."""
-        if name not in self._tags:
+        if name not in self._configs:
             return False
-        del self._tags[name]
+        del self._configs[name]
+        self._runtime.pop(name, None)
         self.save()
         return True
 
-    # ---- Query methods ----
+    def get_tag_def(self, name: str) -> Optional[TagConfig]:
+        return self._configs.get(name)
 
-    def get_active_tags(self) -> Set[str]:
-        """Return set of tags that should be actively matched (core only)."""
-        return {
-            tag.name for tag in self._tags.values()
-            if tag.state == "core"
-        }
-
-    def get_active_tags_for_channel(self, channel_label: Optional[str]) -> Set[str]:
-        """
-        Return combined active tags for a channel: system active + user active.
-        """
-        system_active = get_registry().get_active_tags()
-        if not channel_label:
-            return system_active
-
-        user_reg = get_user_registry(channel_label)
-        if user_reg is None:
-            return system_active
-
-        return system_active | user_reg.get_active_tags()
-
-    def get_core_tags(self) -> Set[str]:
-        """Return set of core tags only."""
-        return {
-            tag.name for tag in self._tags.values()
-            if tag.state == "core"
-        }
-
-    def get_all_tags(self) -> Dict[str, List[Dict]]:
-        """Return all tags grouped by state (for API/dashboard)."""
-        result = {
-            'core': [],
-            'archived': [],
-        }
-        for tag_name, tag in self._tags.items():
-            tag_dict = {
-                'name': tag.name,
-                'state': tag.state,
-                'hits': tag.hits,
-                'last_seen': tag.last_seen,
-                'first_seen': tag.first_seen,
-                'promoted_at': tag.promoted_at,
-                'archived_at': tag.archived_at,
-            }
-            result.setdefault(tag.state, []).append(tag_dict)
-
-        # Sort by hits descending within each state
-        for state in result:
-            result[state].sort(key=lambda x: -x['hits'])
-
-        return result
-
-    def record_hit(self, tag_name: str) -> None:
-        """Record a match for a tag (for tracking user tag adoption)."""
-        if tag_name in self._tags:
-            self._tags[tag_name].hits += 1
-            self._tags[tag_name].last_seen = time.time()
-            # Only save for user registries (system registry doesn't persist hits)
-            if not self._is_system:
-                self.save()
-
-    @property
-    def _tags(self):
-        return self.__dict__.get('_tags', {})
-
-    @_tags.setter
-    def _tags(self, value):
-        self.__dict__['_tags'] = value
-
-    @property
-    def _message_count(self):
-        return self.__dict__.get('_message_count', 0)
-
-    @_message_count.setter
-    def _message_count(self, value):
-        self.__dict__['_message_count'] = value
+    def get_tag_defs(self) -> Dict[str, TagConfig]:
+        return dict(self._configs)
 
 
-# Global singleton instance
-_registry_instance = None
+# ── Singletons ────────────────────────────────────────────────────────────────
+_registry_instance: Optional['TagRegistry'] = None
+_user_registry_cache: Dict[str, 'TagRegistry'] = {}
 
 
-def get_registry() -> TagRegistry:
-    """Get the global TagRegistry singleton."""
+def get_registry() -> 'TagRegistry':
     global _registry_instance
     if _registry_instance is None:
         _registry_instance = TagRegistry()
     return _registry_instance
 
 
-# Per-user registry cache
-_user_registry_cache: Dict[str, TagRegistry] = {}
-
-
-def get_user_registry(channel_label: str) -> Optional[TagRegistry]:
-    """
-    Get (or create) the TagRegistry for a specific user channel.
-
-    User registries are stored at ~/.tag-context/tags.user.registry/<label>.json.
-    Returns None if the user registry directory doesn't exist yet.
-    """
+def get_user_registry(channel_label: str) -> Optional['TagRegistry']:
     USER_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
-
     if channel_label not in _user_registry_cache:
-        registry_path = USER_REGISTRY_DIR / f"{channel_label}.json"
-        if not registry_path.exists():
-            # Don't create empty user registries — only load existing ones
-            return _registry_instance  # Actually, return None to indicate no user reg
+        user_yaml = USER_REGISTRY_DIR / f"{channel_label}.yaml"
+        if not user_yaml.exists():
+            return None
         user_reg = TagRegistry(
-            data_dir=USER_REGISTRY_DIR,
             registry_file=f"{channel_label}.json",
+            is_system=False, yaml_path=user_yaml,
+            data_dir=USER_REGISTRY_DIR,
         )
         _user_registry_cache[channel_label] = user_reg
-
     return _user_registry_cache.get(channel_label)
 
 
 def clear_user_registry_cache() -> None:
-    """Clear the user registry cache (useful for testing)."""
     global _user_registry_cache
     _user_registry_cache = {}
+
+
+def reload_registry():
+    global _registry_instance
+    _registry_instance = TagRegistry()

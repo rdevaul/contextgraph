@@ -96,7 +96,7 @@ Incoming message
            ▼
   ┌──────────────────┐     ┌─────────────────┐
   │  EnsembleTagger  │────►│  TagRegistry     │
-  │  (fixed mode)    │     │  (system_tags.json│
+  │  (fixed mode)    │     │  (tags.yaml│
   └────────┬─────────┘     │   + user tags)    │
            │               └─────────────────┘
            ▼
@@ -484,7 +484,7 @@ class TagMetadata:
 
 #### System Tags
 
-Loaded from `data/system_tags.json` on startup. States: `core`, `archived`.
+Loaded from `data/tags.yaml` on startup. States: `core`, `archived`.
 No auto-discovery, no auto-promotion, no auto-demotion.
 
 #### User Registries
@@ -577,7 +577,7 @@ CREATE TABLE schema_version (
 ### 4.2 JSON Registries
 
 #### System Tag Definition
-**Path:** `data/system_tags.json`
+**Path:** `data/tags.yaml`
 
 ```json
 {
@@ -678,7 +678,7 @@ of 0.4 under normal weight distribution.
 ### 5.2 Tag Sources
 
 #### System Tags
-**Source:** `data/system_tags.json`
+**Source:** `data/tags.yaml`
 **Loaded at:** server startup
 **Modification:** manual edit + restart
 
@@ -996,7 +996,7 @@ Tag a message pair (standalone, no ingestion).
 **Request:**
 ```json
 {  "user_text": "How does the tagger work?",
-  "assistant_text": "The FixedTagger loads tags from system_tags.json..."
+  "assistant_text": "The FixedTagger loads tags from tags.yaml..."
 }
 ```
 
@@ -1084,7 +1084,7 @@ Returns system and user tags with metadata for the plugin's `/tags` command.
 }
 ```
 
-**Behavior:** Aggregates `data/system_tags.json` with all `~/.tag-context/tags.user.registry/*.json` files. Only surfaces user tags with actual activity (hits > 0 or non-core state).
+**Behavior:** Aggregates `data/tags.yaml` with all `~/.tag-context/tags.user.registry/*.json` files. Only surfaces user tags with actual activity (hits > 0 or non-core state).
 
 ---
 
@@ -1338,13 +1338,13 @@ All persistent state lives in `~/.tag-context/`:
 | Variable | Default | Description |
 |---|---|---|
 | `CONTEXTGRAPH_DB_PATH` | `~/.tag-context/context.db` | SQLite database path |
-| `CONTEXTGRAPH_TAGS_CONFIG` | `data/system_tags.json` | System tags file |
+| `CONTEXTGRAPH_TAGS_CONFIG` | `data/tags.yaml` | System tags file |
 | `CONTEXTGRAPH_TAGGER_MODE` | `"fixed"` | Tagger mode. Only "fixed" works. |
 | `STICKY_BUDGET_FRACTION` | `"0.3"` | Fraction of token budget for pinned messages |
 
 ### 11.2 System Tags
 
-`data/system_tags.json` — core/candidate/archived tags with keywords.
+`data/tags.yaml` — core/candidate/archived tags with keywords.
 
 ### 11.3 User Tag Registries
 

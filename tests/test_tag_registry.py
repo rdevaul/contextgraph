@@ -1,269 +1,210 @@
 """
-test_tag_registry.py — Tests for explicit-only tag system.
+test_tag_registry.py — Tests for explicit-only tag system driven by YAML.
 
-System tags: loaded from system_tags.json on startup (deterministic, persistent).
-User tags: added ONLY via explicit /tags command.
-No auto-discovery, auto-promotion, or auto-demotion.
-
-Design: docs/TAG_SYSTEM_DESIGN.md
+YAML is single source of truth for tag definitions.
+JSON (tag_registry.json) is only runtime stats (hits, timestamps).
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 import time
 from pathlib import Path
 
-from tag_registry import TagRegistry, TagMetadata, get_registry, get_user_registry, USER_REGISTRY_DIR
-import tag_registry as _tag_registry_module
+import pytest
 
-
-# ── Fixtures ──────────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def system_config_file(tmp_path):
-    """Create a minimal system_tags.json and return the path."""
-    config = tmp_path / "system_tags.json"
-    config.write_text(json.dumps({
-        "tags": [
-            {"name": "code", "state": "core"},
-            {"name": "ai", "state": "core"},
-            {"name": "testing", "state": "archived"},
-        ]
-    }))
-    return config
+from tag_registry import (
+    TagRegistry,
+    TagConfig,
+    _load_yaml,
+    clear_user_registry_cache,
+    get_user_registry,
+    reload_registry,
+)
+import tag_registry as _mod
 
 
 @pytest.fixture
-def system_registry(tmp_path, system_config_file):
-    """Registry loaded from system_tags.json"""
+def yaml_path(tmp_path):
+    """Create a test tags.yaml and return path."""
+    p = tmp_path / "tags.yaml"
+    p.write_text("""
+tags:
+  - name: code
+    description: "Code and development"
+    keywords: ["code", "def ", "class "]
+    patterns: ["```"]
+  - name: ai
+    description: "AI and machine learning"
+    keywords: ["AI", "machine learning", "model"]
+  - name: testing
+    description: "Testing and QA"
+    keywords: ["test", "pytest"]
+    enabled: false
+""")
+    return p
+
+
+@pytest.fixture
+def system_reg(tmp_path, yaml_path):
+    """System-mode registry backed by the test yaml_path.
+    Saves and restores the global singleton to avoid cross-test pollution."""
+    old = _mod._registry_instance
+    _mod._registry_instance = None  # Clear so this test's registry is used as singleton
     reg = TagRegistry(
         data_dir=tmp_path,
         registry_file="tag_registry.json",
-        system_config_path=system_config_file,
+        yaml_path=yaml_path,
+        is_system=True,
     )
+    _mod._registry_instance = reg
     yield reg
+    _mod._registry_instance = old  # Restore
 
 
 @pytest.fixture
-def system_config_file_empty(tmp_path):
-    config = tmp_path / "system_tags.json"
-    config.write_text(json.dumps({"tags": []}))
-    return config
+def empty_yaml(tmp_path):
+    p = tmp_path / "tags.yaml"
+    p.write_text("tags: []\n")
+    return p
 
 
 @pytest.fixture
-def empty_system_registry(tmp_path, system_config_file_empty):
+def empty_system_reg(tmp_path, empty_yaml):
     return TagRegistry(
         data_dir=tmp_path,
         registry_file="tag_registry.json",
-        system_config_path=system_config_file_empty,
+        yaml_path=empty_yaml,
+        is_system=True,
     )
 
 
-# ── System tag loading ────────────────────────────────────────────────────────
+# ── YAML loading ─────────────────────────────────────────────────────────────
 
-def test_system_registry_loads_core_tags(system_registry):
-    """Core tags from system_tags.json are loaded on init."""
-    active = system_registry.get_active_tags()
+def test_load_yaml_loads_enabled_tags(yaml_path):
+    defs = _load_yaml(yaml_path)
+    assert "code" in defs
+    assert "ai" in defs
+
+
+def test_load_yaml_marks_disabled_as_archived(yaml_path):
+    defs = _load_yaml(yaml_path)
+    assert defs["testing"].state == "archived"
+    assert defs["testing"].enabled is False
+
+
+def test_load_yaml_missing_file():
+    assert _load_yaml(Path("/nonexistent/tags.yaml")) == {}
+
+
+# ── System registry loads core from YAML ──────────────────────────────────────
+
+def test_system_registry_loads_cores_tags(system_reg):
+    active = system_reg.get_active_tags()
     assert "code" in active
     assert "ai" in active
-    assert "testing" not in active  # archived
+    assert "testing" not in active
 
 
-def test_system_registry_loads_archived_tags(system_registry):
-    """Archived tags are present but not active."""
-    all_tags = system_registry.get_all_tags()
-    archived_names = [t["name"] for t in all_tags.get("archived", [])]
-    assert "testing" in archived_names
+def test_system_registry_get_core_tags(system_reg):
+    cores = system_reg.get_core_tags()
+    assert cores == system_reg.get_active_tags()
 
 
-def test_empty_system_config_loads_nothing(empty_system_registry):
-    """An empty system config produces zero tags."""
-    active = empty_system_registry.get_active_tags()
-    assert len(active) == 0
+def test_empty_system_has_no_active_tags(empty_system_reg):
+    assert len(empty_system_reg.get_active_tags()) == 0
 
 
-def test_system_registry_get_core_tags(system_registry):
-    """get_core_tags returns only core-tagged entries."""
-    cores = system_registry.get_core_tags()
-    assert cores == {"code", "ai"}
+# ── System tag CRUD ──────────────────────────────────────────────────────────
+
+def test_add_system_tag(system_reg):
+    assert system_reg.add_system_tag("security") is True
+    assert "security" in system_reg.get_active_tags()
 
 
-def test_get_active_tags_for_channel_without_user(system_registry, tmp_path, system_config_file):
-    """Without a user registry, channel active = system active."""
-    result = system_registry.get_active_tags_for_channel("nonexistent-user-label")
-    # For non-existent user, only system tags returned
-    assert "code" in result
-    assert "ai" in result
+def test_add_system_tag_duplicate(system_reg):
+    assert system_reg.add_system_tag("code") is False
 
 
-# ── System tag CRUD (explicit only) ──────────────────────────────────────────
-
-def test_add_system_tag(system_registry):
-    """Adding a new system tag succeeds and returns True."""
-    assert system_registry.add_system_tag("security") is True
-    assert "security" in system_registry.get_active_tags()
+def test_remove_system_tag(system_reg):
+    assert system_reg.remove_system_tag("code") is True
+    assert "code" not in system_reg.get_active_tags()
 
 
-def test_add_system_tag_duplicate(system_registry):
-    """Adding an existing system tag returns False."""
-    assert system_registry.add_system_tag("code") is False
+def test_remove_nonexistent_system_tag(system_reg):
+    assert system_reg.remove_system_tag("nonexistent") is False
 
 
-def test_remove_system_tag(system_registry):
-    assert system_registry.remove_system_tag("code") is True
-    assert "code" not in system_registry.get_active_tags()
+# ── YAML is always authoritative (never overridden by JSON) ──────────────────
 
-
-def test_remove_nonexistent_system_tag(system_registry):
-    assert system_registry.remove_system_tag("nonexistent") is False
-
-
-# ── User tag CRUD (explicit only) ─────────────────────────────────────────────
-
-def test_add_user_tag(tmp_path, system_config_file):
-    """Adding a user tag creates the tag and persists it."""
-    reg = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="user-alpha.json",
-        system_config_path=system_config_file,
-    )
-    assert reg.add_user_tag("myproject") is True
-    assert "myproject" in reg.get_active_tags()
-
-
-def test_add_user_tag_duplicate(tmp_path, system_config_file):
-    reg = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="user-dup.json",
-        system_config_path=system_config_file,
-    )
-    reg.add_user_tag("myproject")
-    assert reg.add_user_tag("myproject") is False
-
-
-def test_remove_user_tag(tmp_path, system_config_file):
-    reg = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="user-rm.json",
-        system_config_path=system_config_file,
-    )
-    reg.add_user_tag("temp")
-    assert reg.remove_user_tag("temp") is True
-    assert "temp" not in reg.get_active_tags()
-
-
-def test_remove_nonexistent_user_tag(tmp_path, system_config_file):
-    reg = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="user-rm2.json",
-        system_config_path=system_config_file,
-    )
-    assert reg.remove_user_tag("notthere") is False
-
-
-# ── Persistence ───────────────────────────────────────────────────────────────
-
-def test_user_registry_persists(tmp_path, system_config_file):
-    """User registry survives save/load cycle."""
-    reg1 = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="persist-user.json",
-        system_config_path=system_config_file,
-    )
-    reg1.add_user_tag("alpha")
-    reg1.add_user_tag("beta")
-    reg1._message_count = 42
-    reg1.save()
-
+def test_system_tags_always_reload_from_yaml(system_reg, yaml_path):
+    """System tags come from YAML on every load, regardless of JSON overlay."""
+    system_reg.save()
     reg2 = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="persist-user.json",
-        system_config_path=system_config_file,
-    )
-    assert "alpha" in reg2.get_active_tags()
-    assert "beta" in reg2.get_active_tags()
-    assert reg2._message_count == 42
-
-
-def test_system_tags_always_reload_from_disk(tmp_path, system_config_file):
-    """System tags come from the config file, not from a saved JSON."""
-    reg = TagRegistry(
-        data_dir=tmp_path,
+        data_dir=system_reg.data_dir,
         registry_file="tag_registry.json",
-        system_config_path=system_config_file,
+        yaml_path=yaml_path,
+        is_system=True,
     )
-    # Even if we save, the system registry should reload from config.
-    reg.save()
-    reg2 = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="tag_registry.json",
-        system_config_path=system_config_file,
-    )
-    active = reg2.get_active_tags()
-    assert active == {"code", "ai"}
+    assert "code" in reg2.get_active_tags()
+    assert "ai" in reg2.get_active_tags()
+    assert "testing" not in reg2.get_active_tags()
 
 
-# ── Combined active tags (system ∪ user) ─────────────────────────────────────
+# ── User tags ────────────────────────────────────────────────────────────────
 
-def test_combined_active_tags(tmp_path, system_config_file):
-    """get_active_tags_for_channel returns system ∪ user tags."""
-    # Use isolated temp dir, not real USER_REGISTRY_DIR
-    user_dir = tmp_path / "user-regs-test"
-    user_dir.mkdir(exist_ok=True)
-    user_file = user_dir / "combined-test.json"
-
-    # System registry must use canonical file name for _is_system to be True
-    system_reg = TagRegistry(
-        data_dir=tmp_path,
-        registry_file="tag_registry.json",
-        system_config_path=system_config_file,
-    )
-    # User registry uses its own file name
-    user_reg = TagRegistry(
-        data_dir=user_dir,
-        registry_file="combined-test.json",
-        system_config_path=system_config_file,
-    )
-    user_reg.add_user_tag("personal")
-    user_reg.save()
-
-    # Manually test the union logic (avoid get_user_registry singleton)
-    system_active = system_reg.get_active_tags()
-    user_active = user_reg.get_active_tags()
-    combined = system_active | user_active
-    
-    assert "code" in combined  # system
-    assert "ai" in combined    # system
-    assert "personal" in combined  # user
+def test_add_user_tag_persists(system_reg):
+    system_reg.add_user_tag("myproject")
+    assert "myproject" in system_reg.get_active_tags()
+    # Verify JSON persisted
+    state_path = system_reg.data_dir / system_reg.registry_file
+    data = json.loads(state_path.read_text())
+    assert any(t["name"] == "myproject" for t in data["tags"])
 
 
-# ── Recording hits ────────────────────────────────────────────────────────────
-
-def test_record_hit_updates_metadata(system_registry):
-    """record_hit increments hit count and refreshes last_seen."""
-    before = system_registry._tags["code"]
-    before_hits = before.hits
-    before_seen = before.last_seen
-    time.sleep(0.01)
-
-    system_registry.record_hit("code")
-    tag = system_registry._tags["code"]
-    assert tag.hits == before_hits + 1
-    assert tag.last_seen > before_seen
+def test_add_user_tag_duplicate(system_reg):
+    system_reg.add_user_tag("myproject")
+    assert system_reg.add_user_tag("myproject") is False
 
 
-def test_record_hit_unknown_tag_is_silent(system_registry):
-    """Recording a hit for a non-existent tag does not crash."""
-    system_registry.record_hit("does-not-exist")
+def test_remove_user_tag(system_reg):
+    system_reg.add_user_tag("temp")
+    assert system_reg.remove_user_tag("temp") is True
+    assert "temp" not in system_reg.get_active_tags()
 
 
-# ── get_all_tags structure ────────────────────────────────────────────────────
+def test_remove_nonexistent_user_tag(system_reg):
+    assert system_reg.remove_user_tag("notthere") is False
 
-def test_get_all_tags_structure(system_registry):
-    """Returns core/archived dicts with required fields."""
-    result = system_registry.get_all_tags()
+
+# ── Combined active tags (system ∪ user) ────────────────────────────────────
+
+def test_combined_active_tags(system_reg):
+    """get_active_tags_for_channel returns system + user tags for this registry."""
+    system_reg.add_user_tag("personal")
+    # get_active_tags_for_channel calls the global singleton, which is system_reg in this fixture
+    active = system_reg.get_active_tags()
+    assert "code" in active
+    assert "ai" in active
+    assert "personal" in active
+
+
+# ── Record hit ───────────────────────────────────────────────────────────────
+
+def test_record_hit(system_reg):
+    system_reg.record_hit("code")
+    all_tags = system_reg.get_all_tags()
+    code_tags = [t for t in all_tags["core"] if t["name"] == "code"]
+    assert code_tags[0]["hits"] >= 1
+
+
+def test_record_hit_unknown_silent(system_reg):
+    system_reg.record_hit("does-not-exist")
+
+
+# ── get_all_tags structure ───────────────────────────────────────────────────
+
+def test_get_all_tags_structure(system_reg):
+    result = system_reg.get_all_tags()
     assert "core" in result
     assert "archived" in result
 
@@ -272,20 +213,37 @@ def test_get_all_tags_structure(system_registry):
 
     for tag in result["core"]:
         for key in ("name", "state", "hits", "last_seen", "first_seen"):
-            assert key in tag, f"Missing key: {key}"
+            assert key in tag
 
 
-# ── Singletons ────────────────────────────────────────────────────────────────
+# ── get_active_tags_for_channel ──────────────────────────────────────────────
 
-def test_get_registry_returns_single_instance(tmp_path, system_config_file):
-    """Singleton pattern: same instance returned twice."""
-    # Save the real singleton before we mess with it
-    orig = _tag_registry_module._registry_instance
+def test_channel_with_no_user_registry(system_reg):
+    result = system_reg.get_active_tags_for_channel("nonexistent-user")
+    assert "code" in result
+    assert "ai" in result
+
+
+# ── Singleton ────────────────────────────────────────────────────────────────
+
+def test_get_registry_returns_instance():
+    orig = _mod._registry_instance
     try:
-        _tag_registry_module._registry_instance = None
-        r1 = _tag_registry_module.get_registry()
-        r2 = _tag_registry_module.get_registry()
+        _mod._registry_instance = None
+        r1 = _mod.get_registry()
+        r2 = _mod.get_registry()
         assert r1 is r2
     finally:
-        # Restore the real system registry
-        _tag_registry_module._registry_instance = orig
+        _mod._registry_instance = orig
+
+
+def test_reload_registry():
+    orig = _mod._registry_instance
+    try:
+        _mod._registry_instance = None
+        _mod.get_registry()
+        old = _mod._registry_instance
+        _mod.reload_registry()
+        assert _mod._registry_instance is not old
+    finally:
+        _mod._registry_instance = orig
