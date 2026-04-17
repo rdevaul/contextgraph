@@ -2,7 +2,7 @@
 Integration tests for the context graph system.
 
 These tests verify the full Python API pipeline via HTTP calls.
-The API must be running on port 8300 for these tests to pass.
+The API must be running on port 8302 for these tests to pass.
 
 Run with: python3 -m pytest tests/test_integration.py -v --tb=short
 """
@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 
-API_BASE_URL = "http://localhost:8300"
+API_BASE_URL = "http://localhost:8302"
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +23,7 @@ def api_available():
         response = requests.get(f"{API_BASE_URL}/health", timeout=2)
         return response.status_code == 200
     except requests.RequestException:
-        pytest.skip("API is not running on port 8300. Start with: python3 -m api.server")
+        pytest.skip("API is not running on port 8302. Start with: python3 -m api.server")
 
 
 @pytest.fixture(scope="module")

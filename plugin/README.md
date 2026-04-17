@@ -4,7 +4,7 @@ This directory contains an OpenClaw plugin that bridges the ContextEngine interf
 
 ## What it does
 
-When installed as an OpenClaw extension, this plugin replaces the default linear context window with graph-based, semantically-tagged context assembly — routing through the Python API at `http://localhost:8300`.
+When installed as an OpenClaw extension, this plugin replaces the default linear context window with graph-based, semantically-tagged context assembly — routing through the Python API at `http://localhost:8302`.
 
 **Graph mode is OFF by default.** The plugin acts as a transparent pass-through until explicitly enabled, so there is zero risk to existing behavior.
 
@@ -24,7 +24,7 @@ When installed as an OpenClaw extension, this plugin replaces the default linear
 
 - OpenClaw with plugin/extension support
 - Node.js ≥ 22
-- The contextgraph Python API server running on port 8300 (see `../api/` and `../service/`)
+- The contextgraph Python API server running on port 8302 (see `../api/` and `../service/`)
 
 ## Installation
 

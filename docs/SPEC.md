@@ -903,7 +903,7 @@ prevents noise from degrading tag quality and retrieval relevance.
 
 ## 8. API Reference
 
-Base URL: `http://localhost:8300`
+Base URL: `http://localhost:8302`
 Framework: FastAPI (uvicorn)
 All endpoints return JSON unless noted.
 
@@ -1267,15 +1267,15 @@ labels:
 
 ```bash
 # Dry run first
-curl -X POST http://localhost:8300/admin/merge-channel-labels \
+curl -X POST http://localhost:8302/admin/merge-channel-labels \
   -d '{"source_labels": ["994902066"], "target_label": "glados-rich", "dry_run": true}'
 
 # Execute
-curl -X POST http://localhost:8300/admin/merge-channel-labels \
+curl -X POST http://localhost:8302/admin/merge-channel-labels \
   -d '{"source_labels": ["994902066"], "target_label": "glados-rich", "dry_run": false}'
 
 # Retag merged messages
-curl -X POST http://localhost:8300/admin/retag -d '{"limit": 500}'
+curl -X POST http://localhost:8302/admin/retag -d '{"limit": 500}'
 ```
 
 See `docs/MERGE_CHANNELS.md` for complete admin guide.
@@ -1288,7 +1288,7 @@ See `docs/MERGE_CHANNELS.md` for complete admin guide.
 
 | Service | Label | Port | Proxy |
 |---|---|---|---|
-| tag-context (API) | `com.glados.tag-context` | 8300 | Caddy: 8443→8300 (HTTPS) |
+| tag-context (API) | `com.glados.tag-context` | 8302 | Caddy: 8443→8302 (HTTPS) |
 
 **Commands:**
 ```bash

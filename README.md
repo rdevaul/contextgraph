@@ -89,15 +89,15 @@ data/system_tags.json                           # Global/system tag definitions
 **API endpoints:**
 ```bash
 # List all tag definitions for user (channel label)
-curl http://localhost:8300/tags/user/glados-rich
+curl http://localhost:8302/tags/user/glados-rich
 
 # Add a new tag definition for a user
-curl -X POST http://localhost:8300/tags/user/glados-rich/add \
+curl -X POST http://localhost:8302/tags/user/glados-rich/add \
   -H 'Content-Type: application/json' \
   -d '{"tag": "rocket-design", "keywords": ["propulsion", "nozzle", "thrust"]}'
 
 # Delete a tag definition for a user
-curl -X DELETE http://localhost:8300/tags/user/glados-rich/rocket-design
+curl -X DELETE http://localhost:8302/tags/user/glados-rich/rocket-design
 ```
 
 **Path traversal protection:** The API validates all user/channel label names to prevent directory traversal attacks (e.g., `../../../etc/passwd` is rejected).
@@ -266,11 +266,11 @@ remain meaningful at any budget:
 Context Graph runs as two launchd services on this machine:
 
 ### 1. API Server (`tag-context`)
-- **Port:** 8300
+- **Port:** 8302
 - **Logs:** `/tmp/tag-context.log`
-- **Dashboard:** http://localhost:8300/dashboard
-- **Health check:** `curl http://localhost:8300/health`
-- **Quality check:** `curl http://localhost:8300/quality`
+- **Dashboard:** http://localhost:8302/dashboard
+- **Health check:** `curl http://localhost:8302/health`
+- **Quality check:** `curl http://localhost:8302/quality`
 
 The API server provides context assembly (`/assemble`), ingestion (`/ingest`), and quality monitoring endpoints for the OpenClaw plugin.
 
@@ -294,7 +294,7 @@ tail -f /tmp/tag-context.log
 
 ### Dashboard
 
-The Chart.js dashboard at http://localhost:8300/dashboard provides:
+The Chart.js dashboard at http://localhost:8302/dashboard provides:
 - **Scatterplot** — token efficiency visualization (graph vs linear)
 - **Quality metrics** — density, reframing rate, cache hit rate
 - **Token Savings** — percentage saved vs linear retrieval (green = saving, red = costing more)
@@ -416,7 +416,7 @@ List all tag definitions for a specific user.
 
 **Example:**
 ```bash
-curl http://localhost:8300/tags/user/alice
+curl http://localhost:8302/tags/user/alice
 ```
 
 **Response:**
@@ -461,7 +461,7 @@ Delete a tag definition for a user.
 
 **Example:**
 ```bash
-curl -X DELETE http://localhost:8300/tags/user/alice/rocket-design
+curl -X DELETE http://localhost:8302/tags/user/alice/rocket-design
 ```
 
 **Response:**
@@ -538,11 +538,11 @@ tail -f /tmp/tag-context.log
 
 ```bash
 # Service up?
-curl http://localhost:8300/health
+curl http://localhost:8302/health
 # → {"status":"ok","messages_in_store":..., "engine":"contextgraph"}
 
 # Retrieval actually working?
-curl http://localhost:8300/quality
+curl http://localhost:8302/quality
 # → {"zero_return_rate":0.04,"tag_entropy":3.6,"alert":false,...}
 ```
 
@@ -551,7 +551,7 @@ curl http://localhost:8300/quality
 > silently returning empty context. See [Retrieval Quality Monitoring](#retrieval-quality-monitoring).
 
 > **Note:** Never run the server manually (`python3 api/server.py` or `uvicorn ...`) while
-> the launchd service is also active — port 8300 conflicts will cause both to crash-loop.
+> the launchd service is also active — port 8302 conflicts will cause both to crash-loop.
 > Always use `launchctl stop` first, or `launchctl unload` to disable launchd management.
 
 ### OpenClaw plugin deployment
@@ -582,7 +582,7 @@ Toggle graph mode at runtime (in chat):
 The `/quality` endpoint provides retrieval health metrics that `/health` does not:
 
 ```bash
-curl http://localhost:8300/quality | python3 -m json.tool
+curl http://localhost:8302/quality | python3 -m json.tool
 ```
 
 ```json
@@ -622,7 +622,7 @@ record to `~/.tag-context/comparison-log.jsonl` with:
 ```bash
 tail -f ~/.tag-context/comparison-log.jsonl | python3 -m json.tool
 # or via API:
-curl http://localhost:8300/comparison-log
+curl http://localhost:8302/comparison-log
 ```
 
 ## Notes for Agents
@@ -643,7 +643,7 @@ openclaw gateway reload   # SIGUSR1 graceful reload, keeps connections alive
 empty context. Always check `/quality` when diagnosing retrieval problems:
 
 ```bash
-curl http://localhost:8300/quality | python3 -c "import json,sys; q=json.load(sys.stdin); print('alert:', q['alert'], q.get('alert_reasons'))"
+curl http://localhost:8302/quality | python3 -c "import json,sys; q=json.load(sys.stdin); print('alert:', q['alert'], q.get('alert_reasons'))"
 ```
 
 ---
@@ -692,10 +692,10 @@ You can retrieve context filtered by specific tags directly via the API:
 
 ```bash
 # Only retrieve messages tagged with 'rocket-design'
-curl -s 'http://localhost:8300/assemble?tags=rocket-design&budget=2000'
+curl -s 'http://localhost:8302/assemble?tags=rocket-design&budget=2000'
 
 # Multiple tags (comma-separated)
-curl -s 'http://localhost:8300/assemble?tags=rocket-design,propulsion&budget=2000'
+curl -s 'http://localhost:8302/assemble?tags=rocket-design,propulsion&budget=2000'
 ```
 
 This is useful for querying domain-specific context. _(The old `update_memory_dynamic.py`

@@ -106,7 +106,7 @@ Our plugin implements each method:
 - FastAPI server exposing the graph operations
 - Houses all the existing Python code (tagger, assembler, store, quality agent)
 - Runs GP evolution on a schedule (background task or cron)
-- Port: 8300 (localhost only)
+- Port: 8302 (localhost only)
 
 **Rationale:** The core graph logic is 1000+ lines of proven Python (GP evolution
 via DEAP, spaCy NLP, SQLite store). Porting to TypeScript would be a rewrite

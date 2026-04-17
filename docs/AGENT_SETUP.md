@@ -45,7 +45,7 @@ OpenClaw (Telegram/Voice/etc.)
         └── GET  /compare   ← graph vs linear stats (comparison logging)
         │
         ▼
-  api/server.py             ← FastAPI on port 8300
+  api/server.py             ← FastAPI on port 8302
         │
         ├── store.py        ← SQLite MessageStore + tag index
         ├── assembler.py    ← recency + topic context layers
@@ -86,18 +86,18 @@ launchctl load ~/Library/LaunchAgents/com.glados.tag-context.plist
 tail -f /tmp/tag-context.log
 
 # Health check
-curl http://localhost:8300/health
+curl http://localhost:8302/health
 # → {"status":"ok","messages_in_store":...,"engine":"contextgraph"}
 ```
 
 **Plist:** `~/Library/LaunchAgents/com.glados.tag-context.plist`
 **Python:** `~/Projects/tag-context/venv/bin/python3`
-**Port:** 8300
+**Port:** 8302
 **Log:** `/tmp/tag-context.log`
 
 > Note: There is also a `com.contextgraph.api` service from the template-based
 > installer. The active service is `com.glados.tag-context`. Don't run both —
-> they both bind port 8300 and will crash-loop each other.
+> they both bind port 8302 and will crash-loop each other.
 
 ### 2. OpenClaw Plugin
 
@@ -258,7 +258,7 @@ openclaw gateway restart
 Before concluding retrieval is healthy, always check `/quality` — not just `/health`:
 
 ```bash
-curl http://localhost:8300/quality | python3 -m json.tool
+curl http://localhost:8302/quality | python3 -m json.tool
 ```
 
 Key fields:
@@ -344,7 +344,7 @@ Only use `stop`/`restart` as a last resort when the gateway is already dead.
 ---
 
 - **Never run the API manually** while the launchd service is active —
-  port 8300 conflict will crash-loop both.
+  port 8302 conflict will crash-loop both.
 - **`launchctl stop/start` does NOT re-read the plist** — always use
   `unload`/`load` after changing environment variables or the plist itself.
 - **`data/tag_registry.json` is gitignored** — it's a live runtime file

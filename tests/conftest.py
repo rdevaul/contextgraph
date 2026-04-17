@@ -61,10 +61,10 @@ def temp_log_path(tmp_path):
 def api_available():
     """Check if the API is available. Skip tests if not running."""
     try:
-        response = requests.get("http://localhost:8300/health", timeout=2)
+        response = requests.get("http://localhost:8302/health", timeout=2)
         return response.status_code == 200
     except requests.RequestException:
-        pytest.skip("API is not running on port 8300. Start with: python3 -m api.server")
+        pytest.skip("API is not running on port 8302. Start with: python3 -m api.server")
 
 
 @pytest.fixture

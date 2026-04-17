@@ -20,7 +20,7 @@ pip3 install --break-system-packages pytest requests
 
 ### Start the API Server
 
-The integration and E2E tests require the API server to be running on port 8300:
+The integration and E2E tests require the API server to be running on port 8302:
 
 ```bash
 # In one terminal, start the server
@@ -28,9 +28,9 @@ cd /Users/rich/Projects/tag-context
 python3 api/server.py
 ```
 
-**NOTE:** Make sure to update `api/server.py` line 517 to use port 8300:
+**NOTE:** Make sure to update `api/server.py` line 517 to use port 8302:
 ```python
-uvicorn.run(app, host="0.0.0.0", port=8300)  # Change from 8350 to 8300
+uvicorn.run(app, host="0.0.0.0", port=8302)  # Change from 8350 to 8302
 ```
 
 ### Run All Tests
@@ -109,7 +109,7 @@ Multi-turn conversation simulation:
 
 ## Known Issues
 
-If you see failures with KeyError: 'sticky_count', this indicates the API server on port 8300 is an older version that doesn't have sticky pin support. Make sure you're running the latest version of api/server.py.
+If you see failures with KeyError: 'sticky_count', this indicates the API server on port 8302 is an older version that doesn't have sticky pin support. Make sure you're running the latest version of api/server.py.
 
 ## Pytest Markers
 

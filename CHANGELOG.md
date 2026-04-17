@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Preserves semantic content** — Summarization retains key information while preventing token budget domination
 
 #### Production Dashboard
-- **Chart.js visualization** — Full-featured dashboard at `http://localhost:8300/dashboard`
+- **Chart.js visualization** — Full-featured dashboard at `http://localhost:8302/dashboard`
 - **Token efficiency scatterplot** — Graph vs linear comparison across 580+ retrieval turns
 - **Quality metrics** — Context density, reframing rate, cache hit rate (99%+ achieved)
 - **Efficiency lead tracking** — Cumulative token savings over time (~11.8% vs linear baseline)
@@ -81,10 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture diagram** — Updated to show automated turn filtering, lazy summarization, and IDF tag filtering
 
 ### Services & Operations
-- **API server** (`com.glados.tag-context`) — Port 8300, logs to `/tmp/tag-context.log`
+- **API server** (`com.glados.tag-context`) — Port 8302, logs to `/tmp/tag-context.log`
 - **Memory updater** (`com.glados.update-memory`) — Runs every 4 hours, logs to `/tmp/update_memory_dynamic.log`
-- **Dashboard** — http://localhost:8300/dashboard
-- **Health checks** — `curl http://localhost:8300/health` (service alive), `curl http://localhost:8300/quality` (retrieval working)
+- **Dashboard** — http://localhost:8302/dashboard
+- **Health checks** — `curl http://localhost:8302/health` (service alive), `curl http://localhost:8302/quality` (retrieval working)
 
 ### Bug Fixes
 - **WAL contention** — Fixed SQLite database locking issues with concurrent access

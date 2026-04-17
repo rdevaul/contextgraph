@@ -12,7 +12,7 @@ import requests
 import time
 
 
-API_BASE_URL = "http://localhost:8300"
+API_BASE_URL = "http://localhost:8302"
 
 
 @pytest.fixture(scope="module")
@@ -22,7 +22,7 @@ def api_available():
         response = requests.get(f"{API_BASE_URL}/health", timeout=2)
         return response.status_code == 200
     except requests.RequestException:
-        pytest.skip("API is not running on port 8300. Start with: python3 -m api.server")
+        pytest.skip("API is not running on port 8302. Start with: python3 -m api.server")
 
 
 @pytest.fixture(scope="module")

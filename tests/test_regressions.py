@@ -24,7 +24,7 @@ from store import MessageStore
 from assembler import ContextAssembler
 
 # Base URL for live integration tests (requires running server)
-BASE_URL = "http://localhost:8300"
+BASE_URL = "http://localhost:8302"
 
 
 def _api_get(path):

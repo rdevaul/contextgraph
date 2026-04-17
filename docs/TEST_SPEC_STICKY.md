@@ -173,7 +173,7 @@ These tests use a real `MessageStore` (in-memory or temp SQLite) and call
 
 **File:** `tests/test_sticky_server_detection.py` (extend existing)
 
-These tests hit the live API at `http://localhost:8300`.
+These tests hit the live API at `http://localhost:8302`.
 
 #### 3.1 Tool chain auto-pin (existing, keep)
 - `tool_state.last_turn_had_tools=True`, `pending_chain_ids=[ext_id1, ext_id2]`

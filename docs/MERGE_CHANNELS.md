@@ -8,14 +8,14 @@ user tag YAML files.
 
 ## Endpoints
 
-All endpoints require `POST` to `http://localhost:8300/admin/...`
+All endpoints require `POST` to `http://localhost:8302/admin/...`
 
 ### 1. `POST /admin/channel-labels` — View current labels
 
 Returns counts of messages and sessions per channel label.
 
 ```bash
-curl http://localhost:8300/admin/channel-labels
+curl http://localhost:8302/admin/channel-labels
 ```
 
 ### 2. `POST /admin/merge-channel-labels` — Merge specific labels
@@ -65,7 +65,7 @@ merge to ensure tags are up to date.
 ### Step 1: Dry Run
 
 ```bash
-curl -s -X POST http://localhost:8300/admin/merge-channel-labels \
+curl -s -X POST http://localhost:8302/admin/merge-channel-labels \
   -H "Content-Type: application/json" \
   -d '{"source_labels":["(null)"],"target_label":"rich","dry_run":true}'
 ```
@@ -75,7 +75,7 @@ curl -s -X POST http://localhost:8300/admin/merge-channel-labels \
 ⚠️ **DANGER: Destructive operation. Verify dry run first.**
 
 ```bash
-curl -s -X POST http://localhost:8300/admin/merge-channel-labels \
+curl -s -X POST http://localhost:8302/admin/merge-channel-labels \
   -H "Content-Type: application/json" \
   -d '{"source_labels":["(null)"],"target_label":"rich","dry_run":false}'
 ```
@@ -83,7 +83,7 @@ curl -s -X POST http://localhost:8300/admin/merge-channel-labels \
 ### Step 3: Verify
 
 ```bash
-curl http://localhost:8300/admin/channel-labels
+curl http://localhost:8302/admin/channel-labels
 ```
 
 ## Rollback

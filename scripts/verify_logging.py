@@ -5,8 +5,8 @@ verify_logging.py — Diagnostic tool for interaction logging health.
 Checks:
 1. Interaction log files (data/interactions/YYYY-MM-DD.jsonl)
 2. Comparison log (~/.tag-context/comparison-log.jsonl)
-3. API health (http://127.0.0.1:8300/health)
-4. API stats (http://127.0.0.1:8300/comparison-stats)
+3. API health (http://127.0.0.1:8302/health)
+4. API stats (http://127.0.0.1:8302/comparison-stats)
 5. Harvester state (data/harvester-state.json)
 6. Coverage gaps (sessions not harvested)
 
@@ -31,7 +31,7 @@ COMPARISON_LOG = Path.home() / ".tag-context" / "comparison-log.jsonl"
 HARVESTER_STATE = PROJECT_ROOT / "data" / "harvester-state.json"
 SESSIONS_INDEX = Path.home() / ".openclaw/agents/main/sessions/sessions.json"
 
-API_BASE = "http://127.0.0.1:8300"
+API_BASE = "http://127.0.0.1:8302"
 API_HEALTH = f"{API_BASE}/health"
 API_STATS = f"{API_BASE}/comparison-stats"
 

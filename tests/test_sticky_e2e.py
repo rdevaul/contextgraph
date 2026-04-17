@@ -13,7 +13,7 @@ import time
 import uuid
 
 
-API_BASE_URL = "http://localhost:8300"
+API_BASE_URL = "http://localhost:8302"
 
 
 @pytest.fixture(autouse=True)
