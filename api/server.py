@@ -461,12 +461,12 @@ def get_tags(since: Optional[str] = Query(None)):
             salience_scores = store.tag_salience()
 
         system_tags = []
-        for tag_name, meta in registry._tags.items():
+        for tag_name, cfg in registry._configs.items():
             hits = tag_counts.get(tag_name, 0)
             corpus_pct = (hits / corpus_size) if corpus_size > 0 else 0.0
             system_tags.append({
                 "name": tag_name,
-                "state": meta.state,
+                "state": cfg.state,
                 "hits": hits,
                 "corpus_pct": round(corpus_pct, 4),
                 "salience": round(salience_scores.get(tag_name, 0.0), 4),
@@ -484,18 +484,18 @@ def get_tags(since: Optional[str] = Query(None)):
                 try:
                     user_reg = get_user_registry(channel_label)
                     if user_reg:
-                        for tag_name, meta in user_reg._tags.items():
+                        for tag_name, cfg in user_reg._configs.items():
+                            rt = user_reg._runtime.get(tag_name)
+                            tag_hits = rt.hits if rt else 0
                             key = (tag_name, channel_label)
-                            # Aggregate hits from registries that share the same
-                            # channel label (e.g. multiple users on one channel)
                             if key in user_tags_map:
-                                user_tags_map[key]["hits"] += meta.hits
+                                user_tags_map[key]["hits"] += tag_hits
                             else:
                                 salience = salience_scores.get(tag_name, 0.0)
                                 user_tags_map[key] = {
                                     "name": tag_name,
-                                    "state": meta.state,
-                                    "hits": meta.hits,
+                                    "state": cfg.state,
+                                    "hits": tag_hits,
                                     "channel": channel_label,
                                     "salience": round(salience, 4),
                                 }
