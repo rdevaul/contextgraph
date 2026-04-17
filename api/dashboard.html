@@ -322,6 +322,128 @@
             margin-bottom: 10px;
         }
 
+        .rules-panel {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .rules-panel h3 {
+            color: #58a6ff;
+            margin: 12px 0 8px 0;
+            font-size: 1.1em;
+        }
+
+        .rules-panel h3:first-child {
+            margin-top: 0;
+        }
+
+        .rules-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .rules-list li {
+            padding: 4px 8px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            margin: 4px 0;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85em;
+            word-break: break-all;
+        }
+
+        .rules-description {
+            color: #c9d1d9;
+            font-size: 0.95em;
+            margin: 8px 0;
+        }
+
+        .rules-meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 0.85em;
+            color: #8b949e;
+            margin-top: 8px;
+        }
+
+        .rules-meta span {
+            background: #161b22;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+        }
+
+        .autocomplete-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .autocomplete-list.visible {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.9em;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background: #1f6feb20;
+        }
+
+        .autocomplete-item .tag-name {
+            font-weight: 600;
+            color: #58a6ff;
+        }
+
+        .autocomplete-item .tag-desc {
+            color: #8b949e;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+
+        .tag-rule-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .tag-rule-badge.keyword { background: #1f6feb20; color: #58a6ff; }
+        .tag-rule-badge.pattern { background: #3d2c00; color: #d29922; }
+        .tag-rule-badge.enabled { background: #1a472a; color: #3fb950; }
+        .tag-rule-badge.disabled { background: #21262d; color: #6e7681; }
+
         .loading {
             text-align: center;
             padding: 20px;
@@ -425,6 +547,25 @@
             <div class="chart-container">
                 <canvas id="tag-frequency-chart"></canvas>
             </div>
+        </div>
+
+        <!-- Section 4.5: Tag Rules Browser -->
+        <div class="section">
+            <h2>🏷️ Tag Rules Browser</h2>
+            <p style="color:#8b949e; font-size:0.9em; margin-bottom:15px;">
+                Type a tag name and press Enter to see its matching rules from <code>tags.yaml</code>.
+            </p>
+            <div class="input-group">
+                <label for="tag-search-input">Tag name:</label>
+                <div style="display:flex; gap:8px;">
+                    <input id="tag-search-input" type="text" autocomplete="off"
+                        placeholder="e.g. openclaw, agent, robotics..."
+                        style="flex:1; background:#0d1117; border:1px solid #30363d; border-radius:6px;
+                               padding:10px; color:#c9d1d9; font-size:0.95em;">
+                    <button onclick="lookupTag()">Look up</button>
+                </div>
+            </div>
+            <div id="tag-rules-display"></div>
         </div>
 
         <!-- Section 5: Live Assembly Preview -->
@@ -1193,8 +1334,99 @@
             document.getElementById('preview-results').innerHTML = html;
         }
 
+        // ── Tag Rules Browser ────────────────────────────────────────
+
+        function lookupTag() {
+            const input = document.getElementById('tag-search-input');
+            const display = document.getElementById('tag-rules-display');
+            if (!input || !display) return;
+
+            const tagName = input.value.trim();
+            if (!tagName) return;
+
+            display.innerHTML = '<div class="loading">Loading tag rules...</div>';
+
+            fetch(`/tag-rules?tag=${encodeURIComponent(tagName)}`)
+                .then(function(resp) {
+                    if (!resp.ok) throw new Error('Tag not found');
+                    return resp.json();
+                })
+                .then(function(data) {
+                    renderTagRules(data.tag, display);
+                })
+                .catch(function(e) {
+                    display.innerHTML = `<div class="error">Tag '${escapeHtml(tagName)}' not found in tags.yaml</div>`;
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('tag-search-input');
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        lookupTag();
+                    }
+                });
+            }
+        });
+
+        function renderTagRules(tag, container) {
+            const name = escapeHtml(tag.name || '');
+            const desc = escapeHtml(tag.description || '');
+            const keywords = tag.keywords || [];
+            const patterns = tag.patterns || [];
+            const requiresAll = tag.requires_all || false;
+            const confidence = tag.confidence != null ? tag.confidence : 1.0;
+            const enabled = tag.enabled !== false;
+
+            let html = '<div class="rules-panel">';
+            html += '<h3><span style="color:#58a6ff;">' + name + '</span>';
+            html += ' <span class="tag-rule-badge ' + (enabled ? 'enabled' : 'disabled') + '">' + (enabled ? 'Active' : 'Disabled') + '</span></h3>';
+
+            if (desc) {
+                html += '<p class="rules-description">' + desc + '</p>';
+            }
+
+            html += '<div class="rules-meta">';
+            html += '<span>Confidence: ' + confidence + '</span>';
+            html += '<span>Match: ' + (requiresAll ? 'ALL keywords required' : 'ANY keyword matches') + '</span>';
+            html += '<span>' + keywords.length + ' keywords</span>';
+            html += '<span>' + patterns.length + ' regex patterns</span>';
+            html += '</div>';
+
+            if (keywords.length > 0) {
+                html += '<h3>🔑 Keywords</h3>';
+                html += '<ul class="rules-list">';
+                keywords.forEach(function(kw) {
+                    html += '<li>' + escapeHtml(kw) + '</li>';
+                });
+                html += '</ul>';
+            }
+
+            if (patterns.length > 0) {
+                html += '<h3>📐 Regex Patterns</h3>';
+                html += '<ul class="rules-list">';
+                patterns.forEach(function(p) {
+                    html += '<li>' + escapeHtml(p) + '</li>';
+                });
+                html += '</ul>';
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
         // Initialize on load
-        window.addEventListener('load', init);
+        window.addEventListener('load', function() {
+            init();
+        });
     </script>
 </body>
 </html>

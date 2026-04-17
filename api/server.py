@@ -23,6 +23,10 @@ from logger import _is_automated_turn
 import pickle
 import os
 import json
+import yaml
+
+# Cache for parsed tags.yaml — hot-reloaded on each request by checking mtime
+_tags_yaml_cache: tuple = None  # (mtime, data)
 from typing import Optional
 from collections import Counter
 from datetime import datetime, timedelta
@@ -510,10 +514,10 @@ def get_tags(since: Optional[str] = Query(None)):
                 except Exception:
                     pass
 
-        # Filter: only show tags with actual user activity
+        # Filter: show all user tags except archived
         user_tags = [
             t for t in user_tags_map.values()
-            if t["hits"] > 0 or t["state"] != "core"
+            if t["state"] != "archived"
         ]
         # Sort by hits descending
         user_tags.sort(key=lambda t: (-t["hits"], t["name"]))
@@ -1200,6 +1204,45 @@ def admin_channel_labels():
     }
 
 
+def _load_tags_yaml() -> list[dict]:
+    """Load tags.yaml and return the list of tag definitions.
+    Hot-reloads by checking file mtime on each call."""
+    global _tags_yaml_cache
+    yaml_path = Path(__file__).parent.parent / "tags.yaml"
+    mtime = yaml_path.stat().st_mtime if yaml_path.exists() else 0
+    if _tags_yaml_cache and _tags_yaml_cache[0] == mtime:
+        return _tags_yaml_cache[1]
+    if not yaml_path.exists():
+        return []
+    data = yaml.safe_load(yaml_path.read_text())
+    tags = data.get("tags", []) if isinstance(data, dict) else []
+    _tags_yaml_cache = (mtime, tags)
+    return tags
+
+
+@app.get("/tag-rules", response_model=dict)
+def get_tag_rules(tag: str = Query(default=None)):
+    """Return matching rules for tags from tags.yaml.
+    
+    If 'tag' query param is provided, return rules for that specific tag.
+    Otherwise return all tag rules. Useful for debugging tag matching.
+    """
+    tags = _load_tags_yaml()
+    if tag:
+        # Exact match first, then prefix match
+        matches = [t for t in tags if t.get("name") == tag]
+        if not matches:
+            matches = [t for t in tags if t.get("name", "").startswith(tag.lower())]
+        if not matches:
+            # Fuzzy: name contains the query
+            matches = [t for t in tags if tag.lower() in t.get("name", "")]
+        if matches:
+            return {"tag": matches[0]}
+        else:
+            raise HTTPException(status_code=404, detail=f"Tag '{tag}' not found in tags.yaml")
+    return {"tags": tags, "count": len(tags)}
+
+
 def _create_backup_db() -> Optional[Path]:
     """Create a timestamped backup of the store database before destructive ops.
 
@@ -1231,4 +1274,4 @@ def _create_backup_db() -> Optional[Path]:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8300)
+    uvicorn.run(app, host="127.0.0.1", port=8302)
