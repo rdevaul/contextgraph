@@ -30,7 +30,7 @@ When installed as an OpenClaw extension, this plugin replaces the default linear
 
 > ⚠️ **Check first — do not skip this step.**
 >
-> OpenClaw auto-loads plugins from `~/.openclaw/extensions/`. If contextgraph is already
+> OpenClaw auto-loads plugins from `~/.sybilclaw/extensions/`. If contextgraph is already
 > installed there, adding it again to `openclaw.json` will cause a **duplicate registration**
 > crash-loop. Always verify before installing.
 
@@ -46,8 +46,8 @@ openclaw plugins list | grep contextgraph
 ### Step 2: Copy plugin files
 
 ```bash
-mkdir -p ~/.openclaw/extensions/contextgraph
-cp index.ts openclaw.plugin.json package.json ~/.openclaw/extensions/contextgraph/
+mkdir -p ~/.sybilclaw/extensions/contextgraph
+cp index.ts openclaw.plugin.json package.json ~/.sybilclaw/extensions/contextgraph/
 ```
 
 ### Step 3: Reload the gateway
@@ -70,7 +70,7 @@ openclaw plugins list | grep contextgraph
 ### What NOT to do
 
 Do **not** add this plugin to `openclaw.json` under `plugins.allow` or `plugins.entries`.
-Auto-loading from `~/.openclaw/extensions/` is the correct and only installation path.
+Auto-loading from `~/.sybilclaw/extensions/` is the correct and only installation path.
 Adding it to config while it is already auto-loaded will crash the gateway with a duplicate
 registration error.
 
@@ -81,7 +81,7 @@ registration error.
 To deploy a new version of `index.ts`:
 
 ```bash
-cp index.ts ~/.openclaw/extensions/contextgraph/index.ts
+cp index.ts ~/.sybilclaw/extensions/contextgraph/index.ts
 openclaw gateway reload
 ```
 

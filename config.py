@@ -17,12 +17,12 @@ def _env(key: str, default: str) -> str:
 def _resolve_workspace_default() -> str:
     """Auto-detect workspace root for openclaw or sybilclaw installations."""
     home = Path.home()
-    for platform_dir in (".openclaw", ".sybilclaw"):
+    for platform_dir in (".sybilclaw", ".openclaw"):
         candidate = home / platform_dir / "workspace"
         if candidate.is_dir():
             return str(candidate)
-    # Fallback — openclaw is the most common
-    return str(home / ".openclaw" / "workspace")
+    # Fallback — sybilclaw is the current default
+    return str(home / ".sybilclaw" / "workspace")
 
 
 # Workspace root — the agent workspace directory
