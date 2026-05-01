@@ -304,6 +304,67 @@ class MessageStore:
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
+    def get_recent_by_channel(self, n: int, channel_label: str,
+                              include_automated: bool = False) -> List[Message]:
+        """Return the N most recent messages for a specific channel_label, newest first.
+
+        Used by the assembler's recency layer when scope='user' to prevent
+        cross-user content bleed into per-user retrieval.
+        """
+        conn = self._conn()
+        if include_automated:
+            query = (
+                "SELECT * FROM messages WHERE channel_label = ? "
+                "ORDER BY timestamp DESC LIMIT ?"
+            )
+        else:
+            query = (
+                "SELECT * FROM messages WHERE channel_label = ? AND is_automated = 0 "
+                "ORDER BY timestamp DESC LIMIT ?"
+            )
+        rows = conn.execute(query, (channel_label, n)).fetchall()
+        ids = [r["id"] for r in rows]
+        tags_map = self._fetch_tags_bulk(conn, ids)
+        return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
+
+    def get_by_tag_scoped(
+        self,
+        tag: str,
+        limit: int = 20,
+        include_automated: bool = False,
+        channel_label: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> List[Message]:
+        """Return messages carrying `tag`, optionally scoped to channel or session.
+
+        Either, neither, or both filters may be set. When both are set,
+        BOTH must match (AND semantics) — a session belongs to a single
+        channel, so this is a no-op narrowing in practice.
+        """
+        conn = self._conn()
+        clauses = ["t.tag = ?"]
+        params: list = [tag]
+        if not include_automated:
+            clauses.append("m.is_automated = 0")
+        if channel_label is not None:
+            clauses.append("m.channel_label = ?")
+            params.append(channel_label)
+        if session_id is not None:
+            clauses.append("m.session_id = ?")
+            params.append(session_id)
+        params.append(limit)
+        where = " AND ".join(clauses)
+        query = (
+            f"SELECT m.* FROM messages m "
+            f"INNER JOIN tags t ON m.id = t.message_id "
+            f"WHERE {where} "
+            f"ORDER BY m.timestamp DESC LIMIT ?"
+        )
+        rows = conn.execute(query, tuple(params)).fetchall()
+        ids = [r["id"] for r in rows]
+        tags_map = self._fetch_tags_bulk(conn, ids)
+        return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
+
     def channel_tag_counts(self, channel_label: Optional[str] = None) -> dict:
         """Return {tag: count} for messages in a given channel."""
         conn = self._conn()

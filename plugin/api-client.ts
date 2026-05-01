@@ -110,8 +110,17 @@ export class ContextGraphAPIClient {
     userText: string,
     tags?: string[],
     tokenBudget: number = 4000,
-    toolState?: ToolState
+    toolState?: ToolState,
+    options?: {
+      sessionId?: string;
+      channelLabel?: string;
+      userTags?: string[];
+    }
   ): Promise<AssembleResponse> {
+    // Part A (bus approval 20260501220916-a4feb6f0):
+    // Thread session_id, channel_label, user_tags through so the Python
+    // assembler can scope retrieval. Without these every assemble call
+    // retrieves globally across the entire store — cross-user content bleed.
     const response = await fetch(`${this.baseURL}/assemble`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -120,13 +129,22 @@ export class ContextGraphAPIClient {
         ...(tags && tags.length > 0 ? { tags } : {}),
         token_budget: tokenBudget,
         ...(toolState ? { tool_state: toolState } : {}),
+        ...(options?.sessionId ? { session_id: options.sessionId } : {}),
+        ...(options?.channelLabel ? { channel_label: options.channelLabel } : {}),
+        ...(options?.userTags && options.userTags.length > 0 ? { user_tags: options.userTags } : {}),
       }),
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
       console.error("[contextgraph] assemble 422 body:", errorBody);
-      console.error("[contextgraph] assemble request body:", JSON.stringify({ user_text: userText?.slice(0, 200), tags: tags || null, token_budget: tokenBudget }));
+      console.error("[contextgraph] assemble request body:", JSON.stringify({
+        user_text: userText?.slice(0, 200),
+        tags: tags || null,
+        token_budget: tokenBudget,
+        session_id: options?.sessionId ?? null,
+        channel_label: options?.channelLabel ?? null,
+      }));
       throw new Error(`Assemble request failed: ${response.statusText} — ${errorBody}`);
     }
 

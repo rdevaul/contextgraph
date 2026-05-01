@@ -78,7 +78,9 @@ class ContextAssembler:
                  inferred_tags: List[str],
                  pinned_message_ids: Optional[List[str]] = None,
                  channel_label: Optional[str] = None,
-                 user_tags: Optional[List[str]] = None) -> AssemblyResult:
+                 user_tags: Optional[List[str]] = None,
+                 session_id: Optional[str] = None,
+                 scope: str = "user") -> AssemblyResult:
         """
         Build a context window for `incoming_text` given `inferred_tags`.
 
@@ -92,12 +94,29 @@ class ContextAssembler:
             Message IDs that should be pinned in the sticky layer.
             If None, sticky layer is skipped.
         channel_label : Optional[str]
-            If set, user-scoped tags (in `user_tags`) will only retrieve messages
-            from this channel. System tags always retrieve from all channels.
+            If set AND scope=='user', the recency + topic layers filter
+            messages to this channel_label. Provides cross-user isolation
+            (e.g. rich's panes don't pull garrett's content). This is the
+            Part A fix: previously the comment in this file claimed it did
+            this, but no actual filtering was wired — leakage was complete.
         user_tags : Optional[List[str]]
-            Tags that are user-scoped (should be filtered by channel_label).
-            If None, all tags are treated as system tags (no channel filter).
+            Forward-compat hint (currently unused; channel_label filtering
+            in scope='user' is unconditional). Reserved for future per-tag
+            scope policy.
+        session_id : Optional[str]
+            Reserved for Part B (`scope='session'` per-pane isolation).
+            In Part A this is accepted for API stability but not yet used
+            for filtering — 'session' falls through to 'user' behavior.
+        scope : str
+            One of:
+              - 'user'   : filter recency + topic by channel_label (cross-user
+                           isolation; default).
+              - 'global' : no filtering — the legacy behavior. Reserved as an
+                           explicit escape hatch for cross-pane research views.
+              - 'session': reserved for Part B; falls through to 'user' here.
         """
+        if scope not in ("session", "user", "global"):
+            raise ValueError(f"invalid scope {scope!r}; expected session|user|global")
         # ── Sticky layer ───────────────────────────────────────────────────
         sticky_msgs: List[Message] = []
         sticky_tokens = 0
@@ -111,6 +130,11 @@ class ContextAssembler:
                     # Fallback to internal ID lookup for backwards compatibility
                     msg = self.store.get_by_id(msg_id)
                 if msg is None:
+                    continue
+                # Per-user scope: drop pins from other channel_labels so that
+                # rich's pin can't leak into garrett's assemble call.
+                if scope == "user" and channel_label is not None and msg.channel_label is not None \
+                        and msg.channel_label != channel_label:
                     continue
                 cost = _estimate_tokens(msg)
                 if sticky_tokens + cost > sticky_budget:
@@ -139,7 +163,17 @@ class ContextAssembler:
         single_msg_cap = int(self.token_budget * MAX_SINGLE_MSG_BUDGET_FRACTION)
 
         first_recency = True
-        for msg in self.store.get_recent(10):
+        # ── Recency source selection by scope (Part A) ────────────────────────
+        # 'session' is reserved for Part B and currently routes through 'user'
+        # behavior — the bus approval sequence is Part A first (cross-user),
+        # Part B second (cross-pane).
+        if (scope == "user" or scope == "session") and channel_label:
+            recency_source = self.store.get_recent_by_channel(10, channel_label)
+        else:
+            # scope == 'global', or scope='user' with no channel_label hint
+            recency_source = self.store.get_recent(10)
+
+        for msg in recency_source:
             if msg.id in seen_ids:
                 continue
             cost = _estimate_tokens(msg)
@@ -208,17 +242,28 @@ class ContextAssembler:
             useful_tags = sorted(inferred_tags, key=lambda t: tag_counts.get(t, 0))
             useful_tags = useful_tags[: max(1, len(useful_tags) // 2)]
 
-        # Build a set of user-scoped tag names for channel filtering
+        # Build a set of user-scoped tag names for channel filtering.
+        # Forward-compat hint; not currently used to gate filtering, since
+        # channel_label filtering is unconditional within scope='user'.
         user_tag_set = set(user_tags) if user_tags else set()
 
         # Track how many tags each candidate matches — used for scoring below.
         tag_hit_count: dict = {}
 
+        # Pick the topic-layer query based on scope (Part A wires channel_label;
+        # Part B will add a session_id branch on top of this).
+        if (scope == "user" or scope == "session") and channel_label:
+            tag_filter_kwargs = {"channel_label": channel_label}
+        else:
+            tag_filter_kwargs = {}
+
         for tag in useful_tags:
-            # Channel label merge completed 2026-04-09: all messages now use unified
-            # channel labels. No need to pass channel_label to get_by_tag() anymore.
-            # User-scoped tags are filtered via user_tag_set, not channel_label.
-            for msg in self.store.get_by_tag(tag, limit=50):
+            if tag_filter_kwargs:
+                fetched = self.store.get_by_tag_scoped(tag, limit=50, **tag_filter_kwargs)
+            else:
+                # scope='global' (or missing scope key) — preserve legacy behavior.
+                fetched = self.store.get_by_tag(tag, limit=50)
+            for msg in fetched:
                 if msg.id not in seen_ids:
                     topic_candidates.append(msg)
                     seen_ids.add(msg.id)

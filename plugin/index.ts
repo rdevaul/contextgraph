@@ -646,6 +646,13 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
         (lastTurnToolCount >= 1 && existingChain.length > 0);
       const pendingChainIds = lastTurnHadTools ? existingChain : [];
 
+      // Part A (bus approval 20260501220916-a4feb6f0):
+      // Thread session_id + channel_label so the Python assembler can scope
+      // retrieval. Without these the assemble path retrieves globally across the
+      // entire store — cross-user content bleed (the bug documented in the
+      // agentic-1 forensic notes). Server defaults scope='user', which gives
+      // immediate cross-user isolation. Per-pane 'session' scope is opted into
+      // by Part B.
       const result = await apiPost(
         "/assemble",
         {
@@ -654,6 +661,8 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           tool_state: lastTurnHadTools
             ? { last_turn_had_tools: true, pending_chain_ids: pendingChainIds }
             : null,
+          session_id: sessionId,
+          channel_label: userLabel,
         },
         logger
       );

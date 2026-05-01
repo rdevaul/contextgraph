@@ -92,6 +92,16 @@ class AssembleRequest(BaseModel):
     token_budget: int = 4000
     tool_state: ToolState | None = None
     session_id: str | None = None
+    # Per-bus thread 20260501213940-5b002851 / approval 20260501220916-a4feb6f0:
+    # cross-pane content bleed required threading channel_label, user_tags,
+    # and a scope mode through the assemble path. Defaults preserve legacy
+    # global behavior so older plugin builds keep working until they upgrade.
+    channel_label: str | None = None
+    user_tags: list[str] | None = None
+    # Default 'user' per bus approval 20260501220916-a4feb6f0:
+    # cross-pane DM-style continuity for non-multigraph callers, while
+    # multigraph dashboard panes opt into scope='session' explicitly.
+    scope: str = "user"
 
 class PinRequest(BaseModel):
     message_ids: list[str]
@@ -300,8 +310,19 @@ def assemble(request: AssembleRequest):
         # Get pinned message IDs
         pinned_ids = pin_manager.get_pinned_message_ids()
 
+        # Validate scope; coerce unknown values to 'global' for forward compat.
+        requested_scope = request.scope if request.scope in ("session", "user", "global") else "global"
+
         assembler = ContextAssembler(store, token_budget=request.token_budget)
-        result = assembler.assemble(clean_query, request.tags, pinned_message_ids=pinned_ids)
+        result = assembler.assemble(
+            clean_query,
+            request.tags,
+            pinned_message_ids=pinned_ids,
+            channel_label=request.channel_label,
+            user_tags=request.user_tags,
+            session_id=request.session_id,
+            scope=requested_scope,
+        )
 
         return {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
