@@ -651,8 +651,17 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // retrieval. Without these the assemble path retrieves globally across the
       // entire store — cross-user content bleed (the bug documented in the
       // agentic-1 forensic notes). Server defaults scope='user', which gives
-      // immediate cross-user isolation. Per-pane 'session' scope is opted into
-      // by Part B.
+      // immediate cross-user isolation.
+      //
+      // Part B (same approval): multigraph dashboard panes opt into per-pane
+      // isolation by sending scope='session'. Detected by inspecting sessionId
+      // for ':dashboard:' — OpenClaw's multigraph backend assigns ids of the form
+      //   agent:<agent>:dashboard:<uuid>
+      // Everything else stays scope='user' (the cross-pane DM-style continuity).
+      const isDashboardPane =
+        typeof sessionId === "string" && sessionId.includes(":dashboard:");
+      const requestScope: "session" | "user" = isDashboardPane ? "session" : "user";
+
       const result = await apiPost(
         "/assemble",
         {
@@ -663,6 +672,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
             : null,
           session_id: sessionId,
           channel_label: userLabel,
+          scope: requestScope,
         },
         logger
       );

@@ -115,12 +115,14 @@ export class ContextGraphAPIClient {
       sessionId?: string;
       channelLabel?: string;
       userTags?: string[];
+      scope?: "session" | "user" | "global";
     }
   ): Promise<AssembleResponse> {
-    // Part A (bus approval 20260501220916-a4feb6f0):
-    // Thread session_id, channel_label, user_tags through so the Python
-    // assembler can scope retrieval. Without these every assemble call
-    // retrieves globally across the entire store — cross-user content bleed.
+    // Per bus thread 20260501213940-5b002851 + approval 20260501220916-a4feb6f0:
+    // session_id, channel_label, user_tags, and scope must be threaded through
+    // so the Python assembler can scope retrieval. Without these every assemble
+    // call retrieves globally across the entire store, which causes cross-pane
+    // and cross-user content bleed.
     const response = await fetch(`${this.baseURL}/assemble`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -132,6 +134,7 @@ export class ContextGraphAPIClient {
         ...(options?.sessionId ? { session_id: options.sessionId } : {}),
         ...(options?.channelLabel ? { channel_label: options.channelLabel } : {}),
         ...(options?.userTags && options.userTags.length > 0 ? { user_tags: options.userTags } : {}),
+        ...(options?.scope ? { scope: options.scope } : {}),
       }),
     });
 
@@ -144,6 +147,7 @@ export class ContextGraphAPIClient {
         token_budget: tokenBudget,
         session_id: options?.sessionId ?? null,
         channel_label: options?.channelLabel ?? null,
+        scope: options?.scope ?? null,
       }));
       throw new Error(`Assemble request failed: ${response.statusText} — ${errorBody}`);
     }

@@ -96,24 +96,22 @@ class ContextAssembler:
         channel_label : Optional[str]
             If set AND scope=='user', the recency + topic layers filter
             messages to this channel_label. Provides cross-user isolation
-            (e.g. rich's panes don't pull garrett's content). This is the
-            Part A fix: previously the comment in this file claimed it did
-            this, but no actual filtering was wired — leakage was complete.
+            (e.g. rich's panes don't pull garrett's content).
         user_tags : Optional[List[str]]
-            Forward-compat hint (currently unused; channel_label filtering
-            in scope='user' is unconditional). Reserved for future per-tag
-            scope policy.
+            Tags that are user-scoped (forward-compat hint; current
+            implementation always filters topic-layer by channel_label
+            when scope=='user' regardless of this list).
         session_id : Optional[str]
-            Reserved for Part B (`scope='session'` per-pane isolation).
-            In Part A this is accepted for API stability but not yet used
-            for filtering — 'session' falls through to 'user' behavior.
+            If scope=='session', the recency + topic + sticky layers filter
+            to this session. Provides per-pane (per-session) isolation.
         scope : str
             One of:
+              - 'session': filter all 3 layers by session_id (per-pane isolation).
+                           channel_label still applied as a safety belt.
               - 'user'   : filter recency + topic by channel_label (cross-user
-                           isolation; default).
+                           isolation; default for non-multigraph sessions).
               - 'global' : no filtering — the legacy behavior. Reserved as an
                            explicit escape hatch for cross-pane research views.
-              - 'session': reserved for Part B; falls through to 'user' here.
         """
         if scope not in ("session", "user", "global"):
             raise ValueError(f"invalid scope {scope!r}; expected session|user|global")
@@ -131,8 +129,12 @@ class ContextAssembler:
                     msg = self.store.get_by_id(msg_id)
                 if msg is None:
                     continue
-                # Per-user scope: drop pins from other channel_labels so that
-                # rich's pin can't leak into garrett's assemble call.
+                # Per-session scope: drop pins from other sessions.
+                # (Per-pane bus thread 20260501213940-5b002851: brief explicitly
+                # asks sticky layer to be session-filtered when scope='session'.)
+                if scope == "session" and session_id is not None and msg.session_id != session_id:
+                    continue
+                # Per-user scope: drop pins from other channel_labels.
                 if scope == "user" and channel_label is not None and msg.channel_label is not None \
                         and msg.channel_label != channel_label:
                     continue
@@ -163,14 +165,13 @@ class ContextAssembler:
         single_msg_cap = int(self.token_budget * MAX_SINGLE_MSG_BUDGET_FRACTION)
 
         first_recency = True
-        # ── Recency source selection by scope (Part A) ────────────────────────
-        # 'session' is reserved for Part B and currently routes through 'user'
-        # behavior — the bus approval sequence is Part A first (cross-user),
-        # Part B second (cross-pane).
-        if (scope == "user" or scope == "session") and channel_label:
+        # ── Recency source selection by scope ──────────────────────────────
+        if scope == "session" and session_id:
+            recency_source = self.store.get_recent_by_session(10, session_id)
+        elif scope == "user" and channel_label:
             recency_source = self.store.get_recent_by_channel(10, channel_label)
         else:
-            # scope == 'global', or scope='user' with no channel_label hint
+            # scope == 'global', or scope param without the matching key set
             recency_source = self.store.get_recent(10)
 
         for msg in recency_source:
@@ -250,9 +251,13 @@ class ContextAssembler:
         # Track how many tags each candidate matches — used for scoring below.
         tag_hit_count: dict = {}
 
-        # Pick the topic-layer query based on scope (Part A wires channel_label;
-        # Part B will add a session_id branch on top of this).
-        if (scope == "user" or scope == "session") and channel_label:
+        # Pick the topic-layer query based on scope. Per bus approval
+        # 20260501220916-a4feb6f0 (Part A + Part B), the topic layer must
+        # honor scope semantics — otherwise tag overlap leaks rows from
+        # other panes/users into every assemble call.
+        if scope == "session" and session_id:
+            tag_filter_kwargs = {"session_id": session_id, "channel_label": channel_label}
+        elif scope == "user" and channel_label:
             tag_filter_kwargs = {"channel_label": channel_label}
         else:
             tag_filter_kwargs = {}
