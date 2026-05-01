@@ -7,8 +7,11 @@ spacy>=3.7
 anthropic>=0.40
 requests>=2.31  # for Ollama backend
 
-# Fixed tagger (YAML config)
+# Fixed tagger (YAML config) + doc indexer frontmatter
 pyyaml>=6.0
+
+# Doc indexer (wikilink-relationships proposal — Phase A)
+watchdog>=4.0
 
 # Testing
 pytest>=8.0

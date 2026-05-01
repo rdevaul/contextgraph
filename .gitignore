@@ -23,3 +23,8 @@ data/tag_registry.json
 
 data/store.db-shm
 data/store.db-wal
+
+# Doc indexer runtime artifacts
+data/doc_indexer.log
+data/doc_graph.db-shm
+data/doc_graph.db-wal
