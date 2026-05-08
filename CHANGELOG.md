@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Plugin v1.1.0:** `ContextEngine.ownsCompactionForSession({sessionId, sessionKey})` per-session override. When `/graph on` is enabled for a user, the engine takes ownership of compaction for that session; otherwise the host's vanilla compaction path runs. Static `info.ownsCompaction` stays `false` (vanilla-safe default). Full functionality requires SybilClaw ≥ v0.4 with the matching host-side change; vanilla OpenClaw treats the plugin as a no-op (graph-aware ingestion sink without active retrieval).
+- **Plugin v1.1.0:** `ContextEngine.ownsCompactionForSession({sessionId, sessionKey})` per-session override. When `/graph on` is enabled for a user, the engine takes ownership of compaction for that session; otherwise the host's vanilla compaction path runs. Static `info.ownsCompaction` stays `false` (vanilla-safe default). Full functionality requires SybilClaw with the matching host-side change — **merged 2026-05-07** in `rdevaul/sybilclaw#7` (commit `4babd563d5`). Vanilla OpenClaw without the host change treats the plugin as a no-op (graph-aware ingestion sink without active retrieval).
 - `/assemble` response now includes per-message `session_id` and `channel_label` plus top-level `effective_scope`, `effective_session_id`, `effective_channel_label`. Lets callers audit which session/user each row came from. Closes the diagnostic gap that produced false-positive "session_id is None" reports earlier in the day.
 - **Server-side belt-and-braces:** `/assemble` requests with `session_id` containing `:dashboard:` are auto-coerced from `scope='user'` to `scope='session'`. Protects against any plugin regression that fails to set scope correctly.
 - Reasoning-block sanitizer at ingest (`MessageStore.add_message`): strips `[[reasoning]]…[[/reasoning]]` and `<thinking>…</thinking>` blocks (paired or open-only) from `user_text` and `assistant_text` before persistence. Backfilled 493 pre-existing rows.
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- This release pairs with a SybilClaw upstream PR adding `ownsCompactionForSession` to the `ContextEngine` interface. Without the host change the plugin remains backwards-compatible — `info.ownsCompaction = false` is honored as before.
+- The matching SybilClaw host-side change — adding `ownsCompactionForSession` to the `ContextEngine` interface and wiring it into `runEmbeddedAttempt` — was merged on 2026-05-07 (`rdevaul/sybilclaw#7`, commit `4babd563d5`). Without the host change the plugin remains backwards-compatible: `info.ownsCompaction = false` is honored as before, so vanilla OpenClaw is unaffected.
 
 ## [v1.0-rc2] - 2026-03-30
 
