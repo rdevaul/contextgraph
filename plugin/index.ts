@@ -463,6 +463,12 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
     id: "contextgraph",
     name: "Context Graph Engine",
     version: "1.0.0",
+    // Static fallback for hosts that don't read `ownsCompactionForSession`.
+    // Vanilla OpenClaw (without the per-session compaction patch) treats
+    // this as authoritative — keeping it `false` preserves the legacy
+    // tool-result guard for those hosts. SybilClaw with the per-session
+    // patch will instead consult `ownsCompactionForSession` below, which
+    // returns true precisely when the user has graph mode enabled.
     ownsCompaction: false,
   };
 
@@ -471,6 +477,33 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
 
   return {
     info,
+
+    /**
+     * Per-session compaction-ownership override.
+     *
+     * When `/graph on` is enabled for the user inferred from `sessionKey`
+     * (or `sessionId` as a fallback), the engine takes ownership of
+     * compaction — the host installs the loop hook and the engine assembles
+     * a fresh, budget-fitted context window per turn. When graph mode is
+     * off, the engine declines ownership and the host's vanilla compaction
+     * path runs (preemptive tool-result truncation + linear context window).
+     *
+     * Note: `sessionId` is typically an opaque UUID; `sessionKey` carries
+     * the structured `agent:<provider>-<user>:<surface>:<inner>` form that
+     * `inferChannelLabel()` can parse for a user identity. We prefer
+     * `sessionKey` when present.
+     *
+     * Hosts that don't implement this method fall back to `info.ownsCompaction`
+     * (false) and contextgraph operates as a no-op for them. Full graph-mode
+     * functionality requires a host that calls this per attempt.
+     */
+    ownsCompactionForSession({ sessionId, sessionKey }: { sessionId: string; sessionKey?: string }): boolean {
+      // Prefer sessionKey — it carries the structured "agent:<provider>-<user>:..."
+      // form that `inferChannelLabel` knows how to parse. Falls back to
+      // sessionId for hosts that pass only the inner UUID.
+      const userLabel = inferChannelLabel(undefined, sessionKey ?? sessionId, logger);
+      return readGraphMode(userLabel);
+    },
 
     async bootstrap({ sessionId, sessionFile }): Promise<BootstrapResult> {
       // Infer user label from session ID for per-user graph mode check
@@ -818,12 +851,14 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           const comparison = await apiPost("/compare", {
             user_text: userText,
             assistant_text: assistantText || "",
+            channel_label: userLabel,
           }, logger) as any;
 
           if (comparison) {
             writeComparisonLog({
               timestamp: new Date().toISOString(),
               sessionId,
+              channelLabel: userLabel,
               userText: userText.slice(0, 200),
               graphMsgCount: comparison.graph_assembly?.messages?.length ?? 0,
               graphTokens: comparison.graph_assembly?.total_tokens ?? 0,
@@ -900,9 +935,32 @@ export default function register(api: OpenClawPluginApi): void {
         apiStatus = "❌ unreachable";
       }
 
+      // Fetch detailed stats from /graph-status endpoint
+      let statsText = "";
+      try {
+        const controller2 = new AbortController();
+        const timer2 = setTimeout(() => controller2.abort(), 3000);
+        const statusRes = await fetch(`${PYTHON_API_BASE}/graph-status`, { signal: controller2.signal });
+        clearTimeout(timer2);
+        if (statusRes.ok) {
+          const s = await statusRes.json() as any;
+          const last24h = s.last_24h ?? {};
+          const allTime = s.all_time ?? {};
+          statsText = [
+            ``,
+            `**Last 24h:** ${last24h.turns ?? 0} turns · avg ${last24h.avg_graph_tokens ?? 0} graph tok · avg ${last24h.avg_linear_tokens ?? 0} linear tok · savings ${last24h.token_savings_pct?.toFixed(1) ?? 0}%`,
+            `**All time:** ${allTime.turns ?? 0} turns · ${allTime.avg_graph_messages?.toFixed(1) ?? 0} msgs/turn avg`,
+            `**Zero-return rate:** ${((s.zero_return_rate ?? 0) * 100).toFixed(1)}%`,
+            `**Dashboard:** ${PYTHON_API_BASE.replace('/api', '') || 'http://localhost:8302'}`,
+          ].join("\n");
+        }
+      } catch {
+        // Non-fatal — basic status still returned
+      }
+
       const modeLabel = enabled ? "🟢 ON" : "⚪ OFF";
       return {
-        text: `**Context Graph Engine** (\`${userLabel}\`)\nMode: ${modeLabel}\nPython API: ${apiStatus}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
+        text: `**Context Graph Engine** (\`${userLabel}\`)\nMode: ${modeLabel}\nPython API: ${apiStatus}${statsText}\n\nUse \`/graph on\` or \`/graph off\` to toggle.`
       };
     },
   });

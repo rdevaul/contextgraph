@@ -65,7 +65,12 @@ export declare class ContextGraphAPIClient {
         external_id?: string;
         channel_label?: string;
     }): Promise<IngestResponse>;
-    assemble(userText: string, tags?: string[], tokenBudget?: number, toolState?: ToolState): Promise<AssembleResponse>;
+    assemble(userText: string, tags?: string[], tokenBudget?: number, toolState?: ToolState, options?: {
+        sessionId?: string;
+        channelLabel?: string;
+        userTags?: string[];
+        scope?: "session" | "user" | "global";
+    }): Promise<AssembleResponse>;
     compare(userText: string, assistantText: string): Promise<CompareResponse>;
     health(): Promise<HealthResponse>;
 }

@@ -205,7 +205,14 @@ class ContextAssembler:
                         tags=msg.tags,
                         token_count=len(summary_text.split()),
                         external_id=msg.external_id,
-                        summary=None
+                        summary=None,
+                        # 2026-05-07 fix: previously dropped these fields,
+                        # which made oversized→summary rows appear as if
+                        # they had no channel_label / is_automated. Caused
+                        # spurious "channel_label is None" diagnoses in
+                        # the test pane.
+                        is_automated=msg.is_automated,
+                        channel_label=msg.channel_label,
                     )
                     cost = _estimate_tokens(effective_msg)
                 else:
@@ -320,7 +327,13 @@ class ContextAssembler:
                         tags=msg.tags,
                         token_count=len(summary_text.split()),
                         external_id=msg.external_id,
-                        summary=None
+                        summary=None,
+                        # 2026-05-07 fix: matches the recency-path summary
+                        # constructor; channel_label / is_automated must
+                        # propagate through the oversized→summary path so
+                        # downstream filters (and visibility) work.
+                        is_automated=msg.is_automated,
+                        channel_label=msg.channel_label,
                     )
                     cost = _estimate_tokens(effective_msg)
                 else:

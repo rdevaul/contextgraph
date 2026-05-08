@@ -6,6 +6,7 @@ Admin operations: get_channel_label_stats(), merge_channel_labels()
 """
 
 import json
+import re
 import sqlite3
 import threading
 import uuid
@@ -227,8 +228,33 @@ class MessageStore:
 
     # ── write ─────────────────────────────────────────────────────────────────
 
+    # Reasoning/thinking sanitizer (jarvis-rich 2026-05-07).
+    # We strip [[reasoning]]…[[/reasoning]] and <thinking>…</thinking> blocks
+    # at ingest so they never enter the corpus and contaminate future retrieval.
+    # Handles both well-formed pairs and orphan opens (truncated streams).
+    _RE_REASON_PAIR = re.compile(r"\[\[reasoning\]\].*?\[\[/reasoning\]\]\s*", re.DOTALL)
+    _RE_REASON_OPEN = re.compile(r"\[\[reasoning\]\].*\Z", re.DOTALL)
+    _RE_THINK_PAIR  = re.compile(r"<thinking>.*?</thinking>\s*", re.DOTALL)
+    _RE_THINK_OPEN  = re.compile(r"<thinking>.*\Z", re.DOTALL)
+
+    @staticmethod
+    def _strip_reasoning(text: str) -> str:
+        if not text:
+            return text
+        out = MessageStore._RE_REASON_PAIR.sub("", text)
+        out = MessageStore._RE_REASON_OPEN.sub("", out)
+        out = MessageStore._RE_THINK_PAIR.sub("", out)
+        out = MessageStore._RE_THINK_OPEN.sub("", out)
+        return out.strip()
+
     def add_message(self, msg: Message) -> None:
-        """Persist a message and its initial tags."""
+        """Persist a message and its initial tags.
+
+        Reasoning/thinking blocks are stripped from user_text and assistant_text
+        before storage so they don't contaminate future retrieval.
+        """
+        clean_user = self._strip_reasoning(msg.user_text)
+        clean_assistant = self._strip_reasoning(msg.assistant_text)
         with self._lock:
             conn = self._conn()
             conn.execute(
@@ -237,7 +263,7 @@ class MessageStore:
                    channel_label)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (msg.id, msg.session_id, msg.user_id, msg.timestamp,
-                 msg.user_text, msg.assistant_text, msg.token_count, msg.external_id,
+                 clean_user, clean_assistant, msg.token_count, msg.external_id,
                  1 if msg.is_automated else 0, msg.channel_label),
             )
             for tag in msg.tags:

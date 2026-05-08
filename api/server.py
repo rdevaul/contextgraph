@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from store import MessageStore, Message
@@ -238,7 +238,7 @@ def ingest(request: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/assemble", response_model=dict)
-def assemble(request: AssembleRequest):
+def assemble(request: AssembleRequest, http_request: Request = None):  # type: ignore
     try:
         # Tick the pin manager to expire stale pins
         expired = pin_manager.tick()
@@ -313,6 +313,23 @@ def assemble(request: AssembleRequest):
         # Validate scope; coerce unknown values to 'global' for forward compat.
         requested_scope = request.scope if request.scope in ("session", "user", "global") else "global"
 
+        # Belt-and-braces (jarvis-rich 2026-05-07 cross-pane-leak fix):
+        # If the request looks like a Multigraph dashboard pane (sessionId contains
+        # ':dashboard:'), force scope='session' regardless of what the client sent.
+        # This protects against an older/regressed plugin that omits scope routing.
+        if request.session_id and ":dashboard:" in request.session_id and requested_scope != "session":
+            print(f"[assemble] coerced scope user->session for dashboard pane session_id={request.session_id!r}", flush=True)
+            requested_scope = "session"
+
+        # One-line received-shape log (jarvis-rich 2026-05-07).
+        # Compact: just enough to verify the plugin is wiring session_id +
+        # channel_label + scope correctly across all client paths. Keep this on
+        # for a few days to monitor; remove or downgrade to debug-level once
+        # confidence is established.
+        sid = request.session_id or "-"
+        sid_tail = sid.split(":")[-1][:12] if sid != "-" else "-"
+        print(f"[assemble] scope={requested_scope} sid=...{sid_tail} ch={request.channel_label or '-'}", flush=True)
+
         assembler = ContextAssembler(store, token_budget=request.token_budget)
         result = assembler.assemble(
             clean_query,
@@ -325,13 +342,38 @@ def assemble(request: AssembleRequest):
         )
 
         return {
-            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in result.messages],
+            # session_id and channel_label are surfaced in the response so
+            # callers can audit which session/user each retrieved row came
+            # from. This is the visibility fix for the 2026-05-07 test-pane
+            # diagnosis ("every message returned has session_id=None"): the
+            # storage layer was correct all along, the response shape just
+            # dropped the field.
+            "messages": [
+                {
+                    "id": msg.id,
+                    "user_text": msg.user_text,
+                    "assistant_text": msg.assistant_text,
+                    "tags": msg.tags,
+                    "timestamp": msg.timestamp,
+                    "session_id": getattr(msg, "session_id", None),
+                    "channel_label": getattr(msg, "channel_label", None),
+                }
+                for msg in result.messages
+            ],
             "total_tokens": result.total_tokens,
             "sticky_count": result.sticky_count,
             "recency_count": result.recency_count,
             "topic_count": result.topic_count,
             "tags_used": result.tags_used,
-            "expired_pins": expired
+            "expired_pins": expired,
+            # effective_scope reflects the coerce-applied scope (e.g.
+            # `:dashboard:` session_ids are auto-promoted from 'user' to
+            # 'session' — see the coerce branch above). Useful for clients
+            # debugging "why did I get this much/little?" without re-reading
+            # server logs.
+            "effective_scope": requested_scope,
+            "effective_session_id": request.session_id,
+            "effective_channel_label": request.channel_label,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

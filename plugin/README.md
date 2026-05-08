@@ -14,6 +14,28 @@ When installed as an OpenClaw extension, this plugin replaces the default linear
 - `/graph off` — disable (revert to linear windowing)
 - `/graph` — show current status
 
+## Host compatibility (read this if `/graph on` does not appear to engage retrieval)
+
+Full graph-mode functionality requires a host that supports per-session compaction
+ownership via the `ContextEngine.ownsCompactionForSession()` method. Without that
+hook, the host treats the static `info.ownsCompaction = false` as authoritative
+and routes every turn through its built-in linear-window + tool-result guard —
+the engine still ingests messages but its `assemble()` path is never invoked.
+
+**SybilClaw ≥ v0.4 (Rich DeVaul's fork)** implements `ownsCompactionForSession`.
+With it, contextgraph engages or disengages **per user**, gated by their
+`/graph on/off` setting.
+
+**Vanilla OpenClaw (upstream)** does not yet implement this hook; an upstream
+PR proposes adding it. Until that lands, contextgraph on vanilla OpenClaw
+behaves as a *graph-aware ingestion sink without active retrieval* — graph
+state is built and queryable via the API, but the per-turn context-window
+assembly does not engage.
+
+This is intentional and safe: vanilla hosts retain their preemptive
+tool-result-overflow guard. The plugin's static `info.ownsCompaction = false`
+is the vanilla-safe default.
+
 ## Files
 
 - `index.ts` — Plugin implementation (ContextEngine interface bridge)
