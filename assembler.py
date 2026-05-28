@@ -15,6 +15,7 @@ from typing import List, Optional
 
 from store import Message, MessageStore
 from summarizer import summarize_message
+from utils.text import strip_envelope
 
 # Tags appearing in more than this fraction of the corpus are skipped in
 # topic retrieval. At >30% they're effectively stop words (e.g. "code",
@@ -80,6 +81,7 @@ class ContextAssembler:
                  channel_label: Optional[str] = None,
                  user_tags: Optional[List[str]] = None,
                  session_id: Optional[str] = None,
+                 subchannel_label: Optional[str] = None,
                  scope: str = "user") -> AssemblyResult:
         """
         Build a context window for `incoming_text` given `inferred_tags`.
@@ -113,8 +115,8 @@ class ContextAssembler:
               - 'global' : no filtering — the legacy behavior. Reserved as an
                            explicit escape hatch for cross-pane research views.
         """
-        if scope not in ("session", "user", "global"):
-            raise ValueError(f"invalid scope {scope!r}; expected session|user|global")
+        if scope not in ("session", "user", "subchannel", "global"):
+            raise ValueError(f"invalid scope {scope!r}; expected session|user|subchannel|global")
         # ── Sticky layer ───────────────────────────────────────────────────
         sticky_msgs: List[Message] = []
         sticky_tokens = 0
@@ -135,7 +137,10 @@ class ContextAssembler:
                 if scope == "session" and session_id is not None and msg.session_id != session_id:
                     continue
                 # Per-user scope: drop pins from other channel_labels.
-                if scope == "user" and channel_label is not None and msg.channel_label is not None \
+                # NULL channel_label on a stored msg is treated as a wildcard
+                # (legacy messages ingested before labeling was enforced).
+                if scope == "user" and channel_label is not None \
+                        and msg.channel_label is not None \
                         and msg.channel_label != channel_label:
                     continue
                 cost = _estimate_tokens(msg)
@@ -166,9 +171,22 @@ class ContextAssembler:
 
         first_recency = True
         # ── Recency source selection by scope ──────────────────────────────
-        if scope == "session" and session_id:
+        if scope == "subchannel":
+            if channel_label and subchannel_label:
+                recency_source = self.store.get_recent_by_subchannel(10, channel_label, subchannel_label)
+            elif channel_label:
+                # subchannel requested but label missing — fall back to channel-wide
+                import logging
+                logging.getLogger(__name__).warning(
+                    "scope=subchannel requested but subchannel_label is None; "
+                    "falling back to scope=user recency"
+                )
+                recency_source = self.store.get_recent_by_channel(10, channel_label)
+            else:
+                recency_source = self.store.get_recent(10)
+        elif scope == "session" and session_id:
             recency_source = self.store.get_recent_by_session(10, session_id)
-        elif scope == "user" and channel_label:
+        elif scope in ("user",) and channel_label:
             recency_source = self.store.get_recent_by_channel(10, channel_label)
         else:
             # scope == 'global', or scope param without the matching key set
@@ -213,6 +231,7 @@ class ContextAssembler:
                         # the test pane.
                         is_automated=msg.is_automated,
                         channel_label=msg.channel_label,
+                        subchannel_label=msg.subchannel_label,
                     )
                     cost = _estimate_tokens(effective_msg)
                 else:
@@ -264,7 +283,9 @@ class ContextAssembler:
         # other panes/users into every assemble call.
         if scope == "session" and session_id:
             tag_filter_kwargs = {"session_id": session_id, "channel_label": channel_label}
-        elif scope == "user" and channel_label:
+        elif scope in ("user", "subchannel") and channel_label:
+            # For scope=subchannel, topic layer is intentionally channel-wide (not subchannel-narrow).
+            # This preserves cross-thread knowledge retrieval — the core invariant of the design.
             tag_filter_kwargs = {"channel_label": channel_label}
         else:
             tag_filter_kwargs = {}
@@ -334,6 +355,7 @@ class ContextAssembler:
                         # downstream filters (and visibility) work.
                         is_automated=msg.is_automated,
                         channel_label=msg.channel_label,
+                        subchannel_label=msg.subchannel_label,
                     )
                     cost = _estimate_tokens(effective_msg)
                 else:
@@ -351,6 +373,23 @@ class ContextAssembler:
         # ── Combine + sort oldest-first ────────────────────────────────────
         all_msgs = sticky_msgs + recency_msgs + topic_msgs
         all_msgs.sort(key=lambda m: m.timestamp)
+
+        # Strip any lingering OpenClaw preamble from retrieved messages
+        # (safety net for historic data ingested before the strip was applied)
+        def _clean(msg: Message) -> Message:
+            cu = strip_envelope(msg.user_text)
+            ca = strip_envelope(msg.assistant_text)
+            if cu == msg.user_text and ca == msg.assistant_text:
+                return msg
+            return Message(
+                id=msg.id, session_id=msg.session_id, user_id=msg.user_id,
+                timestamp=msg.timestamp, user_text=cu, assistant_text=ca,
+                token_count=msg.token_count, tags=msg.tags,
+                external_id=msg.external_id, is_automated=msg.is_automated,
+                channel_label=msg.channel_label,
+                subchannel_label=msg.subchannel_label,
+            )
+        all_msgs = [_clean(m) for m in all_msgs]
 
         return AssemblyResult(
             messages=all_msgs,

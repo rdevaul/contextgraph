@@ -30,13 +30,15 @@ class Message:
     summary: Optional[str] = None      # Summarized version for large messages
     is_automated: bool = False         # True for cron jobs, heartbeats, etc.
     channel_label: Optional[str] = None  # Channel label for per-agent memory isolation
+    subchannel_label: Optional[str] = None  # Subchannel label for per-thread recency scoping
 
     @classmethod
     def new(cls, session_id: str, user_id: str, timestamp: float,
             user_text: str, assistant_text: str,
             tags: Optional[List[str]] = None, token_count: int = 0,
             external_id: Optional[str] = None, is_automated: bool = False,
-            channel_label: Optional[str] = None) -> "Message":
+            channel_label: Optional[str] = None,
+            subchannel_label: Optional[str] = None) -> "Message":
         """Create a new Message with a generated UUID."""
         return cls(
             id=str(uuid.uuid4()),
@@ -50,6 +52,7 @@ class Message:
             external_id=external_id,
             is_automated=is_automated,
             channel_label=channel_label,
+            subchannel_label=subchannel_label,
         )
 
 
@@ -104,6 +107,10 @@ class MessageStore:
         5: """
             ALTER TABLE messages ADD COLUMN channel_label TEXT;
             CREATE INDEX IF NOT EXISTS idx_messages_channel_label ON messages(channel_label);
+        """,
+        6: """
+            ALTER TABLE messages ADD COLUMN subchannel_label TEXT;
+            CREATE INDEX IF NOT EXISTS idx_messages_subchannel ON messages(channel_label, subchannel_label);
         """,
     }
 
@@ -203,6 +210,7 @@ class MessageStore:
             summary=row["summary"] if "summary" in row.keys() else None,
             is_automated=bool(row["is_automated"]) if "is_automated" in row.keys() else False,
             channel_label=row["channel_label"] if "channel_label" in row.keys() else None,
+            subchannel_label=row["subchannel_label"] if "subchannel_label" in row.keys() else None,
         )
 
     def _fetch_tags_for(self, conn: sqlite3.Connection, message_id: str) -> List[str]:
@@ -258,14 +266,16 @@ class MessageStore:
         with self._lock:
             conn = self._conn()
             conn.execute(
-                """INSERT INTO messages (id, session_id, user_id, timestamp,
+                """INSERT OR IGNORE INTO messages (id, session_id, user_id, timestamp,
                    user_text, assistant_text, token_count, external_id, is_automated,
-                   channel_label)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   channel_label, subchannel_label)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (msg.id, msg.session_id, msg.user_id, msg.timestamp,
                  clean_user, clean_assistant, msg.token_count, msg.external_id,
-                 1 if msg.is_automated else 0, msg.channel_label),
+                 1 if msg.is_automated else 0, msg.channel_label, msg.subchannel_label),
             )
+            if conn.execute("SELECT changes()").fetchone()[0] == 0:
+                return  # already exists — idempotent replay
             for tag in msg.tags:
                 conn.execute(
                     "INSERT OR IGNORE INTO tags (message_id, tag) VALUES (?, ?)",
@@ -297,7 +307,8 @@ class MessageStore:
         tags = self._fetch_tags_for(conn, message_id)
         return self._row_to_message(row, tags)
 
-    def get_recent(self, n: int, include_automated: bool = False) -> List[Message]:
+    def get_recent(self, n: int, include_automated: bool = False,
+                   channel_label: Optional[str] = None) -> List[Message]:
         """Return the N most recent messages, newest first.
 
         Parameters
@@ -306,15 +317,24 @@ class MessageStore:
             Number of messages to return
         include_automated : bool
             If False (default), exclude automated turns (cron/heartbeat/etc)
+        channel_label : str, optional
+            If provided, filter to messages from this channel only.
         """
         conn = self._conn()
+        params: list = []
 
-        if include_automated:
-            query = "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?"
-        else:
-            query = "SELECT * FROM messages WHERE is_automated = 0 ORDER BY timestamp DESC LIMIT ?"
+        clauses = []
+        if not include_automated:
+            clauses.append("is_automated = 0")
+        if channel_label is not None:
+            clauses.append("channel_label = ?")
+            params.append(channel_label)
 
-        rows = conn.execute(query, (n,)).fetchall()
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        query = f"SELECT * FROM messages {where} ORDER BY timestamp DESC LIMIT ?"
+        params.append(n)
+
+        rows = conn.execute(query, params).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -329,6 +349,28 @@ class MessageStore:
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
+
+    def get_recent_by_subchannel(
+        self, n: int, channel_label: str, subchannel_label: str,
+        include_automated: bool = False
+    ) -> List[Message]:
+        """Return the N most recent messages for a (channel_label, subchannel_label) pair.
+
+        Recency layer uses this when scope='subchannel' to isolate per-thread
+        recent context while the topic layer still retrieves channel-wide.
+        """
+        with self._lock:
+            conn = self._conn()
+            auto_clause = "" if include_automated else "AND is_automated = 0"
+            query = (
+                f"SELECT * FROM messages "
+                f"WHERE channel_label = ? AND subchannel_label = ? {auto_clause} "
+                f"ORDER BY timestamp DESC LIMIT ?"
+            )
+            rows = conn.execute(query, (channel_label, subchannel_label, n)).fetchall()
+            ids = [r["id"] for r in rows]
+            tags_map = self._fetch_tags_bulk(conn, ids)
+            return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
     def get_recent_by_channel(self, n: int, channel_label: str,
                               include_automated: bool = False) -> List[Message]:
@@ -595,12 +637,13 @@ class MessageStore:
 
     def set_summary(self, message_id: str, summary: str) -> None:
         """Store a summary for a message."""
-        conn = self._conn()
-        conn.execute(
-            "UPDATE messages SET summary = ? WHERE id = ?",
-            (summary, message_id),
-        )
-        conn.commit()
+        with self._lock:
+            conn = self._conn()
+            conn.execute(
+                "UPDATE messages SET summary = ? WHERE id = ?",
+                (summary, message_id),
+            )
+            conn.commit()
 
     # ── admin: channel label merge ──────────────────────────────────────────
 

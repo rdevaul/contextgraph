@@ -666,7 +666,10 @@
         }
 
         async function fetchComparisonStats() {
-            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const params = new URLSearchParams();
+            if (currentWindow && currentWindow !== 'all') params.set('since', currentWindow);
+            if (currentChannel) params.set('channel_label', currentChannel);
+            const qs = params.toString() ? `?${params.toString()}` : '';
             const response = await fetch(`/comparison-stats${qs}`);
             comparisonStats = await response.json();
         }
@@ -683,15 +686,42 @@
         }
 
         async function fetchTagsData() {
-            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
-            const response = await fetch(`/tags${qs}`);
-            tagsData = await response.json();
+            if (currentChannel) {
+                const response = await fetch(`/tags/channel/${encodeURIComponent(currentChannel)}`);
+                tagsData = await response.json();
+            } else {
+                const qs = currentWindow && currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+                const response = await fetch(`/tags${qs}`);
+                tagsData = await response.json();
+            }
         }
 
         async function fetchQuality() {
-            const qs = currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
-            const response = await fetch(`/quality${qs}`);
-            qualityData = await response.json();
+            // Always fetch global /quality for corpus_size, zero_return_rate, avg_topic_messages.
+            // Those are store-wide metrics and the channel endpoint doesn't return them.
+            const qs = currentWindow && currentWindow !== 'all' ? `?since=${encodeURIComponent(currentWindow)}` : '';
+            const globalResp = await fetch(`/quality${qs}`);
+            qualityData = await globalResp.json();
+
+            // If a channel is selected, merge in the channel-specific tag data
+            // (tag_entropy, top_tags, unique_tags, avg_tags_per_message) on top.
+            if (!currentChannel) {
+                qualityData.channel_message_count = null;
+            }
+            if (currentChannel) {
+                try {
+                    const chResp = await fetch(`/quality/channel/${encodeURIComponent(currentChannel)}`);
+                    const chData = await chResp.json();
+                    if (chData && chData.turns_evaluated != null) {
+                        qualityData.tag_entropy = chData.tag_entropy;
+                        qualityData.top_tags = chData.top_tags;
+                        qualityData.unique_tags = chData.unique_tags;
+                        qualityData.avg_tags_per_message = chData.avg_tags_per_message;
+                        qualityData.channel_turns_evaluated = chData.turns_evaluated;
+                        qualityData.channel_message_count = chData.channel_message_count;
+                    }
+                } catch (e) { /* channel endpoint unavailable, use global data */ }
+            }
         }
 
         function renderDashboard() {
@@ -930,49 +960,65 @@
         }
 
         function renderEfficacy() {
-            if (!metricsData) return;
-
-            const qualityStats = metricsData.quality_stats || {};
-            const taggerIds = Object.keys(qualityStats);
-
-            if (taggerIds.length === 0) {
-                document.getElementById('efficacy-stats').innerHTML = '<div class="stat-card"><div class="stat-label">No quality data yet</div></div>';
+            // Pull retrieval quality numbers from /quality (qualityData), which has the
+            // real fields. /metrics.quality_stats is currently always {} — using it
+            // makes this whole section dead.
+            const target = document.getElementById('efficacy-stats');
+            if (!qualityData || qualityData.turns_evaluated == null) {
+                target.innerHTML = '<div class="stat-card"><div class="stat-label">No quality data yet</div></div>';
                 return;
             }
 
-            // Calculate aggregate stats
-            let totalDensity = 0;
-            let totalReframing = 0;
-            let totalFitness = 0;
-            let count = 0;
+            const turns = qualityData.turns_evaluated || 0;
+            const retrievalTurns = qualityData.retrieval_turns_evaluated || 0;
+            const zrr = qualityData.zero_return_rate != null ? qualityData.zero_return_rate : null;
+            const avgTopic = qualityData.avg_topic_messages != null ? qualityData.avg_topic_messages : null;
+            const tagEntropy = qualityData.tag_entropy != null ? qualityData.tag_entropy : null;
+            const corpusSize = qualityData.corpus_size || 0;
 
-            taggerIds.forEach(id => {
-                const stats = qualityStats[id];
-                totalDensity += stats.mean_density || 0;
-                totalReframing += stats.mean_reframing || 0;
-                totalFitness += stats.fitness || 0;
-                count++;
-            });
+            // Color thresholds: lower zero-return is better, higher topic count + entropy is healthier
+            const zrrColor = zrr == null ? '#8b949e'
+                : zrr <= 0.10 ? '#3fb950'
+                : zrr <= 0.25 ? '#d29922' : '#f85149';
+            const topicColor = avgTopic == null ? '#8b949e'
+                : avgTopic >= 5 ? '#3fb950'
+                : avgTopic >= 2 ? '#d29922' : '#f85149';
+            const entropyColor = tagEntropy == null ? '#8b949e'
+                : tagEntropy >= 4 ? '#3fb950'
+                : tagEntropy >= 2.5 ? '#d29922' : '#f85149';
 
-            const avgDensity = count > 0 ? (totalDensity / count).toFixed(3) : 0;
-            const avgReframing = count > 0 ? (totalReframing / count).toFixed(3) : 0;
-            const avgFitness = count > 0 ? (totalFitness / count).toFixed(3) : 0;
+            const zrrDisplay = zrr == null ? '—' : (zrr * 100).toFixed(1) + '%';
+            const topicDisplay = avgTopic == null ? '—' : avgTopic.toFixed(1);
+            const entropyDisplay = tagEntropy == null ? '—' : tagEntropy.toFixed(2);
 
             const statsHtml = `
                 <div class="stat-card">
-                    <div class="stat-value">${avgDensity}</div>
-                    <div class="stat-label">Avg Context Density</div>
+                    <div class="stat-value" style="color: ${zrrColor}">${zrrDisplay}</div>
+                    <div class="stat-label">Zero-Return Rate</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${avgReframing}</div>
-                    <div class="stat-label">Avg Reframing Signal</div>
+                    <div class="stat-value" style="color: ${topicColor}">${topicDisplay}</div>
+                    <div class="stat-label">Avg Topic Messages</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${avgFitness}</div>
-                    <div class="stat-label">Composite Fitness</div>
+                    <div class="stat-value" style="color: ${entropyColor}">${entropyDisplay}</div>
+                    <div class="stat-label">Tag Entropy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${corpusSize.toLocaleString()}</div>
+                    <div class="stat-label">Corpus Size (all channels)</div>
+                </div>
+                ${qualityData.channel_message_count != null ? `
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #58a6ff">${qualityData.channel_message_count.toLocaleString()}</div>
+                    <div class="stat-label">Channel Messages</div>
+                </div>` : ''}
+                <div class="stat-card">
+                    <div class="stat-value">${retrievalTurns}/${turns}</div>
+                    <div class="stat-label">Retrieval Turns / Total</div>
                 </div>
             `;
-            document.getElementById('efficacy-stats').innerHTML = statsHtml;
+            target.innerHTML = statsHtml;
         }
 
         function renderChart(canvasId, label, data, color) {
@@ -1090,6 +1136,12 @@
 
             const labels = filtered.map(entry => {
                 const date = new Date(entry.timestamp);
+                // For windows > 1d, show date + time so the chart visibly changes when switching windows
+                const spansDays = currentWindow === '7d' || currentWindow === '30d' || currentWindow === 'all';
+                if (spansDays) {
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        + ' ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                }
                 return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             });
 
@@ -1266,7 +1318,7 @@
                 const response = await fetch('/compare', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_text: query, assistant_text: '' })
+                    body: JSON.stringify({ user_text: query, assistant_text: '', ...(currentChannel ? { channel_label: currentChannel } : {}) })
                 });
 
                 const data = await response.json();

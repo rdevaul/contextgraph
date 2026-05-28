@@ -34,6 +34,8 @@ _ENVELOPE_PATTERNS = [
     ),
     # "System: [timestamp] ..." single event lines
     re.compile(r"^System:\s*\[.*?\].*?$", re.MULTILINE),
+    # "System (untrusted): [timestamp] ..." lines (exec/tool completion events)
+    re.compile(r"^System \(untrusted\):\s*.*?$", re.MULTILINE),
     # Multi-line "System: \nSystem: ..." blocks (cron result delivery, X mentions reports)
     re.compile(r"^(System:\s*\n)+System:.*", re.DOTALL | re.MULTILINE),
     # OpenClaw runtime context block: "[Day YYYY-MM-DD HH:MM TZ] OpenClaw runtime context (internal):\nThis context is runtime-ge..."
@@ -88,6 +90,21 @@ _ENVELOPE_PATTERNS = [
     re.compile(r"^\[[\d:]+\]\s*\[Voice PWA\]\s*", re.MULTILINE),
     # Media attachment lines: "[media attached: ...]"
     re.compile(r"\[media attached:.*?\]\s*", re.DOTALL),
+    # <<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>> ... block (entire message is internal metadata)
+    re.compile(
+        r"<<<BEGIN_OPENCLAW_INTERNAL_CONTEXT>>>.*",
+        re.DOTALL,
+    ),
+    # Queued announce wrapper: "[Queued announce messages while agent was busy]\n---\nQueued #N\nOpenClaw runtime..."
+    re.compile(
+        r"\[Queued announce messages while agent was busy\].*",
+        re.DOTALL,
+    ),
+    # Bare "OpenClaw runtime context (internal):" block (any prefix form not caught above)
+    re.compile(
+        r"OpenClaw runtime context \(internal\):.*",
+        re.DOTALL,
+    ),
     # Queued messages block (everything from this line onward)
     re.compile(r"\[Queued messages while agent was busy\].*", re.DOTALL),
 ]
