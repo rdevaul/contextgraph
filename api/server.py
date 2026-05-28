@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from store import MessageStore, Message
+import config as cg_config
 from features import extract_features
 from tagger import _assign_tags_full
 from ensemble import build_ensemble
@@ -71,6 +72,8 @@ app = FastAPI()
 class TagRequest(BaseModel):
     user_text: str
     assistant_text: str
+    channel_label: str | None = None
+    scope: str = "user"
 
 class IngestRequest(BaseModel):
     id: str = Field(None, nullable=True)
@@ -81,6 +84,7 @@ class IngestRequest(BaseModel):
     user_id: str = Field(None, nullable=True)
     external_id: str = Field(None, nullable=True)  # OpenClaw AgentMessage.id or other external system ID
     channel_label: str = Field(None, nullable=True)  # Channel label for per-agent memory isolation
+    subchannel_label: str = Field(None, nullable=True)  # Subchannel label for per-thread recency scoping
 
 class ToolState(BaseModel):
     last_turn_had_tools: bool
@@ -98,10 +102,17 @@ class AssembleRequest(BaseModel):
     # global behavior so older plugin builds keep working until they upgrade.
     channel_label: str | None = None
     user_tags: list[str] | None = None
+    subchannel_label: str | None = None
     # Default 'user' per bus approval 20260501220916-a4feb6f0:
     # cross-pane DM-style continuity for non-multigraph callers, while
     # multigraph dashboard panes opt into scope='session' explicitly.
     scope: str = "user"
+    # Recency floor: prepend the N most-recent rows from the caller's
+    # scope to the assembled result, charging tokens to budget BEFORE
+    # semantic retrieval. None or 0 disables the floor (legacy behavior).
+    # Default is None — the server applies RECENCY_FLOOR_DEFAULT when
+    # this field is omitted; explicit 0 disables.
+    recency_floor: int | None = None
 
 class PinRequest(BaseModel):
     message_ids: list[str]
@@ -116,7 +127,7 @@ class CompareResponse(BaseModel):
     linear_window: dict
     inferred_tags: list = []
 
-store = MessageStore()
+store = MessageStore(db_path=str(cg_config.DB_PATH))
 quality_agent = QualityAgent()
 # Build ensemble with FixedTagger + baseline in "fixed" mode (production mode)
 ensemble = build_ensemble(mode="fixed", quality_agent=quality_agent)
@@ -124,6 +135,14 @@ pin_manager = StickyPinManager()
 
 # Summarization configuration
 SUMMARIZE_THRESHOLD = int(os.getenv("SUMMARIZE_THRESHOLD", "2000"))
+
+# Recency floor configuration (2026-05-28 incident fix):
+# /assemble guarantees at least N most-recent rows from the caller's
+# scope make it into the result, even when semantic scoring misses
+# everything (e.g. content-light replies like "yeas please"). This
+# protects against the failure mode where retrieval scoring can't connect
+# a short reply to the question being answered.
+RECENCY_FLOOR_DEFAULT = int(os.getenv("RECENCY_FLOOR", "5"))
 
 def _background_summarize(message_id: str) -> None:
     """Background task to generate and store a summary for a message."""
@@ -146,6 +165,34 @@ ensemble.register('baseline', baseline_tagger, 1.0)
 async def startup_event():
     store.get_all_tags()  # Initialize the store
     # System tags loaded from tags.yaml via TagRegistry — single source of truth.
+
+    # Ollama health probe (2026-05-28 incident fix):
+    # If Ollama is unreachable at startup, log loudly but DO NOT refuse to
+    # start — the fallback truncation path in summarizer.py keeps ingest
+    # working, and the circuit-breaker prevents per-call latency blowups.
+    # This is a diagnostic signal, not a gate.
+    if os.getenv("SUMMARIZER_BACKEND", "anthropic") == "ollama":
+        ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        try:
+            import httpx
+            with httpx.Client(timeout=httpx.Timeout(connect=5.0, read=5.0, write=5.0, pool=5.0)) as client:
+                r = client.get(f"{ollama_url}/api/tags", headers={"Connection": "close"})
+                r.raise_for_status()
+                models = [m.get("name") for m in r.json().get("models", [])]
+                expected = os.getenv("SUMMARIZER_MODEL", "")
+                model_ok = (not expected) or any(m == expected or m.startswith(expected.split(":")[0]) for m in models)
+                print(
+                    f"[startup] Ollama probe OK url={ollama_url} models={len(models)} "
+                    f"expected_model={expected!r} present={model_ok}",
+                    flush=True,
+                )
+        except Exception as e:
+            print(
+                f"[startup] WARNING: Ollama probe FAILED url={ollama_url} err={e!r} "
+                f"— summarizer will use fallback truncation until Ollama recovers. "
+                f"Ingest will still work; retrieval quality on long messages will be degraded.",
+                flush=True,
+            )
 
 @app.post("/tag", response_model=dict)
 def tag(request: TagRequest):
@@ -194,6 +241,11 @@ def ingest(request: IngestRequest):
         clean_user = strip_envelope(request.user_text)
         # HIGH-01 fix: sanitize injection patterns before storage
         clean_user = _sanitize_for_storage(clean_user)
+        # Reject pure-boilerplate messages — nothing useful to store
+        if clean_user in ("[metadata-only message]", ""):
+            return {"id": message_id, "tags": [], "skipped": True, "reason": "boilerplate-only"}
+        # Strip OpenClaw preamble from assistant_text too (bleeds in via historic ingest)
+        clean_assistant = strip_envelope(request.assistant_text)
 
         # Auto-detect automated turns (cron, heartbeat, local-watcher)
         is_automated = _is_automated_turn(request.user_text)
@@ -202,18 +254,18 @@ def ingest(request: IngestRequest):
         if is_automated:
             tags = []
         else:
-            features = extract_features(clean_user, request.assistant_text)
-            tags = ensemble.assign(features, clean_user, request.assistant_text).tags
+            features = extract_features(clean_user, clean_assistant)
+            tags = ensemble.assign(features, clean_user, clean_assistant).tags
             # Record hit for each tag assigned
             registry = get_registry()
             for tag in tags:
                 registry.record_hit(tag)
-        token_count = len(clean_user.split()) + len(request.assistant_text.split())
+        token_count = len(clean_user.split()) + len(clean_assistant.split())
         message = Message(
             id=message_id,
             session_id=request.session_id,
             user_text=clean_user,
-            assistant_text=request.assistant_text,
+            assistant_text=clean_assistant,
             timestamp=request.timestamp,
             user_id=request.user_id or "default",
             tags=tags,
@@ -221,6 +273,7 @@ def ingest(request: IngestRequest):
             external_id=request.external_id,
             is_automated=is_automated,
             channel_label=request.channel_label,
+            subchannel_label=request.subchannel_label,
         )
         store.add_message(message)
 
@@ -311,13 +364,15 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
         pinned_ids = pin_manager.get_pinned_message_ids()
 
         # Validate scope; coerce unknown values to 'global' for forward compat.
-        requested_scope = request.scope if request.scope in ("session", "user", "global") else "global"
+        valid_scopes = {"session", "user", "subchannel", "global"}
+        requested_scope = request.scope if request.scope in valid_scopes else "global"
 
         # Belt-and-braces (jarvis-rich 2026-05-07 cross-pane-leak fix):
         # If the request looks like a Multigraph dashboard pane (sessionId contains
-        # ':dashboard:'), force scope='session' regardless of what the client sent.
-        # This protects against an older/regressed plugin that omits scope routing.
-        if request.session_id and ":dashboard:" in request.session_id and requested_scope != "session":
+        # ':dashboard:'), and no explicit scope=subchannel was sent, force scope='session'
+        # as a legacy safety net for old plugin builds that don't send scope=subchannel.
+        # New plugin builds send scope=subchannel explicitly and bypass this coerce.
+        if request.session_id and ":dashboard:" in request.session_id and requested_scope not in ("session", "subchannel"):
             print(f"[assemble] coerced scope user->session for dashboard pane session_id={request.session_id!r}", flush=True)
             requested_scope = "session"
 
@@ -330,7 +385,48 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
         sid_tail = sid.split(":")[-1][:12] if sid != "-" else "-"
         print(f"[assemble] scope={requested_scope} sid=...{sid_tail} ch={request.channel_label or '-'}", flush=True)
 
-        assembler = ContextAssembler(store, token_budget=request.token_budget)
+        # ---- Recency floor (2026-05-28 incident fix) -----------------------
+        # Reserve a portion of the token budget for the most-recent N rows in
+        # the caller's scope, BEFORE the assembler runs. This guarantees a
+        # content-light reply (e.g. "yeas please") always sees the immediately
+        # prior turn(s) it was answering, even when semantic scoring misses.
+        #
+        # Scope semantics (mirrors assembler.assemble):
+        #   - subchannel + subchannel_label : per-pane recency (preserves the
+        #     2026-05-22 cross-pane isolation guarantee)
+        #   - session + session_id          : per-session recency
+        #   - otherwise                     : floor disabled (no safe scope)
+        #
+        # Explicit recency_floor=0 disables. None falls back to the global
+        # default RECENCY_FLOOR_DEFAULT.
+        floor_n = (
+            request.recency_floor
+            if request.recency_floor is not None
+            else RECENCY_FLOOR_DEFAULT
+        )
+        recency_floor_msgs: list = []
+        recency_floor_tokens = 0
+        if floor_n and floor_n > 0:
+            if requested_scope == "subchannel" and request.channel_label and request.subchannel_label:
+                recency_floor_msgs = store.get_recent_by_subchannel(
+                    floor_n, request.channel_label, request.subchannel_label
+                )
+            elif requested_scope == "session" and request.session_id:
+                recency_floor_msgs = store.get_recent_by_session(
+                    floor_n, request.session_id
+                )
+            # else: no recency floor applied — 'user' / 'global' scopes don't
+            # have a tight-enough conversational anchor to safely floor on.
+            #
+            # Sort oldest-first so the natural reading order is preserved
+            # when these get prepended to the assembled result.
+            recency_floor_msgs = list(reversed(recency_floor_msgs))
+            recency_floor_tokens = sum(_estimate_tokens(m) for m in recency_floor_msgs)
+
+        # Charge recency-floor tokens to the budget BEFORE assembly.
+        adjusted_budget = max(0, request.token_budget - recency_floor_tokens)
+
+        assembler = ContextAssembler(store, token_budget=adjusted_budget)
         result = assembler.assemble(
             clean_query,
             request.tags,
@@ -338,8 +434,20 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             channel_label=request.channel_label,
             user_tags=request.user_tags,
             session_id=request.session_id,
+            subchannel_label=request.subchannel_label,
             scope=requested_scope,
         )
+
+        # Merge recency-floor rows into the result, deduplicating by id.
+        # Recency-floor rows come FIRST (chronologically earliest first,
+        # since the assembler returns oldest-first too).
+        floor_ids = {m.id for m in recency_floor_msgs}
+        merged_messages = list(recency_floor_msgs) + [
+            m for m in result.messages if m.id not in floor_ids
+        ]
+        # Sort all by timestamp ascending for stable reading order.
+        merged_messages.sort(key=lambda m: m.timestamp)
+        floor_id_set = floor_ids  # for tagging in the response
 
         return {
             # session_id and channel_label are surfaced in the response so
@@ -357,15 +465,23 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
                     "timestamp": msg.timestamp,
                     "session_id": getattr(msg, "session_id", None),
                     "channel_label": getattr(msg, "channel_label", None),
+                    # source tagging (2026-05-28): callers can audit which
+                    # rows came from the recency-floor guarantee vs the
+                    # semantic assembler. Useful for retrieval QA.
+                    "source": "recency_floor" if msg.id in floor_id_set else "assembler",
                 }
-                for msg in result.messages
+                for msg in merged_messages
             ],
-            "total_tokens": result.total_tokens,
+            "total_tokens": result.total_tokens + recency_floor_tokens,
             "sticky_count": result.sticky_count,
             "recency_count": result.recency_count,
             "topic_count": result.topic_count,
             "tags_used": result.tags_used,
             "expired_pins": expired,
+            # recency_floor_count surfaces how many rows the floor contributed
+            # so callers and the dashboard can graph it.
+            "recency_floor_count": len(recency_floor_msgs),
+            "recency_floor_tokens": recency_floor_tokens,
             # effective_scope reflects the coerce-applied scope (e.g.
             # `:dashboard:` session_ids are auto-promoted from 'user' to
             # 'session' — see the coerce branch above). Useful for clients
@@ -374,6 +490,7 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             "effective_scope": requested_scope,
             "effective_session_id": request.session_id,
             "effective_channel_label": request.channel_label,
+            "effective_subchannel_label": request.subchannel_label,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -384,6 +501,43 @@ def health():
         messages_in_store = store.count()  # Actual count via SELECT COUNT(*)
         tags = store.get_all_tags()
         return {"status": "ok", "messages_in_store": messages_in_store, "tags": tags, "engine": "contextgraph"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/messages/{message_id}", response_model=dict)
+def get_message(message_id: str):
+    """Fetch a single stored message by id.
+
+    Added 2026-05-28 to support post-write verification from
+    contextgraph-sync (the "monitoring lies" P0). Sync writes a row, picks
+    one id at random, GETs it back — a 404 means the daemon claimed 200 on
+    ingest but the row didn't land.
+
+    Also accepts the external_id form (OpenClaw message id) as a fallback.
+    """
+    try:
+        msg = store.get_by_id(message_id)
+        if msg is None:
+            msg = store.get_by_external_id(message_id)
+        if msg is None:
+            raise HTTPException(status_code=404, detail=f"message {message_id} not found")
+        return {
+            "id": msg.id,
+            "session_id": msg.session_id,
+            "user_id": msg.user_id,
+            "timestamp": msg.timestamp,
+            "user_text": msg.user_text,
+            "assistant_text": msg.assistant_text,
+            "tags": msg.tags,
+            "token_count": msg.token_count,
+            "external_id": getattr(msg, "external_id", None),
+            "channel_label": getattr(msg, "channel_label", None),
+            "subchannel_label": getattr(msg, "subchannel_label", None),
+            "summary_length": len(getattr(msg, "summary", "") or ""),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -583,6 +737,7 @@ def get_tags(since: Optional[str] = Query(None)):
 @app.post("/compare", response_model=CompareResponse)
 def compare(request: TagRequest):
     try:
+        print(f"[compare-debug] channel_label={request.channel_label!r} scope={request.scope!r}", flush=True)
         features = extract_features(request.user_text, request.assistant_text)
         inferred_tags = ensemble.assign(features, request.user_text, request.assistant_text).tags
 
@@ -590,7 +745,12 @@ def compare(request: TagRequest):
         pinned_ids = pin_manager.get_pinned_message_ids()
 
         assembler = ContextAssembler(store, token_budget=4000)
-        graph_assembly_result = assembler.assemble(request.user_text, inferred_tags, pinned_message_ids=pinned_ids)
+        graph_assembly_result = assembler.assemble(
+            request.user_text, inferred_tags,
+            pinned_message_ids=pinned_ids,
+            channel_label=request.channel_label,
+            scope=request.scope,
+        )
         graph_assembly = {
             "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in graph_assembly_result.messages],
             "total_tokens": graph_assembly_result.total_tokens,
@@ -605,7 +765,9 @@ def compare(request: TagRequest):
         linear_tokens = 0
         budget = 4000
 
-        for msg in store.get_recent(100):  # Fetch enough to fill budget
+        recent_msgs = store.get_recent(100, channel_label=request.channel_label) \
+            if request.channel_label else store.get_recent(100)
+        for msg in recent_msgs:  # Fetch enough to fill budget
             msg_tokens = len(msg.user_text.split()) + len(msg.assistant_text.split())
             if linear_tokens + msg_tokens > budget:
                 break
@@ -654,10 +816,11 @@ def get_comparison_log(limit: Optional[int] = Query(None, description="Maximum n
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/comparison-stats", response_model=dict)
-def get_comparison_stats(since: Optional[str] = Query(None)):
+def get_comparison_stats(since: Optional[str] = Query(None), channel_label: Optional[str] = Query(None)):
     """Compute aggregate statistics from the comparison log.
 
     Since parameter: "1d" (last 24h), "7d" (last 7 days), None (all time).
+    Channel_label: filter to a specific channel (e.g. "rich", "garrett").
     """
     try:
         log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
@@ -711,6 +874,10 @@ def get_comparison_stats(since: Optional[str] = Query(None)):
 
                 entries = [e for e in entries if _parse_ts(e) >= cutoff]
 
+        # Filter by channel_label if specified
+        if channel_label:
+            entries = [e for e in entries if e.get("channelLabel") == channel_label]
+
         if not entries:
             return {
                 "total_turns": 0,
@@ -763,10 +930,23 @@ def get_comparison_stats(since: Optional[str] = Query(None)):
             efficiency_ratio = 0
             token_savings_pct = 0
 
-        # Time series data (most recent 50 entries, chronological order)
+        # Time series data: up to 50 entries spanning the full filtered window so the
+        # chart actually changes when the window dropdown changes. We even-stride sample
+        # rather than just taking the tail, otherwise large windows look identical to
+        # "24h" once the most recent 50 turns dominate the slice.
+        SERIES_MAX = 50
+        if len(entries) <= SERIES_MAX:
+            sampled_entries = list(entries)
+        else:
+            stride = len(entries) / float(SERIES_MAX)
+            # Always include the most recent entry as the final sample; pick the rest at even strides.
+            indices = sorted({min(len(entries) - 1, int(i * stride)) for i in range(SERIES_MAX)})
+            if indices[-1] != len(entries) - 1:
+                indices[-1] = len(entries) - 1
+            sampled_entries = [entries[i] for i in indices]
+
         time_series = []
-        recent_entries = entries[-50:] if len(entries) > 50 else entries
-        for i, entry in enumerate(recent_entries):
+        for i, entry in enumerate(sampled_entries):
             time_series.append({
                 "index": i,
                 "timestamp": entry.get("timestamp", ""),
@@ -1106,6 +1286,81 @@ def admin_retag(req: RetagRequest):
 
 # ── Per-Channel Endpoints ─────────────────────────────────────────────────────
 
+@app.get("/graph-status", response_model=dict)
+def get_graph_status():
+    """Compact status summary for the /graph status command and dashboard.
+
+    Returns last-24h and all-time comparison stats plus zero-return rate.
+    Fast — reads comparison log + quality endpoint only.
+    """
+    try:
+        log_path = Path.home() / ".tag-context" / "comparison-log.jsonl"
+        entries = []
+        if log_path.exists():
+            with open(log_path, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        entries.append(json.loads(line))
+
+        from datetime import datetime, timedelta, timezone as tz
+        now = datetime.now(tz.utc)
+        cutoff_24h = now - timedelta(days=1)
+
+        def _parse_ts(e):
+            ts_val = e.get("timestamp", 0)
+            if isinstance(ts_val, (int, float)):
+                return datetime.fromtimestamp(ts_val, tz=tz.utc)
+            if isinstance(ts_val, str):
+                ts_val = ts_val.replace("Z", "+00:00")
+                try:
+                    return datetime.fromisoformat(ts_val)
+                except ValueError:
+                    return datetime.min.replace(tzinfo=tz.utc)
+            return datetime.min.replace(tzinfo=tz.utc)
+
+        entries_24h = [e for e in entries if _parse_ts(e) >= cutoff_24h]
+
+        def _stats(elist):
+            n = len(elist)
+            if n == 0:
+                return {"turns": 0, "avg_graph_tokens": 0, "avg_linear_tokens": 0,
+                        "avg_graph_messages": 0.0, "token_savings_pct": 0.0}
+            gt = sum(e.get("graphTokens", e.get("graph_assembly", {}).get("tokens", 0)) for e in elist)
+            lt = sum(e.get("linearTokens", e.get("linear_would_have", {}).get("tokens", 0)) for e in elist)
+            gm = sum(e.get("graphMsgCount", e.get("graph_assembly", {}).get("messages", 0)) for e in elist)
+            savings = ((lt - gt) / lt * 100) if lt > 0 else 0.0
+            return {
+                "turns": n,
+                "avg_graph_tokens": round(gt / n, 1),
+                "avg_linear_tokens": round(lt / n, 1),
+                "avg_graph_messages": round(gm / n, 2),
+                "token_savings_pct": round(savings, 2),
+            }
+
+        # Zero-return rate from quality endpoint (store-level)
+        zero_return_rate = None
+        try:
+            q = quality()
+            zero_return_rate = q.get("zero_return_rate")
+        except Exception:
+            pass
+
+        messages_in_store = 0
+        try:
+            messages_in_store = store.count()
+        except Exception:
+            pass
+
+        return {
+            "last_24h": _stats(entries_24h),
+            "all_time": _stats(entries),
+            "zero_return_rate": zero_return_rate,
+            "messages_in_store": messages_in_store,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/channels", response_model=dict)
 def list_channels():
     """List all channel labels with message counts and tag counts.
@@ -1136,7 +1391,7 @@ def channel_quality(channel_label: str):
     """Compute quality metrics scoped to a specific channel label."""
     try:
         # Fetch messages for this channel
-        messages = store.get_recent(50, channel_label=channel_label)
+        messages = store.get_recent_by_channel(50, channel_label=channel_label)
         if not messages:
             return {
                 "channel": channel_label,
@@ -1163,9 +1418,11 @@ def channel_quality(channel_label: str):
                 if p > 0:
                     entropy -= p * math.log2(p)
 
+        channel_count = store.count(channel_label=channel_label)
         return {
             "channel": channel_label,
             "turns_evaluated": len(messages),
+            "channel_message_count": channel_count,
             "unique_tags": len(all_tags),
             "avg_tags_per_message": total_tag_hits / len(messages),
             "tag_entropy": round(entropy, 3),

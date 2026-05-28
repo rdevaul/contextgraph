@@ -456,6 +456,48 @@ function inferChannelLabel(senderId?: string, sessionId?: string, logger?: OpenC
   return "unknown";
 }
 
+// ── Subchannel label inference ────────────────────────────────────────────
+
+/**
+ * Infer a subchannel label from sessionId and optional pane label.
+ * Returns a stable, normalized string for the current thread/surface, or null.
+ *
+ * Recency retrieval is scoped to (channel_label, subchannel_label);
+ * topic retrieval is channel-wide. This gives per-thread recency context
+ * while preserving cross-thread tag-based knowledge retrieval.
+ *
+ * For Multigraph dashboard panes (sessionId contains ':dashboard:'),
+ * the pane UUID suffix is used as a stable subchannel identifier.
+ * For direct channel sessions, the surface type (discord, telegram, etc.)
+ * is extracted from the sessionId structure.
+ */
+function inferSubchannelLabel(sessionId: string | undefined): string | null {
+  if (!sessionId) return null;
+
+  // Multigraph dashboard pane: extract the UUID suffix as the subchannel.
+  // SessionKey form: agent:<agent>:dashboard:<uuid>
+  // The UUID is stable per pane — ideal for subchannel scoping.
+  if (sessionId.includes(':dashboard:')) {
+    const parts = sessionId.split(':dashboard:');
+    const uuidPart = parts[1]?.trim();
+    if (uuidPart) {
+      // Normalize: lowercase, truncate to 64 chars
+      return uuidPart.toLowerCase().slice(0, 64) || null;
+    }
+  }
+
+  // Direct channel sessions: extract surface type from sessionId structure.
+  // e.g. agent:jarvis-rich:discord:... → "discord"
+  const parts = sessionId.split(':');
+  if (parts.length >= 3) {
+    const surface = parts[2];
+    const knownSurfaces = ['discord', 'telegram', 'signal', 'slack', 'matrix', 'whatsapp', 'irc'];
+    if (knownSurfaces.includes(surface)) return surface;
+  }
+
+  return null;
+}
+
 // ── Context Engine implementation ──────────────────────────────────────────
 
 function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextEngine {
@@ -542,6 +584,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           nextMsg?.role === "assistant" ? (extractTextFromMessage(nextMsg) ?? "") : "";
 
         if (userText) {
+          const subchannel = inferSubchannelLabel(sessionId);
           const result = await apiPost(
             "/ingest",
             {
@@ -552,6 +595,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
               assistant_text: assistantText,
               timestamp: now,
               channel_label: userLabel,
+              subchannel_label: subchannel,
             },
             logger
           );
@@ -578,6 +622,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       }
 
       const msgId = `msg-${sessionId}-${Date.now()}`;
+      const subchannel = inferSubchannelLabel(sessionId);
       const result = await apiPost(
         "/ingest",
         {
@@ -588,6 +633,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           assistant_text: "",
           timestamp: Date.now() / 1000,
           channel_label: userLabel,
+          subchannel_label: subchannel,
         },
         logger
       );
@@ -607,6 +653,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       if (userParts.length === 0) return { ingestedCount: 0 };
 
       const batchId = `batch-${sessionId}-${Date.now()}`;
+      const subchannel = inferSubchannelLabel(sessionId);
       const result = await apiPost(
         "/ingest",
         {
@@ -617,6 +664,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           assistant_text: assistantParts.join("\n"),
           timestamp: Date.now() / 1000,
           channel_label: userLabel,
+          subchannel_label: subchannel,
         },
         logger
       );
@@ -656,10 +704,18 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
         return { messages: safe, estimatedTokens: safe.length * 150 };
       }
 
-      // Cap graph retrieval at 8K tokens. The Python API internally splits
-      // this 25% recency / 75% topic (per contextgraph design). System was
-      // validated at 4K default; 8K gives more depth for dense research messages.
-      const GRAPH_TOKEN_BUDGET = 8000;
+      // Cap graph retrieval at 32K tokens. The Python API internally splits
+      // this 25% recency / 75% topic (per contextgraph design). The previous
+      // 8K cap was anachronistic for Opus-class models (200K window) — at
+      // 8K, the recency layer was getting starved (2K budget) and dropping
+      // even short prior turns when there was any sticky/topic competition.
+      // 32K leaves Opus with 168K headroom for the live turn.
+      //
+      // TODO(future PR): make this model-aware — default to 25% of model
+      // context window when model info is available, fall back to 32000.
+      // That requires plumbing model info through the plugin signature,
+      // which is out of scope for this incident fix (2026-05-28).
+      const GRAPH_TOKEN_BUDGET = 32000;
       const budget = Math.min(tokenBudget ?? GRAPH_TOKEN_BUDGET, GRAPH_TOKEN_BUDGET);
 
       // Detect tool use in the most recent assistant turn only — not the last N turns.
@@ -686,14 +742,14 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // agentic-1 forensic notes). Server defaults scope='user', which gives
       // immediate cross-user isolation.
       //
-      // Part B (same approval): multigraph dashboard panes opt into per-pane
-      // isolation by sending scope='session'. Detected by inspecting sessionId
-      // for ':dashboard:' — OpenClaw's multigraph backend assigns ids of the form
-      //   agent:<agent>:dashboard:<uuid>
-      // Everything else stays scope='user' (the cross-pane DM-style continuity).
-      const isDashboardPane =
-        typeof sessionId === "string" && sessionId.includes(":dashboard:");
-      const requestScope: "session" | "user" = isDashboardPane ? "session" : "user";
+      // Part B (same approval): multigraph dashboard panes and direct channel
+      // sessions opt into subchannel-scoped recency by sending scope='subchannel'
+      // with a subchannel_label. When a subchannel can be inferred, use
+      // scope='subchannel' for thread-specific recency + channel-wide topic retrieval.
+      // Fall back to scope='user' when no subchannel is identifiable.
+      // The server-side ':dashboard:' coerce remains as a safety net for legacy builds.
+      const subchannel = inferSubchannelLabel(sessionId);
+      const requestScope: "subchannel" | "user" = subchannel !== null ? "subchannel" : "user";
 
       const result = await apiPost(
         "/assemble",
@@ -705,6 +761,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
             : null,
           session_id: sessionId,
           channel_label: userLabel,
+          subchannel_label: subchannel,
           scope: requestScope,
         },
         logger
@@ -831,6 +888,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
         toolChainIds.delete(sessionId);
       }
 
+      const subchannel = inferSubchannelLabel(sessionId);
       await apiPost(
         "/ingest",
         {
@@ -841,6 +899,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           assistant_text: assistantText,
           timestamp: Date.now() / 1000,
           channel_label: userLabel,
+          subchannel_label: subchannel,
         },
         logger
       );
