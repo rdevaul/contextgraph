@@ -107,6 +107,16 @@ _ENVELOPE_PATTERNS = [
     ),
     # Queued messages block (everything from this line onward)
     re.compile(r"\[Queued messages while agent was busy\].*", re.DOTALL),
+    # Multigraph pane primer blocks: "# Pane Primer — `<name>`" (entire message is agent bootstrap, not user content)
+    re.compile(
+        r"^#\s*Pane Primer\s*[—–-].*",
+        re.DOTALL,
+    ),
+    # Multigraph pane rehydrate notification: "[multigraph:rehydrate] This pane was just rehydrated..."
+    re.compile(
+        r"\[multigraph:rehydrate\].*",
+        re.DOTALL,
+    ),
 ]
 
 # Minimum useful length after stripping — if residual is shorter, keep original.
