@@ -711,12 +711,29 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // even short prior turns when there was any sticky/topic competition.
       // 32K leaves Opus with 168K headroom for the live turn.
       //
-      // TODO(future PR): make this model-aware — default to 25% of model
-      // context window when model info is available, fall back to 32000.
-      // That requires plumbing model info through the plugin signature,
-      // which is out of scope for this incident fix (2026-05-28).
-      const GRAPH_TOKEN_BUDGET = 32000;
-      const budget = Math.min(tokenBudget ?? GRAPH_TOKEN_BUDGET, GRAPH_TOKEN_BUDGET);
+      // Model-aware budget (implemented 2026-06-01): the host passes the
+      // model's FULL context window as `tokenBudget`. ContextGraph should
+      // claim a FRACTION of it for retrieval, leaving the rest for the live
+      // turn + response. This replaces the old hardcoded 32K clamp that
+      // ignored the model's actual window (anachronistic for Opus-class).
+      //   - FRACTION (25%): share of the window reserved for retrieval.
+      //   - FLOOR (32K): never drop below the prior fixed value, so small
+      //     models retain the old behavior.
+      //   - CEIL (120K): sanity cap so a giant window doesn't starve the
+      //     live turn + response.
+      const GRAPH_BUDGET_FRACTION = 0.25;        // 25% of model window for retrieval
+      const GRAPH_TOKEN_BUDGET_FLOOR = 32000;    // never below the prior fixed value
+      const GRAPH_TOKEN_BUDGET_CEIL = 120000;    // sanity cap so the live turn keeps room
+      const modelWindow =
+        typeof tokenBudget === "number" && Number.isFinite(tokenBudget) && tokenBudget > 0
+          ? tokenBudget
+          : null;
+      const budget = modelWindow
+        ? Math.min(
+            GRAPH_TOKEN_BUDGET_CEIL,
+            Math.max(GRAPH_TOKEN_BUDGET_FLOOR, Math.floor(modelWindow * GRAPH_BUDGET_FRACTION)),
+          )
+        : GRAPH_TOKEN_BUDGET_FLOOR;
 
       // Detect tool use in the most recent assistant turn only — not the last N turns.
       // Sticky threads are for multi-turn operations (code reviews, extended dev work)
