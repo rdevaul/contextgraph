@@ -672,9 +672,16 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       return { ingestedCount: result != null ? userParts.length : 0 };
     },
 
-    async assemble({ sessionId, messages, tokenBudget }): Promise<AssembleResult> {
-      // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+    async assemble({ sessionId, sessionKey, messages, tokenBudget }): Promise<AssembleResult> {
+      // Infer user label for the per-user graph-mode gate. PREFER sessionKey
+      // (structured "agent:jarvis-rich:direct:...") — sessionId is typically a
+      // raw UUID that inferChannelLabel can't parse, which made this gate
+      // return "unknown" → graph mode false → silent pass-through on every
+      // gateway-driven turn (latent bug found 2026-06-09 during Current Thing
+      // Phase I verification; the bootstrap hook at ~L484 already preferred
+      // sessionKey for exactly this reason).
+      const sessionRef = sessionKey ?? sessionId;
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
       if (!readGraphMode(userLabel)) {
         // Pass-through: still sanitize tool pairs before returning.
@@ -765,7 +772,12 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // scope='subchannel' for thread-specific recency + channel-wide topic retrieval.
       // Fall back to scope='user' when no subchannel is identifiable.
       // The server-side ':dashboard:' coerce remains as a safety net for legacy builds.
-      const subchannel = inferSubchannelLabel(sessionId);
+      // Use sessionRef (the structured key when available) for subchannel
+      // inference and as the API session_id — same reasoning as the graph-mode
+      // gate above: the raw UUID matches no ':dashboard:'/':direct:' patterns,
+      // so recency scoping + Current Thing snapshots keyed on it would
+      // silently degrade to user-scope with an opaque id.
+      const subchannel = inferSubchannelLabel(sessionRef);
       const requestScope: "subchannel" | "user" = subchannel !== null ? "subchannel" : "user";
 
       const result = await apiPost(
@@ -776,7 +788,7 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           tool_state: lastTurnHadTools
             ? { last_turn_had_tools: true, pending_chain_ids: pendingChainIds }
             : null,
-          session_id: sessionId,
+          session_id: sessionRef,
           channel_label: userLabel,
           subchannel_label: subchannel,
           scope: requestScope,
