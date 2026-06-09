@@ -21,6 +21,15 @@ from reframing import detect_reference
 from utils.text import strip_envelope
 from summarizer import summarize_message
 from logger import _is_automated_turn
+# Current Thing (Phase I) — feature-flagged, safe to import always
+from api.current_thing import (
+    is_enabled as _ct_enabled,
+    ensure_tables as _ct_ensure_tables,
+    render_for_injection as _ct_render,
+    load_snapshot as _ct_load_snapshot,
+    CURRENT_THING_TOKEN_BUDGET as _CT_BUDGET,
+)
+from api.goal_watcher import start_watcher as _ct_start_watcher, notify_new_turn as _ct_notify
 import pickle
 import os
 import json
@@ -113,6 +122,12 @@ class AssembleRequest(BaseModel):
     # Default is None — the server applies RECENCY_FLOOR_DEFAULT when
     # this field is omitted; explicit 0 disables.
     recency_floor: int | None = None
+    # Current Thing injection (Phase I). True by default when feature flag is on;
+    # callers may opt out by passing inject_current_thing=False.
+    inject_current_thing: bool = True
+    # Agent identity — used by Current Thing for heuristic identity computation.
+    # Should match the runtime agent_id of the calling session.
+    agent_id: str | None = None
 
 class PinRequest(BaseModel):
     message_ids: list[str]
@@ -165,6 +180,12 @@ ensemble.register('baseline', baseline_tagger, 1.0)
 async def startup_event():
     store.get_all_tags()  # Initialize the store
     # System tags loaded from tags.yaml via TagRegistry — single source of truth.
+
+    # Current Thing — create DB tables and start goal-watcher thread (flag-gated)
+    if _ct_enabled():
+        _ct_ensure_tables()
+        _ct_start_watcher()
+        print("[startup] CONTEXT_CURRENT_THING_ENABLED — Current Thing active", flush=True)
 
     # Ollama health probe (2026-05-28 incident fix):
     # If Ollama is unreachable at startup, log loudly but DO NOT refuse to
@@ -449,6 +470,46 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
         merged_messages.sort(key=lambda m: m.timestamp)
         floor_id_set = floor_ids  # for tagging in the response
 
+        # ── Current Thing injection (Phase I, feature-flagged) ───────────────────────────────
+        # Carved out of the TOTAL budget separately from the pin/sticky budget.
+        # Injected as a system-level prefix in the response (not stored as a
+        # message row — callers insert it as a system message before history).
+        current_thing_block: str | None = None
+        current_thing_tokens: int = 0
+        if (
+            _ct_enabled()
+            and request.inject_current_thing
+            and request.session_id
+        ):
+            try:
+                _pane_label = request.subchannel_label or request.session_id or ""
+                _agent_id = request.agent_id or ""
+                current_thing_block, current_thing_tokens = _ct_render(
+                    session_id=request.session_id,
+                    pane_label=_pane_label,
+                    channel_label=request.channel_label,
+                    agent_id=_agent_id,
+                )
+                # Notify the goal watcher (non-blocking)
+                snap = _ct_load_snapshot(request.session_id)
+                _ct_notify(
+                    session_id=request.session_id,
+                    pane_label=_pane_label,
+                    channel_label=request.channel_label,
+                    user_text=request.user_text,
+                    recent_turns=[
+                        {"user": m.user_text[:300], "assistant": m.assistant_text[:200]}
+                        for m in merged_messages[-8:]
+                    ],
+                    current_primary_goal=snap.goals.primary if snap else None,
+                    current_active=snap.goals.active if snap else [],
+                )
+            except Exception as _ct_err:
+                # Never let Current Thing errors break /assemble
+                print(f"[current_thing] injection error (non-fatal): {_ct_err!r}", flush=True)
+                current_thing_block = None
+                current_thing_tokens = 0
+
         return {
             # session_id and channel_label are surfaced in the response so
             # callers can audit which session/user each retrieved row came
@@ -491,6 +552,11 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             "effective_session_id": request.session_id,
             "effective_channel_label": request.channel_label,
             "effective_subchannel_label": request.subchannel_label,
+            # Current Thing (Phase I) — present when feature flag is on + session_id provided.
+            # Callers should prepend this as a system message before the history messages.
+            # None when flag is off or injection was opted out.
+            "current_thing": current_thing_block,
+            "current_thing_tokens": current_thing_tokens,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -504,6 +570,68 @@ def health():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── Current Thing endpoints (Phase I) ────────────────────────────────────────────────
+# All endpoints return 503 when CONTEXT_CURRENT_THING_ENABLED is off.
+
+from api.current_thing import (
+    apply_user_patch as _ct_patch,
+    clear_snapshot_field as _ct_clear,
+    load_history as _ct_history,
+    load_snapshot as _ct_get,
+    render_markdown as _ct_render_md,
+)
+
+class CurrentThingPatchRequest(BaseModel):
+    patch: dict
+    agent_id: str = ""
+
+class CurrentThingClearRequest(BaseModel):
+    field: str  # "goals" | "context.reply_language" | "experimental_blocks"
+
+@app.get("/current-thing", response_model=dict)
+def get_current_thing(session_id: str):
+    """Return the current snapshot for a session."""
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    snap = _ct_get(session_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail=f"No snapshot for session {session_id!r}")
+    return {
+        "snapshot": snap.to_dict(),
+        "rendered": _ct_render_md(snap),
+    }
+
+@app.post("/current-thing/update", response_model=dict)
+def update_current_thing(session_id: str, body: CurrentThingPatchRequest):
+    """Apply a user-driven patch to the snapshot."""
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    ok, err = _ct_patch(session_id, body.patch, agent_id=body.agent_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err)
+    snap = _ct_get(session_id)
+    return {"ok": True, "snapshot": snap.to_dict() if snap else None}
+
+@app.post("/current-thing/clear", response_model=dict)
+def clear_current_thing_field(session_id: str, body: CurrentThingClearRequest):
+    """Revert a user-locked field back to LLM/heuristic management."""
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    ok, err = _ct_clear(session_id, body.field)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True}
+
+@app.get("/current-thing/history", response_model=dict)
+def get_current_thing_history(session_id: str, limit: int = 20):
+    """Return drift audit history for a session."""
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    history = _ct_history(session_id, limit=limit)
+    return {"history": history, "count": len(history)}
+
+# ─────────────────────────────────────────────────────────────────────
 
 @app.get("/messages/{message_id}", response_model=dict)
 def get_message(message_id: str):
