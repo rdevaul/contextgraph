@@ -780,6 +780,11 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           channel_label: userLabel,
           subchannel_label: subchannel,
           scope: requestScope,
+          // Current Thing Phase I (2026-06-09): identify the agent (server-trusted
+          // runtime value, never from message content) and accept the injected
+          // block. Server no-ops both unless CONTEXT_CURRENT_THING_ENABLED=1.
+          agent_id: userLabel,
+          inject_current_thing: true,
         },
         logger
       );
@@ -799,11 +804,24 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
           timestamp: number;
         }>;
         total_tokens?: number;
+        current_thing?: string | null;
+        current_thing_tokens?: number;
       };
 
       // Convert Python API messages back to AgentMessage format
       // Use content block arrays to match OpenClaw's internal format
       const assembled: AgentMessage[] = [];
+
+      // Current Thing Phase I: the server returns a rendered, token-capped
+      // markdown block ("## \ud83c\udfaf CURRENT THING") as a top-level field. Prepend it
+      // as the FIRST message so it's the first thing the agent reads every
+      // turn. Absent/null when the feature flag is off — zero behavior change.
+      if (typeof data.current_thing === "string" && data.current_thing.trim().length > 0) {
+        assembled.push({
+          role: "user",
+          content: [{ type: "text", text: data.current_thing }],
+        } as AgentMessage);
+      }
       for (const m of data.messages ?? []) {
         if (m.user_text) {
           assembled.push({

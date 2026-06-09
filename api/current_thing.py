@@ -541,14 +541,16 @@ def update_snapshot_goals(
     primary: Optional[str] = None,
     active: Optional[list[str]] = None,
     completed: Optional[list[str]] = None,
-    source: str = "llm",
-    confidence: float = 0.0,
+    source: Optional[str] = None,
+    confidence: Optional[float] = None,
     watcher_status: str = "idle",
     change_reason: str = "watcher-update",
 ) -> None:
     """
     Update goal fields in the snapshot (called by goal watcher).
-    Respects user-locked goals.
+    Respects user-locked goals. source/confidence are PRESERVED unless
+    explicitly provided (2026-06-09: previously the "llm"/0.0 defaults
+    stamped over the heuristic marker on every status-only update).
     """
     snap = load_snapshot(session_id)
     if snap is None:
@@ -561,8 +563,10 @@ def update_snapshot_goals(
         snap.goals.active = active
     if completed is not None:
         snap.goals.completed_this_session = completed
-    snap.goals.source = source
-    snap.goals.confidence = confidence
+    if source is not None:
+        snap.goals.source = source
+    if confidence is not None:
+        snap.goals.confidence = confidence
     snap.goals.watcher_status = watcher_status
     save_snapshot(snap, change_reason=change_reason)
 

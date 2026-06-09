@@ -31,7 +31,10 @@ _WATCHER_MODEL_DEFAULT = "ollama:http://172.23.1.31:11434/qwen3-coder:30b"
 GOAL_WATCHER_MODEL = os.environ.get("GOAL_WATCHER_MODEL", _WATCHER_MODEL_DEFAULT)
 
 # Hard wall-clock budget per watcher call (seconds).
-WATCHER_TIMEOUT_S = float(os.environ.get("GOAL_WATCHER_TIMEOUT_S", "5.0"))
+# 15s default: cold-loading qwen3-coder:30b on the Studio takes ~6s before
+# generating; 5s timed out on every cold start (observed 2026-06-09). Warm
+# calls answer in <1s, so this only affects the first call after model evict.
+WATCHER_TIMEOUT_S = float(os.environ.get("GOAL_WATCHER_TIMEOUT_S", "15.0"))
 
 # Minimum tokens in a user turn to bother running the watcher.
 WATCHER_MIN_TOKENS = int(os.environ.get("GOAL_WATCHER_MIN_TOKENS", "50"))
@@ -206,6 +209,31 @@ def _apply_drift_result(session_id: str, result: dict, event: WatcherEvent) -> N
 
     severity = result.get("drift_severity", "none")
 
+    # Cold-start bootstrap (bug found in Phase I testing 2026-06-09): when the
+    # session has NO primary goal yet, the model truthfully reports
+    # goal_changed=false / severity=none, and the no-drift path below skipped
+    # adoption forever — primary stayed None until drift or a user pin. If we
+    # have no current goal and the model inferred one (new_primary_goal or any
+    # active sub-goal), adopt it now as the initial goal (low confidence,
+    # unlocked — user pin still wins, later drift can revise).
+    if not event.current_primary_goal:
+        inferred = (result.get("new_primary_goal") or "").strip()
+        actives = [a for a in (result.get("active_sub_goals") or []) if isinstance(a, str) and a.strip()]
+        if not inferred and actives:
+            inferred = actives[0]
+        if inferred:
+            update_snapshot_goals(
+                session_id=session_id,
+                primary=inferred,
+                active=actives,
+                completed=[c for c in (result.get("completed") or []) if isinstance(c, str)],
+                source="llm",
+                confidence=0.5,
+                watcher_status="idle",
+                change_reason="watcher-bootstrap",
+            )
+            return
+
     if severity == "major":
         _major_votes[session_id] = _major_votes.get(session_id, 0) + 1
     else:
@@ -219,12 +247,11 @@ def _apply_drift_result(session_id: str, result: dict, event: WatcherEvent) -> N
     )
 
     if effective_severity == "none":
-        # Update watcher status only
-        update_snapshot_goals(
-            session_id=session_id,
-            watcher_status="idle",
-            change_reason="watcher-no-drift",
-        )
+        # No drift: leave goals (and their source/confidence) untouched — the
+        # previous behavior stamped source="llm"/confidence=0.0 over the
+        # heuristic marker via update_snapshot_goals defaults (cosmetic bug,
+        # 2026-06-09). Touch nothing; the snapshot already reads watcher idle
+        # between runs.
         return
 
     new_primary = None
