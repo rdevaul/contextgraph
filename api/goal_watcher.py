@@ -146,9 +146,14 @@ def _call_llm(prompt: str, timeout: float) -> Optional[str]:
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
 def _build_prompt(event: WatcherEvent) -> str:
-    turns_text = ""
+    # The CURRENT user turn is the most important signal and is NOT part of
+    # recent_turns (which the server fills from retrieved graph history —
+    # empty for fresh sessions). Bug found 2026-06-09: omitting it meant the
+    # model saw no conversation at all on new sessions and always answered
+    # "no drift", so bootstrap adoption never fired.
+    turns_text = f"[Turn 0 — CURRENT] User: {event.user_text[:400]}\n"
     for i, t in enumerate(event.recent_turns[:8]):
-        turns_text += f"[Turn -{i}] User: {t.get('user','')[:300]}\n"
+        turns_text += f"[Turn -{i+1}] User: {t.get('user','')[:300]}\n"
         turns_text += f"         Assistant: {t.get('assistant','')[:200]}\n"
 
     return f"""You watch a conversation between {event.user} and an agent in pane "{event.pane_label}".
@@ -232,6 +237,8 @@ def _apply_drift_result(session_id: str, result: dict, event: WatcherEvent) -> N
                 watcher_status="idle",
                 change_reason="watcher-bootstrap",
             )
+            logger.info(f"[goal_watcher] bootstrap adopted goal for {session_id!r}: {inferred!r}")
+            print(f"[goal_watcher] bootstrap: {session_id[-30:]} -> {inferred[:80]!r}", flush=True)
             return
 
     if severity == "major":
@@ -251,7 +258,9 @@ def _apply_drift_result(session_id: str, result: dict, event: WatcherEvent) -> N
         # previous behavior stamped source="llm"/confidence=0.0 over the
         # heuristic marker via update_snapshot_goals defaults (cosmetic bug,
         # 2026-06-09). Touch nothing; the snapshot already reads watcher idle
-        # between runs.
+        # between runs. Print so watcher activity is observable in the service
+        # log (the old history write was the only run-evidence; keep some).
+        print(f"[goal_watcher] no-drift: {session_id[-30:]}", flush=True)
         return
 
     new_primary = None
