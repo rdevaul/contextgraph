@@ -1130,6 +1130,107 @@ export default function register(api: OpenClawPluginApi): void {
     },
   });
 
+  // Register /thing command — inspect/override the Current Thing for THIS session
+  // (Rich's request 2026-06-09). Subcommands:
+  //   /thing                → show the rendered block + snapshot summary
+  //   /thing set <goal>     → pin the primary goal (user-locked; watcher can't overwrite)
+  //   /thing clear          → revert goals to heuristic/watcher management
+  //   /thing raw            → dump the full snapshot JSON
+  api.registerCommand({
+    name: "thing",
+    description: "Inspect or override the Current Thing context block for this session",
+    acceptsArgs: true,
+    handler: async (ctx) => {
+      // Current Thing snapshots are keyed by the structured session key.
+      const sessionRef = (ctx as any).sessionKey ?? (ctx as any).sessionId;
+      if (!sessionRef) {
+        return { text: "🎯 No session key available — can't resolve a Current Thing for this surface." };
+      }
+      const sid = encodeURIComponent(sessionRef);
+      const argsRaw = (ctx.args ?? "").trim();
+      const sub = argsRaw.split(/\s+/)[0]?.toLowerCase() ?? "";
+
+      const fetchJson = async (path: string, init?: Record<string, unknown>): Promise<any> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        try {
+          const res = await fetch(`${PYTHON_API_BASE}${path}`, {
+            signal: controller.signal,
+            ...(init ?? {}),
+          } as any);
+          clearTimeout(timer);
+          if (res.status === 404) return { __notFound: true };
+          if (!res.ok) return { __error: `HTTP ${res.status}` };
+          return await res.json();
+        } catch (e) {
+          clearTimeout(timer);
+          return { __error: e instanceof Error ? e.message : String(e) };
+        }
+      };
+
+      // ── /thing set <goal text> ────────────────────────────────────
+      if (sub === "set") {
+        const goal = argsRaw.slice(3).trim();
+        if (!goal) {
+          return { text: "Usage: `/thing set <goal text>` — pins the primary goal (user-locked)." };
+        }
+        const result = await fetchJson(`/current-thing/update?session_id=${sid}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patch: { "goals.primary": goal },
+            agent_id: inferChannelLabel(ctx.senderId, sessionRef, logger),
+          }),
+        });
+        if (result.__error) return { text: `🎯 Update failed: ${result.__error}` };
+        if (result.__notFound) return { text: "🎯 No snapshot exists yet for this session — send one normal message first (the snapshot is created on assemble), then retry." };
+        return { text: `🎯 Primary goal pinned (user-locked — the watcher can't overwrite it):\n> ${goal}\n\nUse \`/thing clear\` to hand control back to the watcher.` };
+      }
+
+      // ── /thing clear ──────────────────────────────────────────────
+      if (sub === "clear") {
+        const result = await fetchJson(`/current-thing/clear?session_id=${sid}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ field: "goals" }),
+        });
+        if (result.__error) return { text: `🎯 Clear failed: ${result.__error}` };
+        if (result.__notFound) return { text: "🎯 No snapshot exists for this session — nothing to clear." };
+        return { text: "🎯 Goals cleared — reverted to heuristic/watcher management." };
+      }
+
+      // ── /thing raw ────────────────────────────────────────────────
+      if (sub === "raw") {
+        const result = await fetchJson(`/current-thing?session_id=${sid}`);
+        if (result.__error) return { text: `🎯 Fetch failed: ${result.__error}` };
+        if (result.__notFound) return { text: "🎯 No snapshot exists yet for this session." };
+        const json = JSON.stringify(result.snapshot ?? result, null, 2);
+        const clipped = json.length > 1800 ? json.slice(0, 1800) + "\n… (truncated)" : json;
+        return { text: "```json\n" + clipped + "\n```" };
+      }
+
+      // ── /thing (status) ──────────────────────────────────────────
+      const result = await fetchJson(`/current-thing?session_id=${sid}`);
+      if (result.__error) return { text: `🎯 Current Thing API unreachable: ${result.__error}` };
+      if (result.__notFound) {
+        return { text: "🎯 No Current Thing snapshot for this session yet — it's created on the first graph-mode assemble. (Graph mode off? `/graph` to check.)" };
+      }
+      const snap = result.snapshot ?? {};
+      const goals = snap.goals ?? {};
+      const lines = [
+        `**🎯 Current Thing** (\`${sessionRef.slice(-40)}\`)`,
+        `**Goal:** ${goals.primary ?? "_(none)_"}${goals.locked_by_user ? " 🔒" : ""}`,
+        goals.active?.length ? `**Active:** ${goals.active.join(" · ")}` : null,
+        goals.completed_this_session?.length ? `**Done:** ${goals.completed_this_session.join(" · ")}` : null,
+        `**Source:** ${goals.source ?? "?"} · confidence ${goals.confidence ?? "?"} · watcher ${goals.watcher_status ?? "?"}`,
+        snap.computed_at ? `**Computed:** ${snap.computed_at}` : null,
+        ``,
+        `Subcommands: \`/thing set <goal>\` · \`/thing clear\` · \`/thing raw\``,
+      ].filter(Boolean);
+      return { text: lines.join("\n") };
+    },
+  });
+
   // Register /tags command
   api.registerCommand({
     name: "tags",

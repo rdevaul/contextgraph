@@ -21,6 +21,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "install-plugin": "tsc && cp -r dist/. ~/.openclaw-Jarvis/extensions/contextgraph/dist/ && echo 'Installed. Restart gateway to load.'"
+    "install-plugin": "tsc; cp -r dist/. ~/.openclaw-Jarvis/extensions/contextgraph/dist/ && echo 'Installed. Restart gateway to load.'"
   }
 }
