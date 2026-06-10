@@ -471,6 +471,31 @@ function inferChannelLabel(senderId?: string, sessionId?: string, logger?: OpenC
  * For direct channel sessions, the surface type (discord, telegram, etc.)
  * is extracted from the sessionId structure.
  */
+/**
+ * Detect ephemeral/spawned sessions that must NOT receive graph injection.
+ *
+ * Subagent sessions (`agent:<agent>:subagent:<uuid>`) are spawned with a
+ * carefully curated task brief as their entire context. Injecting user-scoped
+ * graph history is anti-context for them: it buries the brief under up to
+ * 50K tokens of unrelated conversation (observed 2026-06-10: audit subagents
+ * received ~175K-token prompts vs ~34K clean, and responded by narrating
+ * instead of executing — pure confabulation, zero tool calls).
+ *
+ * These sessions also must not INGEST into the graph corpus (their content
+ * is task-mechanics, not user conversation) and must not own compaction.
+ *
+ * ACP sessions (`:acp:`) and cron runs (`:cron:`) get the same treatment
+ * for the same reason: spawned, ephemeral, brief-driven.
+ */
+function isEphemeralSpawnedSession(sessionRef: string | undefined): boolean {
+  if (!sessionRef) return false;
+  return (
+    sessionRef.includes(":subagent:") ||
+    sessionRef.includes(":acp:") ||
+    sessionRef.includes(":cron:")
+  );
+}
+
 function inferSubchannelLabel(sessionId: string | undefined): string | null {
   if (!sessionId) return null;
 
@@ -543,13 +568,23 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // Prefer sessionKey — it carries the structured "agent:<provider>-<user>:..."
       // form that `inferChannelLabel` knows how to parse. Falls back to
       // sessionId for hosts that pass only the inner UUID.
-      const userLabel = inferChannelLabel(undefined, sessionKey ?? sessionId, logger);
+      const sessionRef = sessionKey ?? sessionId;
+      // Subagent/ACP/cron sessions never get graph treatment (2026-06-10 P0):
+      // their context is a curated brief, not a conversation to manage.
+      if (isEphemeralSpawnedSession(sessionRef)) return false;
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
       return readGraphMode(userLabel);
     },
 
-    async bootstrap({ sessionId, sessionFile }): Promise<BootstrapResult> {
-      // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+    async bootstrap({ sessionId, sessionKey, sessionFile }: { sessionId: string; sessionKey?: string; sessionFile: string }): Promise<BootstrapResult> {
+      // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+      const sessionRef = sessionKey ?? sessionId;
+      // Subagent/ACP/cron sessions: never bootstrap into the graph (2026-06-10 P0)
+      if (isEphemeralSpawnedSession(sessionRef)) {
+        return { bootstrapped: false, reason: "ephemeral-spawned-session" };
+      }
+      // Infer user label from session ref for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
       if (!readGraphMode(userLabel)) {
         return { bootstrapped: false, reason: "graph-mode-off" };
@@ -607,9 +642,16 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       return { bootstrapped: true, importedMessages: ingestedCount };
     },
 
-    async ingest({ sessionId, message }): Promise<IngestResult> {
-      // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+    async ingest({ sessionId, sessionKey, message }: { sessionId: string; sessionKey?: string; message: AgentMessage }): Promise<IngestResult> {
+      // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+      const sessionRef = sessionKey ?? sessionId;
+      // Subagent/ACP/cron sessions: task mechanics, not conversation — never
+      // ingest into the corpus (2026-06-10 P0).
+      if (isEphemeralSpawnedSession(sessionRef)) {
+        return { ingested: false };
+      }
+      // Infer user label from session ref for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
       if (!readGraphMode(userLabel)) {
         return { ingested: false };
@@ -641,9 +683,15 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       return { ingested: result != null };
     },
 
-    async ingestBatch({ sessionId, messages }): Promise<IngestBatchResult> {
-      // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+    async ingestBatch({ sessionId, sessionKey, messages }: { sessionId: string; sessionKey?: string; messages: AgentMessage[] }): Promise<IngestBatchResult> {
+      // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+      const sessionRef = sessionKey ?? sessionId;
+      // Subagent/ACP/cron sessions: never ingest (2026-06-10 P0).
+      if (isEphemeralSpawnedSession(sessionRef)) {
+        return { ingestedCount: 0 };
+      }
+      // Infer user label from session ref for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
       if (!readGraphMode(userLabel)) {
         return { ingestedCount: 0 };
@@ -683,7 +731,10 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       const sessionRef = sessionKey ?? sessionId;
       const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
-      if (!readGraphMode(userLabel)) {
+      // Subagent/ACP/cron sessions: NEVER inject graph context (2026-06-10 P0).
+      // Their entire context is a curated task brief; user-scoped graph
+      // retrieval buries it (observed: 175K-token prompts → confabulation).
+      if (isEphemeralSpawnedSession(sessionRef) || !readGraphMode(userLabel)) {
         // Pass-through: still sanitize tool pairs before returning.
         const safe = removeOrphanedToolPairs(messages, logger);
         return {
@@ -886,9 +937,17 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       return { ok: true, compacted: false, reason: "graph-engine-no-compaction" };
     },
 
-    async afterTurn({ sessionId, messages, prePromptMessageCount }): Promise<void> {
-      // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+    async afterTurn({ sessionId, sessionKey, messages, prePromptMessageCount }: { sessionId: string; sessionKey?: string; messages: AgentMessage[]; prePromptMessageCount: number }): Promise<void> {
+      // Prefer sessionKey (structured) over sessionId (raw UUID) — same
+      // class of bug as the Jun 9 assemble fix. With only the UUID, the
+      // label inference returned "unknown" → graph-mode gate false → NO
+      // turn ingest and NO comparison logging since May 7 (the /graph
+      // stats "Last 24h: 0 turns" bug, found 2026-06-10).
+      const sessionRef = sessionKey ?? sessionId;
+      // Subagent/ACP/cron sessions: never ingest turns (2026-06-10 P0).
+      if (isEphemeralSpawnedSession(sessionRef)) return;
+      // Infer user label from session ref for per-user graph mode check
+      const userLabel = inferChannelLabel(undefined, sessionRef, logger);
 
       if (!readGraphMode(userLabel)) return;
 

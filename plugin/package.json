@@ -18,5 +18,9 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "install-plugin": "tsc && cp -r dist/. ~/.openclaw-Jarvis/extensions/contextgraph/dist/ && echo 'Installed. Restart gateway to load.'"
   }
 }

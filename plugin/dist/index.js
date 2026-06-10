@@ -415,6 +415,29 @@ function inferChannelLabel(senderId, sessionId, logger) {
  * For direct channel sessions, the surface type (discord, telegram, etc.)
  * is extracted from the sessionId structure.
  */
+/**
+ * Detect ephemeral/spawned sessions that must NOT receive graph injection.
+ *
+ * Subagent sessions (`agent:<agent>:subagent:<uuid>`) are spawned with a
+ * carefully curated task brief as their entire context. Injecting user-scoped
+ * graph history is anti-context for them: it buries the brief under up to
+ * 50K tokens of unrelated conversation (observed 2026-06-10: audit subagents
+ * received ~175K-token prompts vs ~34K clean, and responded by narrating
+ * instead of executing — pure confabulation, zero tool calls).
+ *
+ * These sessions also must not INGEST into the graph corpus (their content
+ * is task-mechanics, not user conversation) and must not own compaction.
+ *
+ * ACP sessions (`:acp:`) and cron runs (`:cron:`) get the same treatment
+ * for the same reason: spawned, ephemeral, brief-driven.
+ */
+function isEphemeralSpawnedSession(sessionRef) {
+    if (!sessionRef)
+        return false;
+    return (sessionRef.includes(":subagent:") ||
+        sessionRef.includes(":acp:") ||
+        sessionRef.includes(":cron:"));
+}
 function inferSubchannelLabel(sessionId) {
     if (!sessionId)
         return null;
@@ -481,12 +504,23 @@ function createContextGraphEngine(logger) {
             // Prefer sessionKey — it carries the structured "agent:<provider>-<user>:..."
             // form that `inferChannelLabel` knows how to parse. Falls back to
             // sessionId for hosts that pass only the inner UUID.
-            const userLabel = inferChannelLabel(undefined, sessionKey ?? sessionId, logger);
+            const sessionRef = sessionKey ?? sessionId;
+            // Subagent/ACP/cron sessions never get graph treatment (2026-06-10 P0):
+            // their context is a curated brief, not a conversation to manage.
+            if (isEphemeralSpawnedSession(sessionRef))
+                return false;
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
             return readGraphMode(userLabel);
         },
-        async bootstrap({ sessionId, sessionFile }) {
-            // Infer user label from session ID for per-user graph mode check
-            const userLabel = inferChannelLabel(undefined, sessionId, logger);
+        async bootstrap({ sessionId, sessionKey, sessionFile }) {
+            // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+            const sessionRef = sessionKey ?? sessionId;
+            // Subagent/ACP/cron sessions: never bootstrap into the graph (2026-06-10 P0)
+            if (isEphemeralSpawnedSession(sessionRef)) {
+                return { bootstrapped: false, reason: "ephemeral-spawned-session" };
+            }
+            // Infer user label from session ref for per-user graph mode check
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
             if (!readGraphMode(userLabel)) {
                 return { bootstrapped: false, reason: "graph-mode-off" };
             }
@@ -534,9 +568,16 @@ function createContextGraphEngine(logger) {
             logger.info(`contextgraph: bootstrapped ${ingestedCount} messages from ${sessionFile}`);
             return { bootstrapped: true, importedMessages: ingestedCount };
         },
-        async ingest({ sessionId, message }) {
-            // Infer user label from session ID for per-user graph mode check
-            const userLabel = inferChannelLabel(undefined, sessionId, logger);
+        async ingest({ sessionId, sessionKey, message }) {
+            // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+            const sessionRef = sessionKey ?? sessionId;
+            // Subagent/ACP/cron sessions: task mechanics, not conversation — never
+            // ingest into the corpus (2026-06-10 P0).
+            if (isEphemeralSpawnedSession(sessionRef)) {
+                return { ingested: false };
+            }
+            // Infer user label from session ref for per-user graph mode check
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
             if (!readGraphMode(userLabel)) {
                 return { ingested: false };
             }
@@ -559,9 +600,15 @@ function createContextGraphEngine(logger) {
             }, logger);
             return { ingested: result != null };
         },
-        async ingestBatch({ sessionId, messages }) {
-            // Infer user label from session ID for per-user graph mode check
-            const userLabel = inferChannelLabel(undefined, sessionId, logger);
+        async ingestBatch({ sessionId, sessionKey, messages }) {
+            // Prefer structured sessionKey over raw-UUID sessionId (2026-06-10).
+            const sessionRef = sessionKey ?? sessionId;
+            // Subagent/ACP/cron sessions: never ingest (2026-06-10 P0).
+            if (isEphemeralSpawnedSession(sessionRef)) {
+                return { ingestedCount: 0 };
+            }
+            // Infer user label from session ref for per-user graph mode check
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
             if (!readGraphMode(userLabel)) {
                 return { ingestedCount: 0 };
             }
@@ -582,10 +629,20 @@ function createContextGraphEngine(logger) {
             }, logger);
             return { ingestedCount: result != null ? userParts.length : 0 };
         },
-        async assemble({ sessionId, messages, tokenBudget }) {
-            // Infer user label from session ID for per-user graph mode check
-            const userLabel = inferChannelLabel(undefined, sessionId, logger);
-            if (!readGraphMode(userLabel)) {
+        async assemble({ sessionId, sessionKey, messages, tokenBudget }) {
+            // Infer user label for the per-user graph-mode gate. PREFER sessionKey
+            // (structured "agent:jarvis-rich:direct:...") — sessionId is typically a
+            // raw UUID that inferChannelLabel can't parse, which made this gate
+            // return "unknown" → graph mode false → silent pass-through on every
+            // gateway-driven turn (latent bug found 2026-06-09 during Current Thing
+            // Phase I verification; the bootstrap hook at ~L484 already preferred
+            // sessionKey for exactly this reason).
+            const sessionRef = sessionKey ?? sessionId;
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
+            // Subagent/ACP/cron sessions: NEVER inject graph context (2026-06-10 P0).
+            // Their entire context is a curated task brief; user-scoped graph
+            // retrieval buries it (observed: 175K-token prompts → confabulation).
+            if (isEphemeralSpawnedSession(sessionRef) || !readGraphMode(userLabel)) {
                 // Pass-through: still sanitize tool pairs before returning.
                 const safe = removeOrphanedToolPairs(messages, logger);
                 return {
@@ -610,11 +667,32 @@ function createContextGraphEngine(logger) {
                 const safe = removeOrphanedToolPairs(messages, logger);
                 return { messages: safe, estimatedTokens: safe.length * 150 };
             }
-            // Cap graph retrieval at 8K tokens. The Python API internally splits
-            // this 25% recency / 75% topic (per contextgraph design). System was
-            // validated at 4K default; 8K gives more depth for dense research messages.
-            const GRAPH_TOKEN_BUDGET = 8000;
-            const budget = Math.min(tokenBudget ?? GRAPH_TOKEN_BUDGET, GRAPH_TOKEN_BUDGET);
+            // Cap graph retrieval at 32K tokens. The Python API internally splits
+            // this 25% recency / 75% topic (per contextgraph design). The previous
+            // 8K cap was anachronistic for Opus-class models (200K window) — at
+            // 8K, the recency layer was getting starved (2K budget) and dropping
+            // even short prior turns when there was any sticky/topic competition.
+            // 32K leaves Opus with 168K headroom for the live turn.
+            //
+            // Model-aware budget (implemented 2026-06-01): the host passes the
+            // model's FULL context window as `tokenBudget`. ContextGraph should
+            // claim a FRACTION of it for retrieval, leaving the rest for the live
+            // turn + response. This replaces the old hardcoded 32K clamp that
+            // ignored the model's actual window (anachronistic for Opus-class).
+            //   - FRACTION (25%): share of the window reserved for retrieval.
+            //   - FLOOR (32K): never drop below the prior fixed value, so small
+            //     models retain the old behavior.
+            //   - CEIL (120K): sanity cap so a giant window doesn't starve the
+            //     live turn + response.
+            const GRAPH_BUDGET_FRACTION = 0.25; // 25% of model window for retrieval
+            const GRAPH_TOKEN_BUDGET_FLOOR = 32000; // never below the prior fixed value
+            const GRAPH_TOKEN_BUDGET_CEIL = 120000; // sanity cap so the live turn keeps room
+            const modelWindow = typeof tokenBudget === "number" && Number.isFinite(tokenBudget) && tokenBudget > 0
+                ? tokenBudget
+                : null;
+            const budget = modelWindow
+                ? Math.min(GRAPH_TOKEN_BUDGET_CEIL, Math.max(GRAPH_TOKEN_BUDGET_FLOOR, Math.floor(modelWindow * GRAPH_BUDGET_FRACTION)))
+                : GRAPH_TOKEN_BUDGET_FLOOR;
             // Detect tool use in the most recent assistant turn only — not the last N turns.
             // Sticky threads are for multi-turn operations (code reviews, extended dev work)
             // where losing thread continuity would break the work. Single incidental tool calls
@@ -643,7 +721,12 @@ function createContextGraphEngine(logger) {
             // scope='subchannel' for thread-specific recency + channel-wide topic retrieval.
             // Fall back to scope='user' when no subchannel is identifiable.
             // The server-side ':dashboard:' coerce remains as a safety net for legacy builds.
-            const subchannel = inferSubchannelLabel(sessionId);
+            // Use sessionRef (the structured key when available) for subchannel
+            // inference and as the API session_id — same reasoning as the graph-mode
+            // gate above: the raw UUID matches no ':dashboard:'/':direct:' patterns,
+            // so recency scoping + Current Thing snapshots keyed on it would
+            // silently degrade to user-scope with an opaque id.
+            const subchannel = inferSubchannelLabel(sessionRef);
             const requestScope = subchannel !== null ? "subchannel" : "user";
             const result = await apiPost("/assemble", {
                 user_text: lastUserText,
@@ -651,10 +734,15 @@ function createContextGraphEngine(logger) {
                 tool_state: lastTurnHadTools
                     ? { last_turn_had_tools: true, pending_chain_ids: pendingChainIds }
                     : null,
-                session_id: sessionId,
+                session_id: sessionRef,
                 channel_label: userLabel,
                 subchannel_label: subchannel,
                 scope: requestScope,
+                // Current Thing Phase I (2026-06-09): identify the agent (server-trusted
+                // runtime value, never from message content) and accept the injected
+                // block. Server no-ops both unless CONTEXT_CURRENT_THING_ENABLED=1.
+                agent_id: userLabel,
+                inject_current_thing: true,
             }, logger);
             if (!result || typeof result !== "object") {
                 logger.warn("contextgraph assemble: API failed — falling back to pass-through");
@@ -665,6 +753,16 @@ function createContextGraphEngine(logger) {
             // Convert Python API messages back to AgentMessage format
             // Use content block arrays to match OpenClaw's internal format
             const assembled = [];
+            // Current Thing Phase I: the server returns a rendered, token-capped
+            // markdown block ("## \ud83c\udfaf CURRENT THING") as a top-level field. Prepend it
+            // as the FIRST message so it's the first thing the agent reads every
+            // turn. Absent/null when the feature flag is off — zero behavior change.
+            if (typeof data.current_thing === "string" && data.current_thing.trim().length > 0) {
+                assembled.push({
+                    role: "user",
+                    content: [{ type: "text", text: data.current_thing }],
+                });
+            }
             for (const m of data.messages ?? []) {
                 if (m.user_text) {
                     assembled.push({
@@ -706,9 +804,18 @@ function createContextGraphEngine(logger) {
             // Graph engine uses semantic retrieval — no compaction needed
             return { ok: true, compacted: false, reason: "graph-engine-no-compaction" };
         },
-        async afterTurn({ sessionId, messages, prePromptMessageCount }) {
-            // Infer user label from session ID for per-user graph mode check
-            const userLabel = inferChannelLabel(undefined, sessionId, logger);
+        async afterTurn({ sessionId, sessionKey, messages, prePromptMessageCount }) {
+            // Prefer sessionKey (structured) over sessionId (raw UUID) — same
+            // class of bug as the Jun 9 assemble fix. With only the UUID, the
+            // label inference returned "unknown" → graph-mode gate false → NO
+            // turn ingest and NO comparison logging since May 7 (the /graph
+            // stats "Last 24h: 0 turns" bug, found 2026-06-10).
+            const sessionRef = sessionKey ?? sessionId;
+            // Subagent/ACP/cron sessions: never ingest turns (2026-06-10 P0).
+            if (isEphemeralSpawnedSession(sessionRef))
+                return;
+            // Infer user label from session ref for per-user graph mode check
+            const userLabel = inferChannelLabel(undefined, sessionRef, logger);
             if (!readGraphMode(userLabel))
                 return;
             // Only ingest messages from THIS turn — not the full session history.
