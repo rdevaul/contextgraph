@@ -631,6 +631,65 @@ def get_current_thing_history(session_id: str, limit: int = 20):
     history = _ct_history(session_id, limit=limit)
     return {"history": history, "count": len(history)}
 
+
+class CurrentThingTouchRequest(BaseModel):
+    """Body for POST /current-thing/touch (2026-06-10, graph-mode decoupling).
+
+    Lets callers create/refresh + render a Current Thing snapshot WITHOUT
+    going through the full /assemble pipeline. This is the fix for the
+    'Current Thing is dead when graph mode is off' bug: the plugin's
+    assemble hook still fires on every turn even in pass-through mode, so
+    it can call this lightweight endpoint to keep the snapshot alive and
+    get the rendered block for injection.
+    """
+    session_id: str
+    pane_label: str = ""
+    channel_label: Optional[str] = None
+    agent_id: str = ""
+    # Optional: forwarded to the goal watcher so goal inference still works
+    # on the native (non-graph) path. Empty user_text skips the notify.
+    user_text: str = ""
+    recent_turns: list[dict] = Field(default_factory=list)
+
+
+@app.post("/current-thing/touch", response_model=dict)
+def touch_current_thing(body: CurrentThingTouchRequest):
+    """Create/refresh the heuristic snapshot and return the rendered block.
+
+    Graph-mode independent: does NOT touch the assembler, retrieval, or the
+    message store. Safe to call on every turn (heuristic-only, no LLM).
+    """
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    if not body.session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    try:
+        pane_label = body.pane_label or body.session_id
+        block, tokens = _ct_render(
+            session_id=body.session_id,
+            pane_label=pane_label,
+            channel_label=body.channel_label,
+            agent_id=body.agent_id,
+        )
+        # Notify the goal watcher (non-blocking) so goal inference works on
+        # the native path too — mirrors the /assemble injection branch.
+        if body.user_text:
+            snap = _ct_load_snapshot(body.session_id)
+            _ct_notify(
+                session_id=body.session_id,
+                pane_label=pane_label,
+                channel_label=body.channel_label,
+                user_text=body.user_text,
+                recent_turns=body.recent_turns[-8:],
+                current_primary_goal=snap.goals.primary if snap else None,
+                current_active=snap.goals.active if snap else [],
+            )
+        return {"current_thing": block, "current_thing_tokens": tokens}
+    except Exception as e:
+        # Mirror the /assemble branch: Current Thing errors are never fatal.
+        print(f"[current_thing] touch error (non-fatal): {e!r}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ─────────────────────────────────────────────────────────────────────
 
 @app.get("/messages/{message_id}", response_model=dict)

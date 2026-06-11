@@ -734,9 +734,63 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       // Subagent/ACP/cron sessions: NEVER inject graph context (2026-06-10 P0).
       // Their entire context is a curated task brief; user-scoped graph
       // retrieval buries it (observed: 175K-token prompts → confabulation).
-      if (isEphemeralSpawnedSession(sessionRef) || !readGraphMode(userLabel)) {
+      if (isEphemeralSpawnedSession(sessionRef)) {
+        const safe = removeOrphanedToolPairs(messages, logger);
+        return { messages: safe, estimatedTokens: safe.length * 150 };
+      }
+
+      if (!readGraphMode(userLabel)) {
         // Pass-through: still sanitize tool pairs before returning.
         const safe = removeOrphanedToolPairs(messages, logger);
+
+        // Current Thing decoupling (2026-06-10): graph mode OFF used to mean
+        // Current Thing was dead — snapshots were only created inside the
+        // graph-mode /assemble branch. The assemble hook still fires every
+        // turn in pass-through mode, so call the lightweight, graph-free
+        // /current-thing/touch endpoint to keep the snapshot alive and
+        // prepend the rendered block. Server returns 503 when the feature
+        // flag is off and apiPost returns null on any failure — either way
+        // we degrade to plain pass-through with zero behavior change.
+        let ctBlock: string | null = null;
+        try {
+          // Forward the last user message so the goal watcher can still
+          // infer goals on the native path.
+          let lastUserText = "";
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role === "user") {
+              const text = extractTextFromMessage(msg);
+              if (text) { lastUserText = text; break; }
+            }
+          }
+          const touch = await apiPost(
+            "/current-thing/touch",
+            {
+              session_id: sessionRef,
+              pane_label: inferSubchannelLabel(sessionRef) ?? sessionRef,
+              channel_label: userLabel,
+              agent_id: userLabel,
+              user_text: lastUserText.slice(0, 2000),
+            },
+            logger
+          );
+          const t = touch as { current_thing?: string | null } | null;
+          if (t && typeof t.current_thing === "string" && t.current_thing.trim().length > 0) {
+            ctBlock = t.current_thing;
+          }
+        } catch {
+          // Never let Current Thing break pass-through.
+          ctBlock = null;
+        }
+
+        if (ctBlock) {
+          const withCt: AgentMessage[] = [
+            { role: "user", content: [{ type: "text", text: ctBlock }] } as AgentMessage,
+            ...safe,
+          ];
+          return { messages: withCt, estimatedTokens: withCt.length * 150 };
+        }
+
         return {
           messages: safe,
           estimatedTokens: safe.length * 150,
