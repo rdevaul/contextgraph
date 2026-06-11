@@ -580,6 +580,7 @@ from api.current_thing import (
     load_history as _ct_history,
     load_snapshot as _ct_get,
     render_markdown as _ct_render_md,
+    _open_db as _ct_open_db,
 )
 
 class CurrentThingPatchRequest(BaseModel):
@@ -630,6 +631,49 @@ def get_current_thing_history(session_id: str, limit: int = 20):
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
     history = _ct_history(session_id, limit=limit)
     return {"history": history, "count": len(history)}
+
+
+@app.get("/current-thing/all", response_model=dict)
+def list_all_current_things():
+    """List ALL current-thing snapshots (read-only, dashboard visibility tab).
+
+    Added 2026-06-11 for the dashboard 'Current Things' tab. Reads the
+    current_thing_snapshots table directly — no writes, no side effects.
+    """
+    if not _ct_enabled():
+        raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    try:
+        conn = _ct_open_db()
+        try:
+            rows = conn.execute(
+                """SELECT session_id, snapshot_json, updated_at
+                   FROM current_thing_snapshots
+                   ORDER BY updated_at DESC"""
+            ).fetchall()
+        finally:
+            conn.close()
+        items = []
+        for r in rows:
+            try:
+                snap = json.loads(r["snapshot_json"])
+            except Exception:
+                snap = {}
+            identity = snap.get("identity") or {}
+            goals = snap.get("goals") or {}
+            items.append({
+                "session_id": r["session_id"],
+                "pane_label": snap.get("pane_label", ""),
+                "user": identity.get("user", "unknown"),
+                "agent_id": identity.get("agent_id", ""),
+                "primary_goal": goals.get("primary"),
+                "updated_at": r["updated_at"],
+                "snapshot": snap,
+            })
+        return {"items": items, "count": len(items)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class CurrentThingTouchRequest(BaseModel):

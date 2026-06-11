@@ -450,6 +450,147 @@
             color: #8b949e;
         }
 
+        /* ── Current Things tab ── */
+        .ct-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .ct-table th {
+            text-align: left;
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            padding: 8px 10px;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
+        }
+
+        .ct-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #21262d;
+            vertical-align: top;
+        }
+
+        .ct-row {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .ct-row:hover {
+            background: #1f6feb15;
+        }
+
+        .ct-row.expanded {
+            background: #1f6feb20;
+        }
+
+        .ct-user-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: #1f6feb20;
+            color: #58a6ff;
+            white-space: nowrap;
+        }
+
+        .ct-user-badge.rich { background: #1a472a; color: #3fb950; }
+        .ct-user-badge.garrett { background: #2d1b4e; color: #a371f7; }
+        .ct-user-badge.jeremy { background: #3d2c00; color: #d29922; }
+        .ct-user-badge.umair { background: #0d3a4f; color: #56d4dd; }
+        .ct-user-badge.unknown { background: #21262d; color: #6e7681; }
+
+        .ct-pane {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85em;
+            color: #79c0ff;
+            word-break: break-all;
+        }
+
+        .ct-goal {
+            color: #c9d1d9;
+        }
+
+        .ct-goal.empty {
+            color: #6e7681;
+            font-style: italic;
+        }
+
+        .ct-time {
+            color: #8b949e;
+            white-space: nowrap;
+            font-size: 0.85em;
+        }
+
+        .ct-time.fresh { color: #3fb950; }
+
+        .ct-agent {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.8em;
+            color: #8b949e;
+            word-break: break-all;
+        }
+
+        .ct-detail-row td {
+            background: #0d1117;
+            padding: 15px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .ct-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 1000px) {
+            .ct-detail-grid { grid-template-columns: 1fr; }
+        }
+
+        .ct-json {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 0;
+            color: #c9d1d9;
+        }
+
+        .ct-history-item {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .ct-history-reason {
+            color: #d29922;
+            font-weight: 600;
+        }
+
+        .ct-detail-h {
+            color: #79c0ff;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .ct-table-wrap {
+            overflow-x: auto;
+        }
+
         .error {
             background: #3d1319;
             border: 1px solid #f85149;
@@ -500,6 +641,24 @@
                 </div>
             </div>
         </header>
+
+        <!-- Section 0: Current Things (live snapshot visibility) -->
+        <div class="section" id="current-things-section">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                <h2 style="margin:0;">🎯 Current Things</h2>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="color:#8b949e; font-size:13px; white-space:nowrap;">User:</label>
+                    <select id="ct-user-filter" onchange="onCtUserFilterChange()" style="background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">
+                        <option value="">All Users</option>
+                    </select>
+                    <span id="ct-count" style="color:#8b949e; font-size:13px;"></span>
+                </div>
+            </div>
+            <p style="color:#8b949e; font-size:0.9em; margin:8px 0 12px 0;">
+                Live Current Thing snapshots per session (auto-refreshes every 10s). Click a row to expand the full snapshot + history.
+            </p>
+            <div id="current-things-container" class="ct-table-wrap"><div class="loading">Loading…</div></div>
+        </div>
 
         <!-- Section 1: Overhead Analysis (MOST VALUABLE - MOVED TO TOP) -->
         <div class="section">
@@ -599,6 +758,153 @@
             await refreshData();
             setInterval(refreshData, 30000); // Auto-refresh every 30 seconds
             await loadChannels();
+            await refreshCurrentThings();
+            setInterval(refreshCurrentThings, 10000); // Current Things: every 10s
+        }
+
+        // ── Current Things tab ────────────────────────────────────
+        let ctData = [];                  // latest /current-thing/all items
+        let ctUserFilter = '';            // selected user filter
+        let ctExpanded = new Set();       // session_ids with expanded detail
+        let ctHistoryCache = {};          // session_id -> history array
+
+        async function refreshCurrentThings() {
+            try {
+                const resp = await fetch('/current-thing/all');
+                if (!resp.ok) {
+                    document.getElementById('current-things-container').innerHTML =
+                        '<div class="error">Current Thing endpoint unavailable (' + resp.status + ')</div>';
+                    return;
+                }
+                const data = await resp.json();
+                ctData = data.items || [];
+                renderCurrentThings();
+            } catch (e) {
+                console.error('Current Things refresh failed:', e);
+            }
+        }
+
+        function onCtUserFilterChange() {
+            ctUserFilter = document.getElementById('ct-user-filter').value;
+            renderCurrentThings();
+        }
+
+        function ctRelativeTime(epoch) {
+            const secs = Math.max(0, (Date.now() / 1000) - epoch);
+            if (secs < 60) return Math.floor(secs) + 's ago';
+            if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+            if (secs < 86400) return Math.floor(secs / 3600) + 'h ' + Math.floor((secs % 3600) / 60) + 'm ago';
+            return Math.floor(secs / 86400) + 'd ago';
+        }
+
+        function ctShortPane(label) {
+            if (!label) return '(none)';
+            return label.length > 48 ? label.slice(0, 45) + '…' : label;
+        }
+
+        function ctTruncGoal(goal) {
+            if (!goal) return null;
+            return goal.length > 80 ? goal.slice(0, 77) + '…' : goal;
+        }
+
+        function renderCurrentThings() {
+            const container = document.getElementById('current-things-container');
+            if (!container) return;
+
+            // Populate user filter dropdown (preserve selection)
+            const users = [...new Set(ctData.map(i => i.user || 'unknown'))].sort();
+            const sel = document.getElementById('ct-user-filter');
+            const prev = sel.value;
+            sel.innerHTML = '<option value="">All Users</option>' +
+                users.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+            if (users.includes(prev)) sel.value = prev; else { sel.value = ''; ctUserFilter = ''; }
+
+            const items = ctUserFilter
+                ? ctData.filter(i => (i.user || 'unknown') === ctUserFilter)
+                : ctData;
+
+            document.getElementById('ct-count').textContent =
+                items.length + (ctUserFilter ? ' of ' + ctData.length : '') + ' sessions';
+
+            if (!items.length) {
+                container.innerHTML = '<div class="loading">No Current Thing snapshots' +
+                    (ctUserFilter ? ' for ' + escapeHtml(ctUserFilter) : '') + '.</div>';
+                return;
+            }
+
+            let html = '<table class="ct-table"><thead><tr>' +
+                '<th>User</th><th>Pane</th><th>Primary Goal</th><th>Updated</th><th>Agent</th>' +
+                '</tr></thead><tbody>';
+
+            for (const item of items) {
+                const sid = item.session_id;
+                const expanded = ctExpanded.has(sid);
+                const user = item.user || 'unknown';
+                const badgeClass = ['rich','garrett','jeremy','umair'].includes(user.toLowerCase())
+                    ? user.toLowerCase() : (user === 'unknown' ? 'unknown' : '');
+                const goal = ctTruncGoal(item.primary_goal);
+                const fresh = (Date.now() / 1000 - item.updated_at) < 600;
+
+                html += `<tr class="ct-row${expanded ? ' expanded' : ''}" onclick="toggleCtRow('${escapeHtml(sid).replace(/'/g, "\\'")}')">` +
+                    `<td><span class="ct-user-badge ${badgeClass}">${escapeHtml(user)}</span></td>` +
+                    `<td><span class="ct-pane" title="${escapeHtml(item.pane_label || '')}">${escapeHtml(ctShortPane(item.pane_label))}</span></td>` +
+                    `<td>${goal ? '<span class="ct-goal">' + escapeHtml(goal) + '</span>' : '<span class="ct-goal empty">(no goal inferred)</span>'}</td>` +
+                    `<td><span class="ct-time${fresh ? ' fresh' : ''}">${ctRelativeTime(item.updated_at)}</span></td>` +
+                    `<td><span class="ct-agent">${escapeHtml(item.agent_id || '—')}</span></td>` +
+                    '</tr>';
+
+                if (expanded) {
+                    const hist = ctHistoryCache[sid];
+                    let histHtml;
+                    if (hist === undefined) {
+                        histHtml = '<div class="loading">Loading history…</div>';
+                    } else if (!hist.length) {
+                        histHtml = '<div class="loading">No history.</div>';
+                    } else {
+                        histHtml = hist.map(h => {
+                            const g = (h.snapshot && h.snapshot.goals) || {};
+                            return '<div class="ct-history-item">' +
+                                '<span class="ct-history-reason">' + escapeHtml(h.change_reason || '(no reason)') + '</span>' +
+                                ' · <span class="ct-time">' + ctRelativeTime(h.recorded_at) + '</span>' +
+                                '<div style="margin-top:4px; color:#c9d1d9;">' +
+                                escapeHtml(ctTruncGoal(g.primary) || '(no goal)') + '</div>' +
+                                '</div>';
+                        }).join('');
+                    }
+                    html += `<tr class="ct-detail-row"><td colspan="5">` +
+                        '<div class="ct-detail-grid">' +
+                        '<div><div class="ct-detail-h">Full snapshot</div>' +
+                        '<pre class="ct-json">' + escapeHtml(JSON.stringify(item.snapshot, null, 2)) + '</pre></div>' +
+                        '<div><div class="ct-detail-h">History (last 5)</div>' + histHtml +
+                        '<div style="margin-top:8px; font-size:0.8em;"><span class="ct-agent">session: ' +
+                        escapeHtml(sid) + '</span></div></div>' +
+                        '</div></td></tr>';
+                }
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        async function toggleCtRow(sessionId) {
+            if (ctExpanded.has(sessionId)) {
+                ctExpanded.delete(sessionId);
+                renderCurrentThings();
+                return;
+            }
+            ctExpanded.add(sessionId);
+            renderCurrentThings();  // render immediately with loading state
+            if (ctHistoryCache[sessionId] === undefined) {
+                try {
+                    const resp = await fetch('/current-thing/history?session_id=' +
+                        encodeURIComponent(sessionId) + '&limit=5');
+                    const data = resp.ok ? await resp.json() : { history: [] };
+                    ctHistoryCache[sessionId] = data.history || [];
+                } catch (e) {
+                    ctHistoryCache[sessionId] = [];
+                }
+                renderCurrentThings();
+            }
         }
 
         // ── Channel selector ────────────────────────────────────────────
