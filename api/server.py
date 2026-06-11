@@ -633,12 +633,65 @@ def get_current_thing_history(session_id: str, limit: int = 20):
     return {"history": history, "count": len(history)}
 
 
+# ── Current Things dashboard helpers (2026-06-11) ──────────────────────────
+_SESSION_USER_RE = re.compile(r"^agent:jarvis-([a-z0-9_]+):", re.IGNORECASE)
+
+
+def _derive_user_from_session_id(session_id: str) -> Optional[str]:
+    """Best-effort user derivation from session-id pattern agent:jarvis-<user>:...
+
+    Display-layer only — never written back to snapshots. Exists because the
+    snapshot generator (api/current_thing.py:_heuristic_user_from_namespace,
+    called at current_thing.py:365) fails to resolve identity.user for some
+    sessions (notably jarvis-garrett dashboard panes) when channel_label is
+    missing or not an mg-private:<user> namespace tag.
+    """
+    m = _SESSION_USER_RE.match(session_id or "")
+    return m.group(1).lower() if m else None
+
+
+# Cache for multigraph pane-name lookup: (mtime, {sessionKey: (label, archived)})
+_mg_pane_cache: tuple = (None, {})
+_MG_STATE_PATH = Path.home() / ".sybilclaw" / "multigraph-state.json"
+
+
+def _mg_pane_map() -> dict:
+    """Read-only sessionKey -> (label, archived) map from multigraph-state.json.
+
+    Cached by file mtime (the file is ~14MB; don't re-parse every poll).
+    Best-effort: any failure returns the last good (or empty) map.
+    """
+    global _mg_pane_cache
+    try:
+        mtime = _MG_STATE_PATH.stat().st_mtime
+    except OSError:
+        return _mg_pane_cache[1]
+    if _mg_pane_cache[0] == mtime:
+        return _mg_pane_cache[1]
+    try:
+        with open(_MG_STATE_PATH) as f:
+            state = json.load(f)
+        mapping = {}
+        for pane in state.get("panes", []):
+            sk = pane.get("sessionKey")
+            if sk:
+                mapping[sk] = (pane.get("label") or "", bool(pane.get("archived")))
+        _mg_pane_cache = (mtime, mapping)
+    except Exception:
+        pass  # keep last good cache
+    return _mg_pane_cache[1]
+
+
 @app.get("/current-thing/all", response_model=dict)
 def list_all_current_things():
     """List ALL current-thing snapshots (read-only, dashboard visibility tab).
 
     Added 2026-06-11 for the dashboard 'Current Things' tab. Reads the
     current_thing_snapshots table directly — no writes, no side effects.
+    2026-06-11 v2: derives user from session-id when identity.user is
+    missing/unknown (user_derived flag), and resolves friendly pane names
+    from multigraph-state.json (pane_name / pane_archived). Display-layer
+    only — raw snapshot JSON is returned untouched.
     """
     if not _ct_enabled():
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
@@ -660,10 +713,24 @@ def list_all_current_things():
                 snap = {}
             identity = snap.get("identity") or {}
             goals = snap.get("goals") or {}
+            sid = r["session_id"]
+            # User: prefer declared identity; derive from session id if unknown
+            user = identity.get("user") or "unknown"
+            user_derived = False
+            if user == "unknown":
+                derived = _derive_user_from_session_id(sid)
+                if derived:
+                    user = derived
+                    user_derived = True
+            # Pane name: resolve friendly label from multigraph state
+            pane_info = _mg_pane_map().get(sid)
             items.append({
-                "session_id": r["session_id"],
+                "session_id": sid,
                 "pane_label": snap.get("pane_label", ""),
-                "user": identity.get("user", "unknown"),
+                "pane_name": pane_info[0] if pane_info else None,
+                "pane_archived": pane_info[1] if pane_info else False,
+                "user": user,
+                "user_derived": user_derived,
                 "agent_id": identity.get("agent_id", ""),
                 "primary_goal": goals.get("primary"),
                 "updated_at": r["updated_at"],

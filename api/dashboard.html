@@ -450,6 +450,47 @@
             color: #8b949e;
         }
 
+        /* ── Tab bar ── */
+        .tab-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            gap: 4px;
+            background: #0d1117;
+            border-bottom: 1px solid #30363d;
+            padding: 8px 0 0 0;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            color: #8b949e;
+            font-size: 0.95em;
+            font-weight: 600;
+            padding: 10px 18px;
+            cursor: pointer;
+            transition: color 0.15s, background 0.15s;
+        }
+
+        .tab-btn:hover {
+            color: #c9d1d9;
+            background: #161b2280;
+        }
+
+        .tab-btn.active {
+            color: #58a6ff;
+            background: #161b22;
+            border-color: #30363d;
+            border-bottom: 2px solid #58a6ff;
+        }
+
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
         /* ── Current Things tab ── */
         .ct-table {
             width: 100%;
@@ -466,6 +507,37 @@
             padding: 8px 10px;
             border-bottom: 1px solid #30363d;
             white-space: nowrap;
+        }
+
+        .ct-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .ct-table th.sortable:hover { color: #c9d1d9; }
+        .ct-table th.sorted { color: #58a6ff; }
+
+        .ct-derived {
+            color: #d29922;
+            cursor: help;
+            font-weight: 700;
+        }
+
+        .ct-archived-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 0.7em;
+            font-weight: 600;
+            background: #21262d;
+            color: #6e7681;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .ct-pane-name {
+            color: #e3b341;
+            font-weight: 600;
         }
 
         .ct-table td {
@@ -642,6 +714,14 @@
             </div>
         </header>
 
+        <!-- Tab bar (2026-06-11: real show/hide tabs) -->
+        <nav class="tab-bar" id="tab-bar">
+            <button class="tab-btn active" data-tab="metrics" onclick="switchTab('metrics')">📊 Metrics</button>
+            <button class="tab-btn" data-tab="current-things" onclick="switchTab('current-things')">🎯 Current Things</button>
+        </nav>
+
+        <!-- TAB: Current Things -->
+        <div class="tab-pane" id="tab-current-things">
         <!-- Section 0: Current Things (live snapshot visibility) -->
         <div class="section" id="current-things-section">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
@@ -659,7 +739,10 @@
             </p>
             <div id="current-things-container" class="ct-table-wrap"><div class="loading">Loading…</div></div>
         </div>
+        </div><!-- /tab-current-things -->
 
+        <!-- TAB: Metrics (everything that existed before) -->
+        <div class="tab-pane active" id="tab-metrics">
         <!-- Section 1: Overhead Analysis (MOST VALUABLE - MOVED TO TOP) -->
         <div class="section">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
@@ -738,6 +821,7 @@
 
             <div id="preview-results" style="margin-top: 20px;"></div>
         </div>
+        </div><!-- /tab-metrics -->
     </div>
 
     <script>
@@ -763,10 +847,64 @@
         }
 
         // ── Current Things tab ────────────────────────────────────
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.tab === name));
+            document.querySelectorAll('.tab-pane').forEach(p =>
+                p.classList.toggle('active', p.id === 'tab-' + name));
+            try { localStorage.setItem('cg-dashboard-tab', name); } catch (e) {}
+            if (name === 'metrics') {
+                // Charts created/updated while hidden can have zero size — nudge them
+                requestAnimationFrame(() => {
+                    Object.values(charts).forEach(c => { try { c.resize(); } catch (e) {} });
+                });
+            }
+        }
+
+        // Restore last tab on load
+        try {
+            const savedTab = localStorage.getItem('cg-dashboard-tab');
+            if (savedTab === 'current-things') switchTab(savedTab);
+        } catch (e) {}
+
         let ctData = [];                  // latest /current-thing/all items
         let ctUserFilter = '';            // selected user filter
         let ctExpanded = new Set();       // session_ids with expanded detail
         let ctHistoryCache = {};          // session_id -> history array
+        let ctSortKey = 'updated';        // 'user' | 'pane' | 'updated'
+        let ctSortDir = 'desc';           // 'asc' | 'desc'
+
+        function ctPaneDisplay(item) {
+            // Friendly pane name when resolvable, else the raw label/UUID
+            return item.pane_name || item.pane_label || '';
+        }
+
+        function ctSetSort(key) {
+            if (ctSortKey === key) {
+                ctSortDir = ctSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                ctSortKey = key;
+                ctSortDir = key === 'updated' ? 'desc' : 'asc';
+            }
+            renderCurrentThings();
+        }
+
+        function ctSorted(items) {
+            const dir = ctSortDir === 'asc' ? 1 : -1;
+            return [...items].sort((a, b) => {
+                let va, vb;
+                if (ctSortKey === 'user') {
+                    va = (a.user || '').toLowerCase(); vb = (b.user || '').toLowerCase();
+                } else if (ctSortKey === 'pane') {
+                    va = ctPaneDisplay(a).toLowerCase(); vb = ctPaneDisplay(b).toLowerCase();
+                } else {
+                    va = a.updated_at || 0; vb = b.updated_at || 0;
+                }
+                if (va < vb) return -1 * dir;
+                if (va > vb) return 1 * dir;
+                return 0;
+            });
+        }
 
         async function refreshCurrentThings() {
             try {
@@ -832,11 +970,17 @@
                 return;
             }
 
+            const arrow = ctSortDir === 'asc' ? ' ▲' : ' ▼';
+            const th = (key, label) =>
+                `<th class="sortable${ctSortKey === key ? ' sorted' : ''}" onclick="ctSetSort('${key}')">` +
+                label + (ctSortKey === key ? arrow : '') + '</th>';
+
             let html = '<table class="ct-table"><thead><tr>' +
-                '<th>User</th><th>Pane</th><th>Primary Goal</th><th>Updated</th><th>Agent</th>' +
+                th('user', 'User') + th('pane', 'Pane') + '<th>Primary Goal</th>' +
+                th('updated', 'Updated') + '<th>Agent</th>' +
                 '</tr></thead><tbody>';
 
-            for (const item of items) {
+            for (const item of ctSorted(items)) {
                 const sid = item.session_id;
                 const expanded = ctExpanded.has(sid);
                 const user = item.user || 'unknown';
@@ -844,10 +988,18 @@
                     ? user.toLowerCase() : (user === 'unknown' ? 'unknown' : '');
                 const goal = ctTruncGoal(item.primary_goal);
                 const fresh = (Date.now() / 1000 - item.updated_at) < 600;
+                const derivedMark = item.user_derived
+                    ? '<span class="ct-derived" title="User derived from session id (identity.user was unknown)">*</span>'
+                    : '';
+                const paneDisp = ctPaneDisplay(item);
+                const paneCls = item.pane_name ? 'ct-pane ct-pane-name' : 'ct-pane';
+                const archived = item.pane_archived
+                    ? '<span class="ct-archived-badge" title="Pane is archived in Multigraph">archived</span>'
+                    : '';
 
                 html += `<tr class="ct-row${expanded ? ' expanded' : ''}" onclick="toggleCtRow('${escapeHtml(sid).replace(/'/g, "\\'")}')">` +
-                    `<td><span class="ct-user-badge ${badgeClass}">${escapeHtml(user)}</span></td>` +
-                    `<td><span class="ct-pane" title="${escapeHtml(item.pane_label || '')}">${escapeHtml(ctShortPane(item.pane_label))}</span></td>` +
+                    `<td><span class="ct-user-badge ${badgeClass}">${escapeHtml(user)}${derivedMark}</span></td>` +
+                    `<td><span class="${paneCls}" title="${escapeHtml(item.pane_label || '')}">${escapeHtml(ctShortPane(paneDisp))}</span>${archived}</td>` +
                     `<td>${goal ? '<span class="ct-goal">' + escapeHtml(goal) + '</span>' : '<span class="ct-goal empty">(no goal inferred)</span>'}</td>` +
                     `<td><span class="ct-time${fresh ? ' fresh' : ''}">${ctRelativeTime(item.updated_at)}</span></td>` +
                     `<td><span class="ct-agent">${escapeHtml(item.agent_id || '—')}</span></td>` +
