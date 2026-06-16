@@ -526,6 +526,7 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
                     ],
                     current_primary_goal=snap.goals.primary if snap else None,
                     current_active=snap.goals.active if snap else [],
+                    current_changed_at=getattr(snap.goals, "changed_at", 0.0) if snap else 0.0,
                 )
             except Exception as _ct_err:
                 # Never let Current Thing errors break /assemble
@@ -613,11 +614,30 @@ class CurrentThingPatchRequest(BaseModel):
 class CurrentThingClearRequest(BaseModel):
     field: str  # "goals" | "context.reply_language" | "experimental_blocks"
 
+def _resolve_session_id(session_id: str) -> str:
+    """Normalise session_id through the SubchannelResolver.
+
+    Handles the common name-vs-UUID mismatch: an agent may write a snapshot
+    under its full structured key (e.g. ``agent:jarvis-rich:dashboard:abc123``)
+    but then query with just the UUID fragment ``abc123``, or vice-versa.  The
+    resolver maps every known alias to the canonical form so all current_thing
+    endpoints always find the right row regardless of which form the caller
+    uses.
+    """
+    if not session_id:
+        return session_id
+    canonical = _subchannel_resolver.resolve(session_id)
+    if canonical != session_id:
+        print(f"[current_thing] session_id resolved: {session_id!r} → {canonical!r}", flush=True)
+    return canonical
+
+
 @app.get("/current-thing", response_model=dict)
 def get_current_thing(session_id: str):
     """Return the current snapshot for a session."""
     if not _ct_enabled():
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    session_id = _resolve_session_id(session_id)
     snap = _ct_get(session_id)
     if snap is None:
         raise HTTPException(status_code=404, detail=f"No snapshot for session {session_id!r}")
@@ -631,6 +651,7 @@ def update_current_thing(session_id: str, body: CurrentThingPatchRequest):
     """Apply a user-driven patch to the snapshot."""
     if not _ct_enabled():
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    session_id = _resolve_session_id(session_id)
     ok, err = _ct_patch(session_id, body.patch, agent_id=body.agent_id)
     if not ok:
         raise HTTPException(status_code=400, detail=err)
@@ -642,6 +663,7 @@ def clear_current_thing_field(session_id: str, body: CurrentThingClearRequest):
     """Revert a user-locked field back to LLM/heuristic management."""
     if not _ct_enabled():
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    session_id = _resolve_session_id(session_id)
     ok, err = _ct_clear(session_id, body.field)
     if not ok:
         raise HTTPException(status_code=400, detail=err)
@@ -652,6 +674,7 @@ def get_current_thing_history(session_id: str, limit: int = 20):
     """Return drift audit history for a session."""
     if not _ct_enabled():
         raise HTTPException(status_code=503, detail="Current Thing feature not enabled")
+    session_id = _resolve_session_id(session_id)
     history = _ct_history(session_id, limit=limit)
     return {"history": history, "count": len(history)}
 

@@ -107,8 +107,12 @@ def _get_db_path() -> Path:
                                str(Path.home() / ".tag-context" / "store.db")))
 
 def _open_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_get_db_path()), check_same_thread=False)
+    # timeout + busy_timeout are mandatory: this DB is shared with the main
+    # MessageStore (WAL mode, busy_timeout=30000). Without these, any write
+    # during live ingest traffic raises OperationalError('database is locked').
+    conn = sqlite3.connect(str(_get_db_path()), check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 def ensure_tables() -> None:
@@ -162,6 +166,13 @@ class CTGoals:
     confidence: float = 0.0
     locked_by_user: bool = False
     watcher_status: str = "idle"       # "idle" | "running" | "offline" | "timeout" | "quality_fail"
+    # changed_at (2026-06-15, de-anchor fix #4): epoch ts of the last GENUINE
+    # primary-goal change. Distinct from the snapshot's per-turn updated_at,
+    # which is re-stamped on every heuristic-refresh and so always looks
+    # "fresh". This is the staleness clock for the goal_watcher staleness
+    # ceiling. Backward-compat: missing/0.0 means "unknown" and is treated as
+    # eligible for the staleness check (i.e. as if maximally stale).
+    changed_at: float = 0.0
 
 @dataclass
 class CTNeighbors:
@@ -413,9 +424,22 @@ def render_markdown(snap: CurrentThingSnapshot, token_budget: int = CURRENT_THIN
     core = header + identity_block + lang_block + date_block
 
     # Goal blocks
+    # Staleness guard (2026-06-09): low-confidence goals render as tentative
+    # so a stale/decayed goal can't masquerade as authoritative direction.
+    tentative = (
+        snap.goals.confidence < 0.5
+        and not snap.goals.locked_by_user
+        and snap.goals.source != "user"
+    )
     goal_primary = ""
     if snap.goals.primary:
-        goal_primary = f"\n**Primary goal:** {snap.goals.primary}.\n"
+        if tentative:
+            goal_primary = (
+                f"\n**Primary goal (tentative — may be stale, verify with user):** "
+                f"{snap.goals.primary}.\n"
+            )
+        else:
+            goal_primary = f"\n**Primary goal:** {snap.goals.primary}.\n"
 
     goal_active = ""
     if snap.goals.active:
@@ -558,6 +582,14 @@ def update_snapshot_goals(
     if snap.goals.locked_by_user:
         return  # User has locked goals; watcher cannot overwrite
     if primary is not None:
+        # Track changed_at only on a GENUINE primary change (2026-06-15 fix #4).
+        # A re-stamp of the same text (heuristic-refresh / re-derived identical
+        # goal) must NOT reset the staleness clock, or every goal looks fresh
+        # forever. Normalize whitespace/case so cosmetic diffs don't count.
+        def _norm(s: Optional[str]) -> str:
+            return (s or "").strip().lower()
+        if _norm(primary) != _norm(snap.goals.primary):
+            snap.goals.changed_at = time.time()
         snap.goals.primary = primary
     if active is not None:
         snap.goals.active = active
@@ -589,7 +621,16 @@ def apply_user_patch(
     """
     snap = load_snapshot(session_id)
     if snap is None:
-        return False, "No snapshot found for session"
+        # Bootstrap a minimal snapshot so user-driven /thing set works even
+        # before the first /assemble call has created one heuristically.
+        from datetime import datetime, timezone
+        snap = CurrentThingSnapshot()
+        snap.session_id = session_id
+        snap.computed_at = datetime.now(timezone.utc).isoformat()
+        snap.goals.source = "user"
+        # Derive pane_label from UUID fragment if present
+        parts = session_id.split(":")
+        snap.pane_label = parts[-1] if parts else session_id
 
     for key, value in patch.items():
         if key == "context.reply_language":
@@ -597,7 +638,10 @@ def apply_user_patch(
         elif key == "context.reply_language_locked":
             snap.context.reply_language_locked = bool(value)
         elif key == "goals.primary":
-            snap.goals.primary = str(value) if value else None
+            _new_primary = str(value) if value else None
+            if (_new_primary or "").strip().lower() != (snap.goals.primary or "").strip().lower():
+                snap.goals.changed_at = time.time()
+            snap.goals.primary = _new_primary
             snap.goals.source = "user"
             snap.goals.locked_by_user = True
         elif key == "goals.active":
@@ -626,6 +670,8 @@ def clear_snapshot_field(session_id: str, field_name: str) -> tuple[bool, str]:
     if snap is None:
         return False, "No snapshot found"
     if field_name == "goals":
+        if snap.goals.primary is not None:
+            snap.goals.changed_at = time.time()
         snap.goals.locked_by_user = False
         snap.goals.primary = None
         snap.goals.active = []
