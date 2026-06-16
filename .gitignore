@@ -28,3 +28,5 @@ data/store.db-wal
 data/doc_indexer.log
 data/doc_graph.db-shm
 data/doc_graph.db-wal
+*.bak
+*.bak.*
