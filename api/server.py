@@ -30,6 +30,7 @@ from api.current_thing import (
     CURRENT_THING_TOKEN_BUDGET as _CT_BUDGET,
 )
 from api.goal_watcher import start_watcher as _ct_start_watcher, notify_new_turn as _ct_notify
+from api.subchannel_resolver import get_resolver as _get_subchannel_resolver
 import pickle
 import os
 import json
@@ -147,6 +148,8 @@ quality_agent = QualityAgent()
 # Build ensemble with FixedTagger + baseline in "fixed" mode (production mode)
 ensemble = build_ensemble(mode="fixed", quality_agent=quality_agent)
 pin_manager = StickyPinManager()
+# Subchannel resolver: normalises UUID / slug / label variants to canonical form
+_subchannel_resolver = _get_subchannel_resolver(store._conn())
 
 # Summarization configuration
 SUMMARIZE_THRESHOLD = int(os.getenv("SUMMARIZE_THRESHOLD", "2000"))
@@ -282,6 +285,25 @@ def ingest(request: IngestRequest):
             for tag in tags:
                 registry.record_hit(tag)
         token_count = len(clean_user.split()) + len(clean_assistant.split())
+        # Resolve subchannel_label to canonical form (UUID preferred).
+        # This prevents the same pane being tagged as UUID in some messages
+        # and as slug/label in others, which breaks recency retrieval and
+        # causes the goal watcher to see empty recent_turns.
+        _raw_sub = request.subchannel_label
+        _canon_sub = _subchannel_resolver.resolve(_raw_sub) if _raw_sub else _raw_sub
+        if _raw_sub and _raw_sub != _canon_sub:
+            # Register the slug → UUID mapping for future fast lookup
+            _subchannel_resolver.register(_canon_sub, [_raw_sub])
+        # If the session_id contains a UUID fragment, also register it as an
+        # alias for the subchannel so goal_watcher queries using session_id
+        # resolve to the same canonical as subchannel queries.
+        if _canon_sub and request.session_id:
+            _sid_parts = request.session_id.split(":")
+            for _part in _sid_parts:
+                if len(_part) > 8 and "-" in _part:
+                    _subchannel_resolver.register(_canon_sub, [_part])
+                    break
+
         message = Message(
             id=message_id,
             session_id=request.session_id,
@@ -294,7 +316,7 @@ def ingest(request: IngestRequest):
             external_id=request.external_id,
             is_automated=is_automated,
             channel_label=request.channel_label,
-            subchannel_label=request.subchannel_label,
+            subchannel_label=_canon_sub,
         )
         store.add_message(message)
 
@@ -397,14 +419,15 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             print(f"[assemble] coerced scope user->session for dashboard pane session_id={request.session_id!r}", flush=True)
             requested_scope = "session"
 
-        # One-line received-shape log (jarvis-rich 2026-05-07).
-        # Compact: just enough to verify the plugin is wiring session_id +
-        # channel_label + scope correctly across all client paths. Keep this on
-        # for a few days to monitor; remove or downgrade to debug-level once
-        # confidence is established.
-        sid = request.session_id or "-"
-        sid_tail = sid.split(":")[-1][:12] if sid != "-" else "-"
-        print(f"[assemble] scope={requested_scope} sid=...{sid_tail} ch={request.channel_label or '-'}", flush=True)
+        # Resolve subchannel_label to canonical form at query time.
+        # Mirrors the ingest-time resolution so recency queries always hit the
+        # same rows regardless of whether the client sent UUID, slug, or label.
+        _raw_sub_q = request.subchannel_label
+        _canon_sub_q = _subchannel_resolver.resolve(_raw_sub_q) if _raw_sub_q else _raw_sub_q
+        if _raw_sub_q and _raw_sub_q != _canon_sub_q:
+            print(f"[assemble] subchannel resolved: {_raw_sub_q!r} → {_canon_sub_q!r}", flush=True)
+        # Patch request in-place so all downstream uses see canonical form
+        request = request.model_copy(update={"subchannel_label": _canon_sub_q})
 
         # ---- Recency floor (2026-05-28 incident fix) -----------------------
         # Reserve a portion of the token budget for the most-recent N rows in
@@ -1035,7 +1058,6 @@ def get_tags(since: Optional[str] = Query(None)):
 @app.post("/compare", response_model=CompareResponse)
 def compare(request: TagRequest):
     try:
-        print(f"[compare-debug] channel_label={request.channel_label!r} scope={request.scope!r}", flush=True)
         features = extract_features(request.user_text, request.assistant_text)
         inferred_tags = ensemble.assign(features, request.user_text, request.assistant_text).tags
 
