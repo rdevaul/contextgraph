@@ -373,24 +373,34 @@ class MessageStore:
             return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
 
     def get_recent_by_channel(self, n: int, channel_label: str,
-                              include_automated: bool = False) -> List[Message]:
+                              include_automated: bool = False,
+                              exclude_dashboard: bool = False) -> List[Message]:
         """Return the N most recent messages for a specific channel_label, newest first.
 
         Used by the assembler's recency layer when scope='user' to prevent
         cross-user content bleed into per-user retrieval.
+
+        exclude_dashboard : bool
+            If True, exclude Multigraph pane sessions (session_id containing
+            ':dashboard:'). Pane work stays pane-scoped unless explicitly
+            bridged (assemble-time bridging, Current Thing Q1 decision).
+            Prevents pane content from leaking into main-channel context.
         """
         conn = self._conn()
-        if include_automated:
-            query = (
-                "SELECT * FROM messages WHERE channel_label = ? "
-                "ORDER BY timestamp DESC LIMIT ?"
+        clauses = ["channel_label = ?"]
+        params: list = [channel_label]
+        if not include_automated:
+            clauses.append("is_automated = 0")
+        if exclude_dashboard:
+            clauses.append(
+                "(session_id IS NULL OR session_id NOT LIKE '%:dashboard:%')"
             )
-        else:
-            query = (
-                "SELECT * FROM messages WHERE channel_label = ? AND is_automated = 0 "
-                "ORDER BY timestamp DESC LIMIT ?"
-            )
-        rows = conn.execute(query, (channel_label, n)).fetchall()
+        query = (
+            f"SELECT * FROM messages WHERE {' AND '.join(clauses)} "
+            f"ORDER BY timestamp DESC LIMIT ?"
+        )
+        params.append(n)
+        rows = conn.execute(query, tuple(params)).fetchall()
         ids = [r["id"] for r in rows]
         tags_map = self._fetch_tags_bulk(conn, ids)
         return [self._row_to_message(r, tags_map[r["id"]]) for r in rows]
@@ -402,12 +412,17 @@ class MessageStore:
         include_automated: bool = False,
         channel_label: Optional[str] = None,
         session_id: Optional[str] = None,
+        exclude_dashboard: bool = False,
     ) -> List[Message]:
         """Return messages carrying `tag`, optionally scoped to channel or session.
 
         Either, neither, or both filters may be set. When both are set,
         BOTH must match (AND semantics) — a session belongs to a single
         channel, so this is a no-op narrowing in practice.
+
+        exclude_dashboard : bool
+            If True, exclude Multigraph pane sessions (session_id containing
+            ':dashboard:') from results. See get_recent_by_channel.
         """
         conn = self._conn()
         clauses = ["t.tag = ?"]
@@ -420,6 +435,10 @@ class MessageStore:
         if session_id is not None:
             clauses.append("m.session_id = ?")
             params.append(session_id)
+        if exclude_dashboard:
+            clauses.append(
+                "(m.session_id IS NULL OR m.session_id NOT LIKE '%:dashboard:%')"
+            )
         params.append(limit)
         where = " AND ".join(clauses)
         query = (

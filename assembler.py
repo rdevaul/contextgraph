@@ -187,7 +187,12 @@ class ContextAssembler:
         elif scope == "session" and session_id:
             recency_source = self.store.get_recent_by_session(10, session_id)
         elif scope in ("user",) and channel_label:
-            recency_source = self.store.get_recent_by_channel(10, channel_label)
+            # Exclude Multigraph pane (:dashboard:) sessions from user-scope
+            # recency. Pane work is pane-scoped; deliberate cross-scope pulls
+            # go through assemble-time bridging (Current Thing Q1), not
+            # accidental recency vacuum. 2026-06-09.
+            recency_source = self.store.get_recent_by_channel(
+                10, channel_label, exclude_dashboard=True)
         else:
             # scope == 'global', or scope param without the matching key set
             recency_source = self.store.get_recent(10)
@@ -286,7 +291,11 @@ class ContextAssembler:
         elif scope in ("user", "subchannel") and channel_label:
             # For scope=subchannel, topic layer is intentionally channel-wide (not subchannel-narrow).
             # This preserves cross-thread knowledge retrieval — the core invariant of the design.
+            # scope='user' additionally excludes :dashboard: pane sessions —
+            # pane content must not leak into main-channel assembly (2026-06-09).
             tag_filter_kwargs = {"channel_label": channel_label}
+            if scope == "user":
+                tag_filter_kwargs["exclude_dashboard"] = True
         else:
             tag_filter_kwargs = {}
 
