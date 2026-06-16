@@ -303,13 +303,36 @@ function removeOrphanedToolPairs(
 
 // ── Message text extraction ────────────────────────────────────────────────
 
+// Strip model reasoning/thinking blocks before any text enters the corpus.
+// Reasoning text frequently contains first-person identity assertions
+// ("I am Jarvis-rich…") and scratchpad noise that pollute retrieval and can
+// drag agent-identity confusion across panes. We sanitize at the single
+// extraction chokepoint so EVERY ingest path (ingest/afterTurn/bootstrap)
+// is covered. (2026-06-15)
+function stripReasoning(text: string): string {
+  if (!text) return text;
+  let out = text;
+  // 1. Well-formed paired blocks: <think>…</think>, <thinking>…</thinking>,
+  //    <reasoning>…</reasoning>, and ⟨think⟩-style unicode variants. Non-greedy,
+  //    dot-matches-newline, case-insensitive.
+  out = out.replace(/<\s*(think|thinking|reasoning)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+  // 2. Dangling open tag with no close (truncated reasoning dumps): strip from
+  //    the opening tag to end-of-string.
+  out = out.replace(/<\s*(think|thinking|reasoning)\s*>[\s\S]*$/gi, "");
+  // 3. Orphan close tag with no open (block began before this message slice):
+  //    strip from start-of-string up to and including the close tag.
+  out = out.replace(/^[\s\S]*?<\s*\/\s*(think|thinking|reasoning)\s*>/gi, "");
+  return out.trim();
+}
+
 function extractTextFromMessage(msg: AgentMessage): string | null {
   // Only ingest user and assistant text messages — skip tool calls/results
   if (msg.role !== "user" && msg.role !== "assistant") {
     return null;
   }
   if (typeof (msg as { content?: unknown }).content === "string") {
-    return (msg as { content: string }).content;
+    const cleaned = stripReasoning((msg as { content: string }).content);
+    return cleaned.length > 0 ? cleaned : null;
   }
   const content = (msg as { content?: unknown[] }).content;
   if (Array.isArray(content)) {
@@ -325,7 +348,9 @@ function extractTextFromMessage(msg: AgentMessage): string | null {
         texts.push((block as { text: string }).text);
       }
     }
-    return texts.length > 0 ? texts.join("\n") : null;
+    if (texts.length === 0) return null;
+    const cleaned = stripReasoning(texts.join("\n"));
+    return cleaned.length > 0 ? cleaned : null;
   }
   return null;
 }
