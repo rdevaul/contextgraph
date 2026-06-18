@@ -505,18 +505,28 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             and request.session_id
         ):
             try:
+                # Resolve through the SubchannelResolver so the /assemble
+                # injection path keys snapshots on the SAME canonical id as the
+                # /current_thing GET/PATCH endpoints (which already resolve via
+                # _resolve_session_id). Before this fix the injection path used
+                # the raw request.session_id, so a pane arriving under a UUID
+                # fragment / slug / label alias would read+write a DIFFERENT
+                # snapshot row than the one a user's `/thing set` (PATCH) wrote
+                # to. That desync caused cross-pane Current Thing contamination
+                # and "my /thing set didn't take" symptoms. (2026-06-17)
+                _ct_session_id = _resolve_session_id(request.session_id)
                 _pane_label = request.subchannel_label or request.session_id or ""
                 _agent_id = request.agent_id or ""
                 current_thing_block, current_thing_tokens = _ct_render(
-                    session_id=request.session_id,
+                    session_id=_ct_session_id,
                     pane_label=_pane_label,
                     channel_label=request.channel_label,
                     agent_id=_agent_id,
                 )
                 # Notify the goal watcher (non-blocking)
-                snap = _ct_load_snapshot(request.session_id)
+                snap = _ct_load_snapshot(_ct_session_id)
                 _ct_notify(
-                    session_id=request.session_id,
+                    session_id=_ct_session_id,
                     pane_label=_pane_label,
                     channel_label=request.channel_label,
                     user_text=request.user_text,
