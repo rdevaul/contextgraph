@@ -419,6 +419,23 @@ def assemble(request: AssembleRequest, http_request: Request = None):  # type: i
             print(f"[assemble] coerced scope user->session for dashboard pane session_id={request.session_id!r}", flush=True)
             requested_scope = "session"
 
+        # Strict-default for concrete direct sessions (jarvis-rich 2026-06-29
+        # cross-session-leak fix): a ':direct:' session (e.g. a 1:1 Discord/DM
+        # chat) should NOT vacuum cross-session 'user'-scope recency by default,
+        # which lets a stale prior conversation semantically collide with the
+        # current one. Coerce to scope='session' UNLESS the caller EXPLICITLY
+        # asked for a broad scope. Pydantic's default is 'user', so we cannot
+        # distinguish an explicit 'user' from the default; therefore the opt-in
+        # for deliberate cross-session recall on a direct session is
+        # scope='global' (or 'subchannel'), not 'user'.
+        elif (
+            request.session_id
+            and ":direct:" in request.session_id
+            and request.scope == "user"  # still at default; not deliberately broadened
+        ):
+            print(f"[assemble] coerced scope user->session for direct session session_id={request.session_id!r}", flush=True)
+            requested_scope = "session"
+
         # Resolve subchannel_label to canonical form at query time.
         # Mirrors the ingest-time resolution so recency queries always hit the
         # same rows regardless of whether the client sent UUID, slug, or label.
