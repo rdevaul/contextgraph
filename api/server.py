@@ -1122,7 +1122,7 @@ def compare(request: TagRequest):
             scope=request.scope,
         )
         graph_assembly = {
-            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in graph_assembly_result.messages],
+            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp, "channel_label": msg.channel_label} for msg in graph_assembly_result.messages],
             "total_tokens": graph_assembly_result.total_tokens,
             "sticky_count": graph_assembly_result.sticky_count,
             "recency_count": graph_assembly_result.recency_count,
@@ -1832,7 +1832,7 @@ def compare_channel(channel_label: str, request: TagRequest):
             channel_label=channel_label
         )
         graph_assembly = {
-            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp} for msg in graph_assembly_result.messages],
+            "messages": [{"id": msg.id, "user_text": msg.user_text, "assistant_text": msg.assistant_text, "tags": msg.tags, "timestamp": msg.timestamp, "channel_label": msg.channel_label} for msg in graph_assembly_result.messages],
             "total_tokens": graph_assembly_result.total_tokens,
             "sticky_count": graph_assembly_result.sticky_count,
             "recency_count": graph_assembly_result.recency_count,
@@ -1951,5 +1951,57 @@ def _create_backup_db() -> Optional[Path]:
         return None
 
 if __name__ == "__main__":
+    # NOTE: Production runs via launchd (ai.dml.contextgraph.plist) as:
+    #   python3 -m uvicorn api.server:app --host 0.0.0.0 --port 8302
+    # That path never executes this block. This block only runs on a manual
+    # `python api/server.py` invocation -- historically a footgun, because it
+    # used to hardcode 127.0.0.1:8302 and would silently shadow the launchd
+    # service while inheriting a shell env that lacks CONTEXT_CURRENT_THING_ENABLED,
+    # causing every localhost caller to get 503s. (2026-07-01 incident.)
+    #
+    # Hardening:
+    #  - Default to a dedicated DEV port (8399), never prod 8302.
+    #  - Refuse to bind 8302 unless CONTEXTGRAPH_ALLOW_PROD_PORT=1 is set.
+    #  - Loudly warn if CONTEXT_CURRENT_THING_ENABLED is not set.
+    import os
+    import sys
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8302)
+
+    PROD_PORT = 8302
+    DEFAULT_DEV_PORT = 8399
+
+    allow_prod = os.environ.get("CONTEXTGRAPH_ALLOW_PROD_PORT") == "1"
+    try:
+        port = int(os.environ.get("CONTEXTGRAPH_DEV_PORT", str(DEFAULT_DEV_PORT)))
+    except ValueError:
+        print(
+            f"[server] CONTEXTGRAPH_DEV_PORT is not a valid int; "
+            f"falling back to {DEFAULT_DEV_PORT}",
+            file=sys.stderr,
+        )
+        port = DEFAULT_DEV_PORT
+
+    if port == PROD_PORT and not allow_prod:
+        print(
+            f"[server] REFUSING to bind prod port {PROD_PORT} from a manual run.\n"
+            f"[server] The production server is managed by launchd "
+            f"(ai.dml.contextgraph.plist).\n"
+            f"[server] Running this file directly on {PROD_PORT} would shadow it "
+            f"and likely serve 503s (missing env flags).\n"
+            f"[server] Using dev port {DEFAULT_DEV_PORT} instead. To force prod "
+            f"port anyway, set CONTEXTGRAPH_ALLOW_PROD_PORT=1.",
+            file=sys.stderr,
+        )
+        port = DEFAULT_DEV_PORT
+
+    if os.environ.get("CONTEXT_CURRENT_THING_ENABLED") != "1":
+        print(
+            "[server] WARNING: CONTEXT_CURRENT_THING_ENABLED is not set to '1'.\n"
+            "[server] The /current-thing endpoints will return 503. If you are "
+            "debugging Current Thing, export CONTEXT_CURRENT_THING_ENABLED=1 "
+            "before running.",
+            file=sys.stderr,
+        )
+
+    print(f"[server] Starting DEV instance on 127.0.0.1:{port}", file=sys.stderr)
+    uvicorn.run(app, host="127.0.0.1", port=port)
