@@ -59,34 +59,95 @@ def _fallback_truncation(msg: Message) -> str:
 
 
 def _summarize_anthropic(msg: Message) -> str:
-    """Summarize using Anthropic Claude API."""
+    """Summarize using Anthropic Claude API.
+
+    Connection hygiene (2026-07-21 incident fix):
+      The original implementation built an anthropic.Anthropic() client per
+      call but relied on the SDK's default pooled httpx transport with
+      keepalive ON and NO explicit timeout. In a 20-day-lived daemon that
+      pool accumulated a dead keepalive socket -> every call raised
+      "Connection error" -> summaries silently landed empty for ~2 weeks
+      (Jul 7 onward). This mirrors the Ollama wedge fixed in May, which was
+      only ever patched on the Ollama path, never the (now-default) anthropic
+      path.
+
+      Fixes applied here, matching _summarize_ollama:
+        - Fresh client per call with an explicit non-keepalive httpx transport
+          (Connection: close, no pooled sockets to go stale).
+        - Explicit connect/read timeouts so a wedged socket fails fast.
+        - SDK-level retries disabled (max_retries=0); the circuit breaker
+          owns retry/backoff policy.
+        - Shared circuit breaker: after N consecutive failures, bypass the
+          API for the cooldown window and serve fallback truncation directly.
+    """
     try:
         import anthropic
+        import httpx
     except ImportError:
-        logger.error("anthropic package not installed; install with: pip install anthropic>=0.40")
+        logger.error("anthropic/httpx not installed; install with: pip install 'anthropic>=0.40' httpx")
         return _fallback_truncation(msg)
 
     if not ANTHROPIC_API_KEY:
         logger.error("ANTHROPIC_API_KEY not set; cannot use anthropic backend")
         return _fallback_truncation(msg)
 
+    # Circuit breaker: skip the API entirely during a sustained outage so we
+    # don't absorb N * connect-timeout of latency per message.
+    if not _summarizer_breaker.allow():
+        logger.debug(
+            "Summarizer circuit breaker open; using fallback truncation for msg.id=%s",
+            getattr(msg, "id", "?"),
+        )
+        return _fallback_truncation(msg)
+
+    prompt_text = SUMMARIZATION_PROMPT.format(
+        user_text=msg.user_text,
+        assistant_text=msg.assistant_text,
+    )
+
+    # Short-lived, non-pooled HTTP transport. keepalive_expiry=0 + explicit
+    # Connection: close means no socket survives the call to go stale.
+    timeout = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
+    limits = httpx.Limits(
+        max_connections=1,
+        max_keepalive_connections=0,
+        keepalive_expiry=0.0,
+    )
+    http_client = httpx.Client(
+        timeout=timeout,
+        limits=limits,
+        headers={"Connection": "close"},
+    )
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt_text = SUMMARIZATION_PROMPT.format(
-            user_text=msg.user_text,
-            assistant_text=msg.assistant_text
+        client = anthropic.Anthropic(
+            api_key=ANTHROPIC_API_KEY,
+            http_client=http_client,
+            max_retries=0,
         )
         response = client.messages.create(
             model=SUMMARIZER_MODEL,
             max_tokens=600,
-            messages=[{"role": "user", "content": prompt_text}]
+            messages=[{"role": "user", "content": prompt_text}],
         )
-        # Extract text from response
         summary = response.content[0].text if response.content else ""
-        return summary.strip() if summary else _fallback_truncation(msg)
+        if summary and summary.strip():
+            _summarizer_breaker.record_success()
+            return summary.strip()
+        logger.warning(
+            "Anthropic returned empty content for msg.id=%s; treating as failure",
+            getattr(msg, "id", "?"),
+        )
+        _summarizer_breaker.record_failure()
+        return _fallback_truncation(msg)
     except Exception as e:
         logger.error(f"Anthropic summarization failed: {e}")
+        _summarizer_breaker.record_failure()
         return _fallback_truncation(msg)
+    finally:
+        try:
+            http_client.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -174,10 +235,17 @@ class _OllamaCircuitBreaker:
             self._tripped_at = None
 
 
-_ollama_breaker = _OllamaCircuitBreaker(
+# Shared circuit breaker for BOTH summarizer backends (2026-07-21). The class
+# was originally Ollama-specific but is backend-agnostic; a single breaker now
+# protects whichever backend is active (anthropic default, or ollama).
+_summarizer_breaker = _OllamaCircuitBreaker(
     threshold=OLLAMA_BREAKER_THRESHOLD,
     cooldown_sec=OLLAMA_BREAKER_COOLDOWN_SEC,
 )
+
+# Backward-compatible alias: existing Ollama path + any tests reference
+# `_ollama_breaker`. Keep it pointing at the same shared instance.
+_ollama_breaker = _summarizer_breaker
 
 
 def _summarize_ollama(msg: Message) -> str:

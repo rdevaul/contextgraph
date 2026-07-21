@@ -87,8 +87,16 @@ class SubchannelResolver:
     one has been registered; otherwise it's the first form seen.
     """
 
-    def __init__(self, conn: sqlite3.Connection) -> None:
-        self._conn = conn
+    def __init__(self, conn) -> None:
+        # `conn` may be a raw sqlite3.Connection (legacy / tests) OR a zero-arg
+        # callable returning the current thread's connection (production, under
+        # the thread-local store introduced 2026-07-21). Wrapping a factory
+        # avoids reusing one captured connection across FastAPI threads, which
+        # was the source of "cannot commit - no transaction is active".
+        if callable(conn):
+            self._conn_fn = conn
+        else:
+            self._conn_fn = lambda c=conn: c
         self._lock = threading.RLock()
         # alias → canonical
         self._map: dict[str, str] = {}
@@ -189,24 +197,26 @@ class SubchannelResolver:
             self._map[slug] = canonical
         if persist:
             try:
-                self._conn.execute(
+                conn = self._conn_fn()
+                conn.execute(
                     "INSERT OR REPLACE INTO subchannel_aliases (alias, canonical) VALUES (?,?)",
                     (alias, canonical),
                 )
-                self._conn.commit()
+                conn.commit()
             except Exception as exc:
                 logger.warning(f"[resolver] DB write failed for {alias!r}: {exc}")
 
     def _ensure_schema(self) -> None:
         try:
-            self._conn.executescript(DDL)
-            self._conn.commit()
+            conn = self._conn_fn()
+            conn.executescript(DDL)
+            conn.commit()
         except Exception as exc:
             logger.warning(f"[resolver] schema init failed: {exc}")
 
     def _load_from_db(self) -> None:
         try:
-            rows = self._conn.execute(
+            rows = self._conn_fn().execute(
                 "SELECT alias, canonical FROM subchannel_aliases"
             ).fetchall()
             for alias, canonical in rows:
@@ -227,8 +237,13 @@ _instances: dict[int, SubchannelResolver] = {}
 _instances_lock = threading.Lock()
 
 
-def get_resolver(conn: sqlite3.Connection) -> SubchannelResolver:
-    """Return a cached SubchannelResolver for the given connection."""
+def get_resolver(conn) -> SubchannelResolver:
+    """Return a cached SubchannelResolver for the given connection or factory.
+
+    `conn` may be a raw connection (legacy/tests) or a zero-arg callable that
+    returns the current thread's connection (production). Keyed on the object
+    identity of whichever was passed, so one resolver is shared per store.
+    """
     key = id(conn)
     with _instances_lock:
         if key not in _instances:

@@ -149,7 +149,11 @@ quality_agent = QualityAgent()
 ensemble = build_ensemble(mode="fixed", quality_agent=quality_agent)
 pin_manager = StickyPinManager()
 # Subchannel resolver: normalises UUID / slug / label variants to canonical form
-_subchannel_resolver = _get_subchannel_resolver(store._conn())
+# Pass the store's connection accessor (a bound method) as a *factory*, not a
+# captured connection. Under the thread-local store (2026-07-21 txn-race fix)
+# each call returns the calling thread's own connection, so resolver writes no
+# longer commit on a foreign thread's connection.
+_subchannel_resolver = _get_subchannel_resolver(store._conn)
 
 # Summarization configuration
 SUMMARIZE_THRESHOLD = int(os.getenv("SUMMARIZE_THRESHOLD", "2000"))
@@ -163,16 +167,46 @@ SUMMARIZE_THRESHOLD = int(os.getenv("SUMMARIZE_THRESHOLD", "2000"))
 RECENCY_FLOOR_DEFAULT = int(os.getenv("RECENCY_FLOOR", "5"))
 
 def _background_summarize(message_id: str) -> None:
-    """Background task to generate and store a summary for a message."""
+    """Background task to generate and store a summary for a message.
+
+    Post-write verification (2026-07-21 guardrail): after writing, we re-read
+    the summary and detect the silent-failure signature (empty summary, or a
+    summary equal to the fallback-truncation output). This is the foot-gun
+    flagged in the May 22 + May 28 audits: the summarizer swallows API errors,
+    returns fallback text, the write 'succeeds', and the daemon logs nothing
+    while retrieval quality quietly rots. We now log it at WARNING with a
+    distinct marker so heartbeat/log scans can alert on a sustained rate.
+    """
+    import logging
     try:
         msg = store.get_by_id(message_id)
         if msg is None:
             return
         summary = summarize_message(msg)
         store.set_summary(message_id, summary)
+
+        # Verify the write landed and is a real summary, not silent fallback.
+        stored = store.get_summary(message_id)
+        if not stored or not stored.strip():
+            logging.warning(
+                "SUMMARY_EMPTY_AFTER_WRITE message_id=%s "
+                "(summarizer returned empty; retrieval will degrade)",
+                message_id,
+            )
+        else:
+            try:
+                from summarizer import _fallback_truncation
+                if stored.strip() == _fallback_truncation(msg).strip():
+                    logging.warning(
+                        "SUMMARY_FALLBACK_USED message_id=%s "
+                        "(summarizer backend failed; served truncation — "
+                        "check summarizer.py logs / circuit breaker)",
+                        message_id,
+                    )
+            except Exception:
+                pass
     except Exception as e:
         # Log but don't propagate — this is fire-and-forget
-        import logging
         logging.error(f"Background summarization failed for {message_id}: {e}")
 
 # Register baseline tagger for fallback/ensemble voting

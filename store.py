@@ -74,22 +74,35 @@ class MessageStore:
         path = Path(db_path) if db_path else self.DEFAULT_DB
         path.parent.mkdir(parents=True, exist_ok=True)
         self._db_path = str(path)
+        # Process-wide write lock. Reentrant so nested write helpers are safe.
+        # Readers do NOT take this lock (WAL gives them a consistent snapshot).
         self._lock = threading.RLock()
-        self._conn_obj: Optional[sqlite3.Connection] = None
+        # Thread-local connection registry. Each thread lazily opens its own
+        # connection on first use; connections live for the thread's lifetime.
+        self._local = threading.local()
         self._init_db()
 
     # ── connection ────────────────────────────────────────────────────────────
 
     def _conn(self) -> sqlite3.Connection:
-        """Return the shared SQLite connection (thread-safe via _lock)."""
-        if self._conn_obj is None:
+        """Return this thread's own SQLite connection, opening it on first use.
+
+        Thread-local by design: sharing one connection across FastAPI's
+        threadpool caused cross-thread transaction interleaving and the
+        "cannot commit - no transaction is active" failures (2026-07-21).
+        Each thread owns an independent connection; WAL mode lets them read
+        concurrently and the process write lock serialises writers.
+        """
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
             conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=30)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=30000")
-            self._conn_obj = conn
-        return self._conn_obj
+            conn.execute("PRAGMA synchronous=NORMAL")
+            self._local.conn = conn
+        return conn
 
     # ── migrations ────────────────────────────────────────────────────────────
 
