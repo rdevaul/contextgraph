@@ -1688,6 +1688,64 @@ def admin_retag(req: RetagRequest):
     }
 
 
+@app.post("/admin/backfill-summaries", response_model=dict)
+def admin_backfill_summaries(threshold: int = 400, batch: int = 5,
+                             since: float = 0.0, until: float = 4102444800.0):
+    """Backfill summaries for empty-summary rows, INSIDE the daemon process.
+
+    2026-07-21: running a second writer process (backfill_*.py) against the
+    same SQLite file caused a `database is locked` storm — two uncoordinated
+    writers contend on the WAL write-lock. Doing the work here means it goes
+    through the daemon's OWN store/write path and serialises internally with
+    ingest/summarize/current_thing, so there's no cross-process contention.
+
+    Processes at most `batch` rows per call (keep it small, e.g. 5). Drive it
+    from an external paced loop: call repeatedly with a sleep between calls
+    until remaining == 0. Idempotent and resumable — only touches rows whose
+    summary is still empty and whose token_count exceeds `threshold`.
+    """
+    import logging as _logging
+    from summarizer import _fallback_truncation
+
+    conn = store._conn()
+    rows = conn.execute(
+        "SELECT id FROM messages "
+        "WHERE (summary IS NULL OR summary='') AND token_count > ? "
+        "AND timestamp BETWEEN ? AND ? ORDER BY timestamp ASC LIMIT ?",
+        (threshold, since, until, batch),
+    ).fetchall()
+
+    ok = 0
+    fail = 0
+    for (mid,) in rows:
+        msg = store.get_by_id(mid)
+        if msg is None:
+            continue
+        cur = store.get_summary(mid)
+        if cur and cur.strip():
+            continue  # got summarized concurrently
+        try:
+            summary = summarize_message(msg)
+            if summary and summary.strip() and \
+                    summary.strip() != _fallback_truncation(msg).strip():
+                store.set_summary(mid, summary.strip())
+                ok += 1
+            else:
+                fail += 1
+        except Exception as e:
+            _logging.warning(f"[backfill] failed id={mid}: {e}")
+            fail += 1
+
+    remaining = conn.execute(
+        "SELECT COUNT(*) FROM messages "
+        "WHERE (summary IS NULL OR summary='') AND token_count > ? "
+        "AND timestamp BETWEEN ? AND ?",
+        (threshold, since, until),
+    ).fetchone()[0]
+
+    return {"ok": ok, "fail": fail, "processed": len(rows), "remaining": remaining}
+
+
 # ── Per-Channel Endpoints ─────────────────────────────────────────────────────
 
 @app.get("/graph-status", response_model=dict)
