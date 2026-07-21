@@ -119,15 +119,24 @@ def _summarize_anthropic(msg: Message) -> str:
         headers={"Connection": "close"},
     )
     try:
+        # IMPORTANT (2026-07-21): the anthropic SDK does NOT inherit the read
+        # timeout from a custom http_client for its request-level timeout —
+        # that param defaults to NOT_GIVEN, so a hung TLS read can block
+        # forever (observed: backfill wedged in _ssl__SSLSocket_read with no
+        # timeout firing despite the httpx client's read=30). We MUST set
+        # timeout= on the SDK itself, and again per-request (belt & braces),
+        # so a stalled socket actually raises.
         client = anthropic.Anthropic(
             api_key=ANTHROPIC_API_KEY,
             http_client=http_client,
             max_retries=0,
+            timeout=timeout,
         )
         response = client.messages.create(
             model=SUMMARIZER_MODEL,
             max_tokens=600,
             messages=[{"role": "user", "content": prompt_text}],
+            timeout=timeout,
         )
         summary = response.content[0].text if response.content else ""
         if summary and summary.strip():
