@@ -79,6 +79,25 @@ def _is_retrieval_turn(entry: dict) -> bool:
 
 app = FastAPI()
 
+# TEMP DIAGNOSTIC (2026-07-22): log which endpoint + fields cause 422s so we can
+# identify the misbehaving /ingest caller. Logs field locs + types only (no
+# message content) plus which keys the body DID contain. REMOVE after diagnosis.
+from fastapi.exceptions import RequestValidationError as _RVE
+from fastapi.responses import JSONResponse as _JSONResp
+
+@app.exception_handler(_RVE)
+async def _log_422(request, exc):
+    import logging as _lg
+    try:
+        errs = [{"loc": e.get("loc"), "type": e.get("type")} for e in exc.errors()]
+        body = exc.errors()[0].get("input") if exc.errors() else None
+        keys = sorted(body.keys()) if isinstance(body, dict) else type(body).__name__
+        _lg.warning("VALIDATION_422 path=%s errors=%s body_keys=%s",
+                    request.url.path, errs, keys)
+    except Exception:
+        pass
+    return _JSONResp(status_code=422, content={"detail": exc.errors()})
+
 class TagRequest(BaseModel):
     user_text: str
     assistant_text: str
@@ -180,6 +199,13 @@ def _background_summarize(message_id: str) -> None:
     import logging
     try:
         msg = store.get_by_id(message_id)
+        # Release the implicit read snapshot before the slow (~5s) summarize,
+        # so the later set_summary write can acquire/upgrade cleanly instead of
+        # being wedged on a stale snapshot (2026-07-22 lock-starvation fix).
+        try:
+            store._conn().commit()
+        except Exception:
+            pass
         if msg is None:
             return
         summary = summarize_message(msg)
@@ -1714,18 +1740,29 @@ def admin_backfill_summaries(threshold: int = 400, batch: int = 5,
         "AND timestamp BETWEEN ? AND ? ORDER BY timestamp ASC LIMIT ?",
         (threshold, since, until, batch),
     ).fetchall()
+    # CRITICAL (2026-07-22): release the implicit read transaction opened by
+    # the SELECT above BEFORE the slow (~5s) summarize + write. Python sqlite3
+    # in deferred mode keeps a read snapshot open on this connection until a
+    # commit; if we hold it across summarization, the later set_summary write
+    # can't upgrade the snapshot once other writers have committed -> a
+    # SQLITE_BUSY that busy_timeout can't resolve (observed: every row fails
+    # 'database is locked', endpoint hangs the full busy window). Committing
+    # here drops the snapshot so each write starts fresh.
+    conn.commit()
 
     ok = 0
     fail = 0
     for (mid,) in rows:
         msg = store.get_by_id(mid)
+        conn.commit()  # release read snapshot from get_by_id
         if msg is None:
             continue
         cur = store.get_summary(mid)
+        conn.commit()  # release read snapshot from get_summary
         if cur and cur.strip():
             continue  # got summarized concurrently
         try:
-            summary = summarize_message(msg)
+            summary = summarize_message(msg)  # slow (~5s); NO open txn held now
             if summary and summary.strip() and \
                     summary.strip() != _fallback_truncation(msg).strip():
                 store.set_summary(mid, summary.strip())
