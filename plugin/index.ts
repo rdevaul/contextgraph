@@ -719,12 +719,15 @@ function createContextGraphEngine(logger: OpenClawPluginApi["logger"]): ContextE
       };
     },
 
-    async compact({ sessionId }): Promise<CompactResult> {
+    async compact(params): Promise<CompactResult> {
       // Infer user label from session ID for per-user graph mode check
-      const userLabel = inferChannelLabel(undefined, sessionId, logger);
+      const userLabel = inferChannelLabel(undefined, params.sessionId, logger);
 
       if (!readGraphMode(userLabel)) {
-        return { ok: true, compacted: false, reason: "graph-off-defer-to-legacy" };
+        // Graph mode off: run the stock runtime compaction, as the legacy engine does.
+        // Returning compacted:false here would skip compaction entirely.
+        const { delegateCompactionToRuntime } = await import("openclaw/plugin-sdk");
+        return await delegateCompactionToRuntime(params);
       }
       // Graph engine uses semantic retrieval — no compaction needed
       return { ok: true, compacted: false, reason: "graph-engine-no-compaction" };
